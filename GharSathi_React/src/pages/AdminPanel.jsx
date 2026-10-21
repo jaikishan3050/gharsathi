@@ -43,6 +43,9 @@ export default function AdminPanel() {
     updateSubservicePrice,
     addService,
     addSubservice,
+    deleteService,
+    deleteSubservice,
+    purgeProductionData,
     updateComplaint,
     resetDemoData,
     requestAdminWithdrawal,
@@ -51,6 +54,12 @@ export default function AdminPanel() {
 
   const [active, setActive] = useState('overview');
   const [notice, setNotice] = useState('');
+
+  // Delete & Purge Modal States
+  const [deleteServiceModal, setDeleteServiceModal] = useState(null);
+  const [deleteSubserviceModal, setDeleteSubserviceModal] = useState(null);
+  const [purgeConfirmModal, setPurgeConfirmModal] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
 
   // Admin Search & Filter States
   const [adminBookingSearch, setAdminBookingSearch] = useState('');
@@ -427,18 +436,18 @@ export default function AdminPanel() {
           {adminAuthError && <div className="warning-notice">{adminAuthError}</div>}
 
           <form onSubmit={handleAdminLogin} className="admin-login-form">
-            <Field label="Admin Email ID *" hint="Default: admin@gharsathi.com">
+            <Field label="Admin Email ID *" hint="Production: prabhat@gharsathi.in">
               <input
                 required
-                type="email"
+                type="text"
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@gharsathi.com"
+                placeholder="prabhat@gharsathi.in"
                 autoFocus
               />
             </Field>
 
-            <Field label="Password *" hint="Default: admin123">
+            <Field label="Password *" hint="Production: Gharsathi@2026">
               <input
                 required
                 type="password"
@@ -453,8 +462,8 @@ export default function AdminPanel() {
             </button>
 
             <div className="demo-credentials-box">
-              <small>Demo Credentials:</small>
-              <p>Email: <strong>admin@gharsathi.com</strong> · Password: <strong>admin123</strong></p>
+              <small>Production Super Admin Access:</small>
+              <p>Email: <strong>prabhat@gharsathi.in</strong> · Password: <strong>Gharsathi@2026</strong></p>
             </div>
           </form>
 
@@ -1494,6 +1503,15 @@ export default function AdminPanel() {
                         >
                           Save
                         </button>
+                        <button
+                          type="button"
+                          className="button button-small button-danger"
+                          style={{ marginLeft: '6px' }}
+                          onClick={() => setDeleteServiceModal(service)}
+                          title={`Permanently delete ${service.name}`}
+                        >
+                          🗑️ Delete
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1585,7 +1603,8 @@ export default function AdminPanel() {
                             <tr>
                               <th>Subservice Name & Description</th>
                               <th style={{ width: '110px' }}>Est. Time</th>
-                              <th style={{ width: '220px' }}>Current Price & Rate Update (₹)</th>
+                              <th style={{ width: '200px' }}>Current Price & Rate Update (₹)</th>
+                              <th style={{ width: '90px', textAlign: 'center' }}>Action</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1628,6 +1647,16 @@ export default function AdminPanel() {
                                         {isModified ? 'Update' : 'Save'}
                                       </button>
                                     </div>
+                                  </td>
+                                  <td style={{ textAlign: 'center' }}>
+                                    <button
+                                      type="button"
+                                      className="button button-small button-danger"
+                                      onClick={() => setDeleteSubserviceModal({ serviceId: service.id, serviceName: service.name, sub })}
+                                      title={`Delete package ${sub.name}`}
+                                    >
+                                      🗑️
+                                    </button>
                                   </td>
                                 </tr>
                               );
@@ -2018,6 +2047,24 @@ export default function AdminPanel() {
               Reset Demo Data
             </button>
           </div>
+
+          <div className="danger-zone" style={{ marginTop: '16px', border: '1.5px solid #ef4444', background: '#fff5f5' }}>
+            <div>
+              <strong style={{ color: '#b91c1c' }}>Purge All Mock Data (Production Clean Mode)</strong>
+              <p style={{ color: '#7f1d1d' }}>
+                Completely wipes all mock bookings, dummy technicians, test complaints, and simulated transactions from the live PostgreSQL database.
+                Retains official service catalogue and provisions primary superuser (prabhat@gharsathi.in).
+              </p>
+            </div>
+            <button
+              type="button"
+              className="button button-danger"
+              style={{ background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+              onClick={() => setPurgeConfirmModal(true)}
+            >
+              Purge Database Now ⚠️
+            </button>
+          </div>
         </>
       )}
     </PanelShell>
@@ -2057,6 +2104,125 @@ export default function AdminPanel() {
         onClose={() => setServiceModalOpen(false)}
         onAddService={addService}
       />
+    )}
+
+    {/* Delete Service Confirmation Modal */}
+    {deleteServiceModal && (
+      <div className="modal-overlay" onClick={() => setDeleteServiceModal(null)}>
+        <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+          <div className="modal-header">
+            <div>
+              <p className="eyebrow eyebrow-gold">CONFIRM SERVICE DELETION</p>
+              <h3 style={{ color: '#dc2626' }}>Delete {deleteServiceModal.name}?</h3>
+            </div>
+            <button type="button" className="modal-close-btn" onClick={() => setDeleteServiceModal(null)}>✕</button>
+          </div>
+          <div style={{ padding: '20px 24px' }}>
+            <p style={{ fontSize: '13px', lineHeight: '1.5', color: '#4b6354' }}>
+              Are you sure you want to permanently delete <strong>{deleteServiceModal.name}</strong> from the catalogue?
+              All associated subservice packages ({deleteServiceModal.subcategories?.length || 0}) will also be removed.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+              <button type="button" className="button button-outline" onClick={() => setDeleteServiceModal(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={async () => {
+                  await deleteService(deleteServiceModal.id);
+                  setDeleteServiceModal(null);
+                  setNotice(`Service "${deleteServiceModal.name}" deleted.`);
+                }}
+              >
+                Confirm Delete Service 🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Delete Subservice Confirmation Modal */}
+    {deleteSubserviceModal && (
+      <div className="modal-overlay" onClick={() => setDeleteSubserviceModal(null)}>
+        <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+          <div className="modal-header">
+            <div>
+              <p className="eyebrow eyebrow-gold">CONFIRM PACKAGE DELETION</p>
+              <h3 style={{ color: '#dc2626' }}>Delete {deleteSubserviceModal.sub.name}?</h3>
+            </div>
+            <button type="button" className="modal-close-btn" onClick={() => setDeleteSubserviceModal(null)}>✕</button>
+          </div>
+          <div style={{ padding: '20px 24px' }}>
+            <p style={{ fontSize: '13px', lineHeight: '1.5', color: '#4b6354' }}>
+              Remove package <strong>{deleteSubserviceModal.sub.name}</strong> (₹{deleteSubserviceModal.sub.price}) from <strong>{deleteSubserviceModal.serviceName}</strong>?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+              <button type="button" className="button button-outline" onClick={() => setDeleteSubserviceModal(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={async () => {
+                  await deleteSubservice(deleteSubserviceModal.serviceId, deleteSubserviceModal.sub.id);
+                  setDeleteSubserviceModal(null);
+                  setNotice(`Package "${deleteSubserviceModal.sub.name}" deleted.`);
+                }}
+              >
+                Confirm Delete Package 🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Production Purge Confirmation Modal */}
+    {purgeConfirmModal && (
+      <div className="modal-overlay" onClick={() => !isPurging && setPurgeConfirmModal(false)}>
+        <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+          <div className="modal-header">
+            <div>
+              <p className="eyebrow eyebrow-gold">PRODUCTION PURGE</p>
+              <h3 style={{ color: '#dc2626' }}>Wipe All Mock/Demo Data?</h3>
+            </div>
+            <button type="button" className="modal-close-btn" disabled={isPurging} onClick={() => setPurgeConfirmModal(false)}>✕</button>
+          </div>
+          <div style={{ padding: '20px 24px' }}>
+            <p style={{ fontSize: '13px', lineHeight: '1.5', color: '#4b6354' }}>
+              This will completely wipe all test bookings, mock complaints, dummy technicians, and simulated wallet entries from the live database.
+            </p>
+            <p style={{ fontSize: '12px', background: '#fef2f2', padding: '10px 14px', borderRadius: '8px', color: '#991b1b', border: '1px solid #fecaca' }}>
+              ⚠️ The primary superuser <strong>prabhat@gharsathi.in</strong> (Gharsathi@2026) and official services catalog will remain intact.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+              <button type="button" className="button button-outline" disabled={isPurging} onClick={() => setPurgeConfirmModal(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={async () => {
+                  setIsPurging(true);
+                  try {
+                    await purgeProductionData();
+                    setNotice('Production database purged cleanly. 0 demo records remain.');
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setIsPurging(false);
+                    setPurgeConfirmModal(false);
+                  }
+                }}
+              >
+                {isPurging ? 'Purging Live Database…' : 'Yes, Purge Database Now ⚠️'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     )}
   </>
   );

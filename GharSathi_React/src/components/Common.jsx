@@ -564,8 +564,6 @@ export function InvoiceModal({ booking, onClose }) {
     window.print();
   };
 
-  const techFee = Math.max(0, Number(booking.price || 0) - 149);
-
   return (
     <div className="modal-overlay invoice-modal-overlay" onClick={onClose}>
       <div className="modal-card invoice-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -678,23 +676,12 @@ export function InvoiceModal({ booking, onClose }) {
                 <td>
                   <strong>{booking.serviceName}</strong>
                   {booking.subcategoryName && (
-                    <div className="item-sub-desc">Variant: {booking.subcategoryName}</div>
+                    <div className="item-sub-desc">Package: {booking.subcategoryName}</div>
                   )}
-                  <div className="item-note">Doorstep professional labor, diagnostics & verified repair</div>
+                  <div className="item-note">Doorstep professional service, verified diagnostics & 30-day warranty</div>
                 </td>
-                <td>Appliance & Home Repair</td>
-                <td style={{ textAlign: 'right' }}>₹{techFee.toLocaleString('en-IN')}</td>
-              </tr>
-              <tr>
-                <td>2</td>
-                <td>
-                  <strong>Ghar Sathi Safety & Facilitation Platform Fee</strong>
-                  <div className="item-note">
-                    Fixed Fair ₹149 platform charge (No percentage cut · Includes GPS dispatch & 30-day warranty)
-                  </div>
-                </td>
-                <td>Platform Facilitation</td>
-                <td style={{ textAlign: 'right' }}>₹149</td>
+                <td>Home Services</td>
+                <td style={{ textAlign: 'right' }}>₹{Number(booking.price || 0).toLocaleString('en-IN')}</td>
               </tr>
             </tbody>
             <tfoot>

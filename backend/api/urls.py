@@ -9,6 +9,7 @@ from .views import (
     AdminAnalyticsView,
     ResetDemoView,
     SetupSuperuserView,
+    PurgeProductionDataView,
     RazorpayCreateOrderView,
     RazorpayVerifyPaymentView,
     CustomerProfileViewSet,
@@ -36,4 +37,5 @@ urlpatterns = [
     path('admin/reset-demo/', ResetDemoView.as_view(), name='admin-reset-demo'),
     path('admin/setup-superuser/', SetupSuperuserView.as_view(), name='admin-setup-superuser'),
     path('auth/setup-admin/', SetupSuperuserView.as_view(), name='auth-setup-admin'),
+    path('admin/purge-production-data/', PurgeProductionDataView.as_view(), name='admin-purge-production-data'),
 ]

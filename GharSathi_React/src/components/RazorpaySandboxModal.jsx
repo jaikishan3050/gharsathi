@@ -17,8 +17,6 @@ export default function RazorpaySandboxModal({
   if (!isOpen || !orderData) return null;
 
   const totalAmount = orderData.amount_in_rupees || (orderData.amount ? orderData.amount / 100 : 0);
-  const platformFee = orderData.platform_fee || 149;
-  const serviceBasePrice = Math.max(0, totalAmount - platformFee);
   const orderId = orderData.order_id || `order_demo_${Date.now()}`;
 
   const handleSimulatePayment = (isSuccess = true) => {
@@ -71,20 +69,10 @@ export default function RazorpaySandboxModal({
           </button>
         </div>
 
-        {/* Amount Breakdown Strip */}
-        <div className="rzp-amount-summary-strip">
-          <div className="rzp-amount-item">
-            <span>Service Base</span>
-            <strong>₹{serviceBasePrice.toLocaleString('en-IN')}</strong>
-          </div>
-          <span className="rzp-plus-sign">+</span>
-          <div className="rzp-amount-item">
-            <span>Platform Fee</span>
-            <strong className="rzp-gold-fee">₹{platformFee}</strong>
-          </div>
-          <span className="rzp-equals-sign">=</span>
-          <div className="rzp-amount-total">
-            <span>Payable Amount</span>
+        {/* Amount Summary Strip */}
+        <div className="rzp-amount-summary-strip" style={{ justifyContent: 'center' }}>
+          <div className="rzp-amount-total" style={{ textAlign: 'center' }}>
+            <span>Total Payable Amount</span>
             <h2>₹{totalAmount.toLocaleString('en-IN')}</h2>
           </div>
         </div>

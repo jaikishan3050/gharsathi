@@ -275,6 +275,26 @@ export const api = {
     });
   },
 
+  deleteService: async (serviceId) => {
+    return await apiRequest(`/services/${serviceId}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  deleteSubservice: async (serviceId, subserviceId) => {
+    return await apiRequest(`/services/${serviceId}/delete-subservice/`, {
+      method: 'POST',
+      body: JSON.stringify({ subservice_id: subserviceId }),
+    });
+  },
+
+  purgeProductionData: async () => {
+    return await apiRequest('/admin/purge-production-data/', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
   // Technicians
   getTechnicians: async (params = {}) => {
     const q = new URLSearchParams(params).toString();

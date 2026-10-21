@@ -493,7 +493,7 @@ export default function CustomerPanel() {
               </h2>
               <p>
                 AC, Washing Machine, Refrigerator, RO, Electrician aur Home Deep Cleaning.
-                Verified technicians, live GPS location mapping, aur transparent fixed ₹149 platform commission.
+                Verified technicians, live GPS location mapping, aur transparent upfront pricing.
               </p>
               <div className="hero-button-row">
                 <button
@@ -571,10 +571,10 @@ export default function CustomerPanel() {
           <section className="why-choose-banner-card">
             <div className="why-choose-text">
               <p className="eyebrow eyebrow-gold">WHY GHAR SATHI?</p>
-              <h3>Transparent Fixed ₹149 Commission Guarantee</h3>
+              <h3>Fair Pricing & 100% Quality Guarantee</h3>
               <p>
-                Humare technicians se koi percentage cut nahi liya jata! Har kaam par company ka commission
-                strictly flat ₹149 hai. Isse technicians khush hokar aapke ghar par best quality kaam karte hain.
+                Ghar Sathi par koi hidden charges ya surprise fees nahi hain! Transparent rates, 30-day free warranty,
+                aur certified expert technicians ke sath aapko milti hai behtareen doorstep service.
               </p>
               <div className="why-points-list">
                 <span>✓ 100% Background-Verified Technicians</span>
@@ -1127,7 +1127,7 @@ export default function CustomerPanel() {
                       <strong>Razorpay Sandbox Gateway Active</strong>
                     </div>
                     <p>
-                      Service fee + flat ₹149 platform fee. Clicking proceed will open the Razorpay UPI & Card simulator with 100% instant verification.
+                      Clicking proceed will open the secure Razorpay UPI & Card gateway with 100% instant verification.
                     </p>
                   </div>
                 )}
@@ -1173,7 +1173,7 @@ export default function CustomerPanel() {
                 <div>
                   <span>Final Service Price</span>
                   <strong>₹{currentSubcategory ? currentSubcategory.price : service.price}</strong>
-                  <small>Transparent fixed fee · ₹149 platform commission included</small>
+                  <small>Transparent all-inclusive pricing · Zero hidden charges</small>
                 </div>
                 <button className="button button-gold button-large" type="submit">
                   {form.payment?.includes('Online') ? (

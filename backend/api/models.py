@@ -95,7 +95,7 @@ class Booking(models.Model):
     pincode = models.CharField(max_length=10, blank=True, default='')
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    service = models.ForeignKey(Service, on_delete=models.PROTECT, related_name='bookings')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, null=True, blank=True, related_name='bookings')
     service_name = models.CharField(max_length=120, blank=True, default='')
     subcategory_id = models.CharField(max_length=80, blank=True, default='')
     subcategory_name = models.CharField(max_length=120, blank=True, default='')

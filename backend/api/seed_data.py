@@ -433,20 +433,8 @@ def seed_database():
         processed_at=timezone.now(),
     )
 
-    # 6. Seed / Ensure Default Superuser for Django Admin
-    from django.contrib.auth.models import User
-    admin_user = User.objects.filter(username='admin').first()
-    if not admin_user:
-        User.objects.create_superuser(
-            username='admin',
-            email='admin@gharsathi.in',
-            password='GharSathi@2026'
-        )
-    else:
-        admin_user.set_password('GharSathi@2026')
-        admin_user.is_staff = True
-        admin_user.is_superuser = True
-        admin_user.save()
+    # 6. Provision Production Superusers for Django Admin
+    ensure_production_superuser()
 
     return {
         'services': Service.objects.count(),
@@ -455,4 +443,87 @@ def seed_database():
         'transactions': WalletTransaction.objects.count(),
         'complaints': Complaint.objects.count(),
         'withdrawals': AdminWithdrawal.objects.count(),
+    }
+
+
+def ensure_production_superuser():
+    """Provisions or updates production superuser prabhat@gharsathi.in / Gharsathi@2026."""
+    from django.contrib.auth.models import User
+    prabhat = User.objects.filter(username='prabhat').first() or User.objects.filter(email='prabhat@gharsathi.in').first()
+    if not prabhat:
+        prabhat = User.objects.create_superuser(
+            username='prabhat',
+            email='prabhat@gharsathi.in',
+            password='Gharsathi@2026'
+        )
+    else:
+        prabhat.username = 'prabhat'
+        prabhat.email = 'prabhat@gharsathi.in'
+        prabhat.set_password('Gharsathi@2026')
+        prabhat.is_staff = True
+        prabhat.is_superuser = True
+        prabhat.is_active = True
+        prabhat.save()
+
+    admin_user = User.objects.filter(username='admin').first()
+    if not admin_user:
+        User.objects.create_superuser(
+            username='admin',
+            email='admin@gharsathi.in',
+            password='Gharsathi@2026'
+        )
+    else:
+        admin_user.set_password('Gharsathi@2026')
+        admin_user.is_staff = True
+        admin_user.is_superuser = True
+        admin_user.is_active = True
+        admin_user.save()
+
+
+def purge_database():
+    """
+    Completely purges and wipes all demo/seeded bookings, dummy technicians,
+    mock complaints, demo transactions, and test withdrawals.
+    Preserves official services and provisions production superusers.
+    """
+    from .models import (
+        Service, TechnicianProfile, Booking, WalletTransaction,
+        Complaint, AdminWithdrawal, CustomerProfile, OTPVerification
+    )
+
+    # 1. Purge all transactional, dummy partner, and mock records
+    Complaint.objects.all().delete()
+    Booking.objects.all().delete()
+    AdminWithdrawal.objects.all().delete()
+    WalletTransaction.objects.all().delete()
+    TechnicianProfile.objects.all().delete()
+    CustomerProfile.objects.all().delete()
+    OTPVerification.objects.all().delete()
+
+    # 2. Ensure official base services catalog exists
+    if Service.objects.count() == 0:
+        for s_data in SERVICES_DATA:
+            Service.objects.create(
+                slug=s_data['slug'],
+                name=s_data['name'],
+                category=s_data['category'],
+                base_price=s_data['base_price'],
+                description=s_data['description'],
+                icon=s_data['icon'],
+                image=s_data['image'],
+                subcategories=s_data['subcategories'],
+                is_active=True,
+            )
+
+    # 3. Ensure production superusers
+    ensure_production_superuser()
+
+    return {
+        'services': Service.objects.count(),
+        'technicians': TechnicianProfile.objects.count(),
+        'bookings': Booking.objects.count(),
+        'transactions': WalletTransaction.objects.count(),
+        'complaints': Complaint.objects.count(),
+        'withdrawals': AdminWithdrawal.objects.count(),
+        'customers': CustomerProfile.objects.count(),
     }

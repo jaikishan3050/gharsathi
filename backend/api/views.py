@@ -34,7 +34,7 @@ from .serializers import (
     AdminWithdrawalSerializer,
     CustomerProfileSerializer,
 )
-from .seed_data import seed_database
+from .seed_data import seed_database, purge_database, ensure_production_superuser
 from .services.sms import send_sms_otp
 
 logger = logging.getLogger(__name__)
@@ -164,6 +164,42 @@ class ServiceViewSet(viewsets.ModelViewSet):
         service.subcategories = subs
         service.save()
         return Response(ServiceSerializer(service).data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        service = self.get_object()
+        service_name = service.name
+        service.delete()
+        return Response({
+            'success': True,
+            'message': f"Service '{service_name}' and all associated subservices deleted successfully."
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['delete', 'post'], url_path='delete-subservice')
+    def delete_subservice(self, request, pk=None):
+        service = self.get_object()
+        sub_id = (
+            request.data.get('subservice_id')
+            or request.data.get('subcategoryId')
+            or request.data.get('id')
+            or request.query_params.get('subservice_id')
+            or request.query_params.get('id')
+        )
+        if not sub_id:
+            return Response({'error': 'subservice_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        subs = list(service.subcategories or [])
+        initial_len = len(subs)
+        subs = [s for s in subs if str(s.get('id')) != str(sub_id) and s.get('name') != str(sub_id)]
+
+        if len(subs) < initial_len:
+            service.subcategories = subs
+            service.save()
+            return Response({
+                'success': True,
+                'message': f"Subservice '{sub_id}' deleted successfully from '{service.name}'.",
+                'service': ServiceSerializer(service).data
+            }, status=status.HTTP_200_OK)
+        return Response({'error': f"Subservice '{sub_id}' not found in '{service.name}'"}, status=status.HTTP_404_NOT_FOUND)
 
 
 
@@ -735,7 +771,7 @@ class ResetDemoView(APIView):
 
 
 class SetupSuperuserView(APIView):
-    """Creates or updates the default superuser for Django Admin."""
+    """Creates or updates the production superuser for Django Admin."""
 
     def get(self, request):
         return self._process(request)
@@ -744,43 +780,56 @@ class SetupSuperuserView(APIView):
         return self._process(request)
 
     def _process(self, request):
-        from django.contrib.auth.models import User
         from django.contrib.auth import authenticate
 
         data = request.data if request.method == 'POST' and request.data else request.query_params
-        username = data.get('username') or 'admin'
-        password = data.get('password') or 'GharSathi@2026'
-        email = data.get('email') or 'admin@gharsathi.in'
+        username = data.get('username') or 'prabhat'
+        password = data.get('password') or 'Gharsathi@2026'
+        email = data.get('email') or 'prabhat@gharsathi.in'
 
-        user = User.objects.filter(username=username).first()
-        created = False
-        if not user:
-            user = User.objects.create_superuser(
-                username=username,
-                email=email,
-                password=password
-            )
-            created = True
-        else:
-            user.set_password(password)
-            user.is_staff = True
-            user.is_superuser = True
-            user.is_active = True
-            user.save()
+        ensure_production_superuser()
 
-        auth_check = authenticate(username=username, password=password)
+        auth_username = authenticate(username=username, password=password)
+        auth_email = authenticate(username=email, password=password)
+
         return Response({
             'success': True,
-            'message': f"Superuser '{username}' configured successfully.",
-            'created': created,
-            'auth_verified': auth_check is not None,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'is_staff': user.is_staff,
-                'is_superuser': user.is_superuser,
-                'is_active': user.is_active,
+            'message': f"Production superuser '{username}' ({email}) configured successfully.",
+            'auth_verified_username': auth_username is not None,
+            'auth_verified_email': auth_email is not None,
+            'credentials': {
+                'username': username,
+                'email': email,
+                'login_url': '/admin/',
+            }
+        })
+
+
+class PurgeProductionDataView(APIView):
+    """
+    Completely flushes and wipes all mock/seeded test data (dummy technicians,
+    test bookings, mock complaints, mock transactions) and provisions
+    the production superuser (prabhat@gharsathi.in / Gharsathi@2026).
+    """
+
+    def get(self, request):
+        return self.post(request)
+
+    def post(self, request):
+        counts = purge_database()
+        from django.contrib.auth import authenticate
+        auth_prabhat = authenticate(username='prabhat', password='Gharsathi@2026')
+        auth_email = authenticate(username='prabhat@gharsathi.in', password='Gharsathi@2026')
+
+        return Response({
+            'success': True,
+            'message': 'Ghar Sathi production database completely purged and wiped of all mock/test records.',
+            'remaining_records': counts,
+            'production_superuser': {
+                'username': 'prabhat',
+                'email': 'prabhat@gharsathi.in',
+                'auth_verified_username': auth_prabhat is not None,
+                'auth_verified_email': auth_email is not None,
             }
         })
 

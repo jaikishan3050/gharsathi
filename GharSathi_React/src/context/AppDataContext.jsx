@@ -879,8 +879,13 @@ export function AppDataProvider({ children }) {
 
   // Admin Authentication
   const loginAdmin = useCallback((email, password) => {
-    const cleanEmail = email.trim().toLowerCase();
-    if ((cleanEmail === 'admin@gharsathi.com' || cleanEmail === 'admin') && password === 'admin123') {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPass = (password || '').trim();
+    const isProductionAdmin =
+      (cleanEmail === 'prabhat@gharsathi.in' || cleanEmail === 'prabhat' || cleanEmail === 'admin' || cleanEmail === 'admin@gharsathi.in' || cleanEmail === 'admin@gharsathi.com') &&
+      (cleanPass === 'Gharsathi@2026' || cleanPass === 'GharSathi@2026' || cleanPass === 'admin123');
+
+    if (isProductionAdmin) {
       setIsAdminLoggedIn(true);
       addToast({
         title: 'Super Admin Access Granted 🛡️',
@@ -891,10 +896,10 @@ export function AppDataProvider({ children }) {
     }
     addToast({
       title: 'Admin Login Failed',
-      message: 'Use admin@gharsathi.com / admin123',
+      message: 'Invalid email or password. Use prabhat@gharsathi.in',
       type: 'error',
     });
-    return { success: false, error: 'Invalid admin credentials. Use admin@gharsathi.com / admin123' };
+    return { success: false, error: 'Invalid admin credentials. Please enter the correct email and password.' };
   }, [addToast]);
 
   const logoutAdmin = useCallback(() => {
@@ -1445,6 +1450,89 @@ export function AppDataProvider({ children }) {
     });
   }, [backendStatus, addActivity, addToast]);
 
+  // Delete Service (Admin)
+  const deleteService = useCallback(async (serviceId) => {
+    if (backendStatus === 'live') {
+      try {
+        await api.deleteService(serviceId);
+      } catch (err) {
+        console.warn('Backend deleteService warning:', err);
+      }
+    }
+
+    setData((current) => ({
+      ...current,
+      services: current.services.filter((s) => s.id !== serviceId && s.pk !== serviceId && s.slug !== serviceId),
+      activity: [addActivity(`Deleted service: ${serviceId}`), ...current.activity].slice(0, 50),
+    }));
+
+    addToast({
+      title: 'Service Deleted 🗑️',
+      message: 'Service has been removed from catalogue.',
+      type: 'info',
+    });
+    return { success: true };
+  }, [backendStatus, addActivity, addToast]);
+
+  // Delete Subservice (Admin)
+  const deleteSubservice = useCallback(async (serviceId, subserviceId) => {
+    if (backendStatus === 'live') {
+      try {
+        await api.deleteSubservice(serviceId, subserviceId);
+      } catch (err) {
+        console.warn('Backend deleteSubservice warning:', err);
+      }
+    }
+
+    setData((current) => ({
+      ...current,
+      services: current.services.map((s) => {
+        if (s.id !== serviceId && s.pk !== serviceId && s.slug !== serviceId) return s;
+        return {
+          ...s,
+          subcategories: (s.subcategories || []).filter((sub) => String(sub.id) !== String(subserviceId)),
+        };
+      }),
+      activity: [addActivity(`Deleted package ${subserviceId} from ${serviceId}`), ...current.activity].slice(0, 50),
+    }));
+
+    addToast({
+      title: 'Package Removed 🗑️',
+      message: 'Subservice package has been deleted.',
+      type: 'info',
+    });
+    return { success: true };
+  }, [backendStatus, addActivity, addToast]);
+
+  // Purge all demo/mock data (Admin)
+  const purgeProductionData = useCallback(async () => {
+    let res = null;
+    if (backendStatus === 'live') {
+      try {
+        res = await api.purgeProductionData();
+      } catch (err) {
+        console.warn('Backend purgeProductionData warning:', err);
+      }
+    }
+
+    setData((current) => ({
+      ...current,
+      bookings: [],
+      complaints: [],
+      technicians: [],
+      transactions: [],
+      withdrawals: [],
+      activity: [addActivity('Clean production wipe: All demo and test data purged.'), ...current.activity].slice(0, 50),
+    }));
+
+    addToast({
+      title: 'Clean Production Wipe ✓',
+      message: 'All mock bookings, dummy technicians and test data have been purged.',
+      type: 'success',
+    });
+    return res || { success: true };
+  }, [backendStatus, addActivity, addToast]);
+
   // Complaints
   const addComplaint = useCallback((form) => {
     const complaint = {
@@ -1909,6 +1997,9 @@ export function AppDataProvider({ children }) {
       updateSubservicePrice,
       addService,
       addSubservice,
+      deleteService,
+      deleteSubservice,
+      purgeProductionData,
       addComplaint,
       updateComplaint,
       requestAdminWithdrawal,
@@ -1950,6 +2041,9 @@ export function AppDataProvider({ children }) {
       updateSubservicePrice,
       addService,
       addSubservice,
+      deleteService,
+      deleteSubservice,
+      purgeProductionData,
       addComplaint,
       updateComplaint,
       requestAdminWithdrawal,
