@@ -433,6 +433,21 @@ def seed_database():
         processed_at=timezone.now(),
     )
 
+    # 6. Seed / Ensure Default Superuser for Django Admin
+    from django.contrib.auth.models import User
+    admin_user = User.objects.filter(username='admin').first()
+    if not admin_user:
+        User.objects.create_superuser(
+            username='admin',
+            email='admin@gharsathi.in',
+            password='GharSathi@2026'
+        )
+    else:
+        admin_user.set_password('GharSathi@2026')
+        admin_user.is_staff = True
+        admin_user.is_superuser = True
+        admin_user.save()
+
     return {
         'services': Service.objects.count(),
         'technicians': TechnicianProfile.objects.count(),
