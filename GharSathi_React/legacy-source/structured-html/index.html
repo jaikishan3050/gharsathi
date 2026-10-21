@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/index.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Login | Ghar Sathi</title>
+</head>
+<body>
+<!-- HERO SECTION -->
+<section class="hero">
+<div class="brand">
+<img alt="Ghar Sathi Logo" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+<div>
+<h1>Ghar <span>Sathi</span></h1>
+<p>Har Ghar ka Sathi</p>
+</div>
+</div>
+</section>
+<!-- LOGIN CARD -->
+<main class="login-wrap">
+<section class="login-card">
+<div aria-hidden="true" class="user-icon">
+<img alt="Ghar Sathi Logo" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+</div>
+<h2>Login to Ghar Sathi</h2>
+<p class="subtitle">Enter your details and verify OTP to login</p>
+<form id="loginForm">
+<!-- Full Name -->
+<div class="form-group">
+<label for="fullName">Full Name *</label>
+<input id="fullName" name="fullName" placeholder="Enter your full name" required="" type="text"/>
+</div>
+<!-- Mobile Number & Send OTP -->
+<div class="form-group">
+<label for="phone">Mobile Number *</label>
+<div class="input-with-btn">
+<input id="phone" maxlength="10" name="phone" placeholder="Enter 10-digit mobile number" required="" type="tel"/>
+<button class="otp-send-btn" id="sendOtpBtn" onclick="sendOTP()" type="button">
+                        Send OTP
+                    </button>
+</div>
+<div class="status-msg" id="otpNotice"></div>
+</div>
+<!-- OTP Input & Verify Button (Hidden initially) -->
+<div class="form-group" id="otpGroup" style="display: none;">
+<label for="otpInput">Enter 4-Digit OTP *</label>
+<div class="input-with-btn">
+<input id="otpInput" maxlength="4" placeholder="Enter OTP (Test OTP: 1234)" type="text"/>
+<button class="otp-verify-btn" onclick="verifyOTP()" type="button">
+                        Verify OTP
+                    </button>
+</div>
+<div class="status-msg" id="otpVerifyNotice"></div>
+</div>
+<button class="login-btn" type="submit">
+                Login   →
+            </button>
+</form>
+</section>
+</main>
+<!-- BELOW CONTENT -->
+<section class="below-content">
+<h2>Welcome to Ghar Sathi</h2>
+<p>Book trusted home-service professionals for your home repair and maintenance needs.</p>
+<div class="features">
+<div class="feature">
+<div class="feature-icon">👨‍🔧</div>
+<p>Trusted<br/>Technicians</p>
+</div>
+<div class="feature">
+<div class="feature-icon">🏠</div>
+<p>Home Service<br/>at Your Doorstep</p>
+</div>
+<div class="feature">
+<div class="feature-icon">⚡</div>
+<p>Fast &amp;<br/>Reliable</p>
+</div>
+</div>
+<div class="privacy">
+        🛡️ <strong>Your privacy matters.</strong><br/>
+        Your account details stay secure with Ghar Sathi.
+    </div>
+</section>
+<!-- LOGIN SCRIPT WITH DATABASE INTEGRATION -->
+
+<script src="js/index.js"></script>
+</body>
+</html>

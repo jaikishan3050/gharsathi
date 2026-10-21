@@ -1,0 +1,14 @@
+{
+  "name": "Ghar Sathi Home Services",
+  "short_name": "Ghar Sathi",
+  "description": "Har ghar ke kaam ke liye ek hi saathi.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F4F7F4",
+  "theme_color": "#0B3D2E",
+  "icons": [
+    { "src": "/images/gharsathi-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/images/gharsathi-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

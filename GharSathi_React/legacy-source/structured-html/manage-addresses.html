@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/manage-addresses.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Manage Addresses | Ghar Sathi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans pb-24">
+<!-- Top Header -->
+<header class="bg-[#0B3D2E] text-white p-4 sticky top-0 z-50 shadow-md">
+<div class="max-w-2xl mx-auto flex justify-between items-center">
+<div class="flex items-center gap-3">
+<img alt="Logo" class="h-12 w-auto" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+<div>
+<h1 class="text-xl font-bold">Ghar Sathi</h1>
+<p class="text-xs text-gray-200">Trusted Home Services</p>
+</div>
+</div>
+</div>
+</header>
+<!-- Page Title & Back Bar -->
+<div class="bg-[#0B3D2E] text-white px-4 pb-6 pt-2">
+<div class="max-w-2xl mx-auto flex items-center gap-4">
+<a class="text-white hover:text-gray-300" href="Home.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</a>
+<div>
+<h2 class="text-2xl font-bold">Manage Addresses</h2>
+<p class="text-xs text-gray-300">Save and manage your locations</p>
+</div>
+</div>
+</div>
+<!-- Main Container -->
+<main class="max-w-2xl mx-auto px-4 mt-4">
+<!-- Live Location Detection Banner -->
+<div class="bg-white border border-green-200 p-4 rounded-2xl shadow-sm flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<div class="bg-green-100 p-2.5 rounded-full text-[#0B3D2E]">
+<svg class="w-5 h-5" fill="currentColor" viewbox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"></path></svg>
+</div>
+<div>
+<p class="text-xs text-gray-600">Your current location is automatically detected using your device's live location.</p>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap shadow hover:bg-green-800 transition" onclick="detectLiveLocation()">📍 Live Location</button>
+</div>
+<!-- Filter Tabs -->
+<div class="flex gap-2 overflow-x-auto no-scrollbar py-2 mb-4">
+<button class="addr-tab px-5 py-2 rounded-full bg-[#D4AF37] text-white font-bold text-sm shadow whitespace-nowrap" onclick="filterAddresses('Address', this)">Address</button>
+<button class="addr-tab px-5 py-2 rounded-full bg-white text-gray-700 font-semibold text-sm shadow-sm border whitespace-nowrap hover:bg-gray-50" onclick="filterAddresses('Home', this)">Home</button>
+<button class="addr-tab px-5 py-2 rounded-full bg-white text-gray-700 font-semibold text-sm shadow-sm border whitespace-nowrap hover:bg-gray-50" onclick="filterAddresses('Work', this)">Work</button>
+<button class="addr-tab px-5 py-2 rounded-full bg-white text-gray-700 font-semibold text-sm shadow-sm border whitespace-nowrap hover:bg-gray-50" onclick="filterAddresses('Other', this)">Other</button>
+</div>
+<!-- Addresses List -->
+<div class="space-y-4" id="addressListContainer">
+<!-- Dynamically populated -->
+</div>
+<!-- Add New Address Button -->
+<div class="mt-6">
+<button class="w-full bg-[#0B3D2E] text-white py-3.5 rounded-2xl font-bold text-sm shadow-lg hover:bg-green-800 transition flex items-center justify-center gap-2" onclick="openAddAddressModal()">
+<span>+ Add New Address</span>
+</button>
+</div>
+</main>
+<!-- ADD / EDIT ADDRESS MODAL -->
+<div class="fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center p-4 overflow-y-auto" id="addressModal" style="display: none;">
+<div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative my-8">
+<button class="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-2xl" onclick="closeAddAddressModal()">×</button>
+<h3 class="text-xl font-bold text-[#0B3D2E] mb-2">Add New Address</h3>
+<p class="text-xs text-gray-500 mb-4">We have automatically fetched your current location from your device.</p>
+<div class="bg-green-50 border border-green-200 p-3 rounded-xl flex items-center justify-between mb-4">
+<div class="text-xs text-[#0B3D2E]">
+<span class="font-bold block">Current Location Detected</span>
+<span class="text-gray-600" id="detectedLocationText">Patna, Bihar - 800001</span>
+</div>
+<button class="bg-white border border-[#0B3D2E] text-[#0B3D2E] px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm" onclick="openMapModal()">Change Location</button>
+</div>
+<form class="space-y-3" id="addressForm" onsubmit="saveAddress(event)">
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
+<input class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]" id="fullName" placeholder="Enter full name" required="" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">Mobile Number *</label>
+<input class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]" id="mobileNumber" placeholder="+91 98765 43210" required="" type="tel"/>
+</div>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">House / Flat No. *</label>
+<input class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]" id="houseNo" placeholder="e.g. 12B, Ground Floor" required="" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">Street / Locality *</label>
+<input class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]" id="locality" placeholder="e.g. Boring Road, Near Temple" required="" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">Landmark</label>
+<input class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]" id="landmark" placeholder="e.g. Near Bus Stand" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">State *</label>
+<select class="w-full border bg-white px-3 py-2 rounded-xl text-xs focus:outline-none" id="state">
+<option value="Bihar">Bihar</option>
+</select>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">District *</label>
+<select class="w-full border bg-white px-3 py-2 rounded-xl text-xs focus:outline-none" id="district" onchange="validateDistrictAndPincode()">
+<option disabled="" selected="" value="">Select District</option>
+<option value="Patna">Patna</option>
+<option value="Ara (Bhojpur)">Ara (Bhojpur)</option>
+<option value="Hajipur (Vaishali)">Hajipur (Vaishali)</option>
+<option value="Bihta">Bihta</option>
+<option value="Chhapra (Saran)">Chhapra (Saran)</option>
+<option value="Muzaffarpur">Muzaffarpur</option>
+<option value="Darbhanga">Darbhanga</option>
+<option value="Gaya">Gaya</option>
+<option value="Bhagalpur">Bhagalpur</option>
+<option value="Purnia">Purnia</option>
+<option value="Begusarai">Begusarai</option>
+<option value="Samastipur">Samastipur</option>
+<option value="Katihar">Katihar</option>
+<option value="Siwan">Siwan</option>
+<option value="Gopalganj">Gopalganj</option>
+<option value="Nalanda">Nalanda</option>
+<option value="Sasaram (Rohtas)">Sasaram (Rohtas)</option>
+<option value="Buxar">Buxar</option>
+<option value="Aurangabad">Aurangabad</option>
+<option value="Nawada">Nawada</option>
+<option value="Madhubani">Madhubani</option>
+<option value="Sitamarhi">Sitamarhi</option>
+<option value="Saharsa">Saharsa</option>
+<option value="Kishanganj">Kishanganj</option>
+<option value="Araria">Araria</option>
+<option value="Jamui">Jamui</option>
+<option value="Banka">Banka</option>
+<option value="Jehanabad">Jehanabad</option>
+<option value="Lakhisarai">Lakhisarai</option>
+<option value="Sheikhpura">Sheikhpura</option>
+<option value="Arwal">Arwal</option>
+<option value="Kaimur (Bhabua)">Kaimur (Bhabua)</option>
+<option value="Sheohar">Sheohar</option>
+<option value="Supaul">Supaul</option>
+<option value="Madhepura">Madhepura</option>
+<option value="Khagaria">Khagaria</option>
+<option value="Munger">Munger</option>
+<option value="East Champaran">East Champaran (Motihari)</option>
+<option value="West Champaran">West Champaran (Bettiah)</option>
+</select>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">City / Village *</label>
+<input class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none" id="city" placeholder="Enter city/village" required="" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">PIN Code * (Live Lookup)</label>
+<input class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none font-bold text-[#0B3D2E]" id="pincode" maxlength="6" oninput="validateDistrictAndPincode()" placeholder="Enter PIN code" required="" type="text"/>
+</div>
+</div>
+<!-- Live Location Status Box -->
+<div class="bg-blue-50 border border-blue-200 p-2.5 rounded-xl text-xs text-blue-800 flex items-center justify-between" id="pincodeStatusBox">
+<span>📡 Enter PIN code &amp; District to verify matching</span>
+<span class="text-orange-600 font-bold">Pending</span>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">Address Type *</label>
+<div class="flex gap-3">
+<label class="flex items-center gap-1 text-xs font-semibold cursor-pointer border px-4 py-2 rounded-xl bg-green-50 border-[#0B3D2E] text-[#0B3D2E]">
+<input checked="" class="accent-[#0B3D2E]" name="addrType" type="radio" value="Home"/> Home
+                        </label>
+<label class="flex items-center gap-1 text-xs font-semibold cursor-pointer border px-4 py-2 rounded-xl">
+<input class="accent-[#0B3D2E]" name="addrType" type="radio" value="Work"/> Work
+                        </label>
+<label class="flex items-center gap-1 text-xs font-semibold cursor-pointer border px-4 py-2 rounded-xl">
+<input class="accent-[#0B3D2E]" name="addrType" type="radio" value="Other"/> Other
+                        </label>
+</div>
+</div>
+<div class="flex items-center gap-2 pt-1">
+<input checked="" class="w-4 h-4 accent-[#0B3D2E]" id="isDefault" type="checkbox"/>
+<label class="text-xs font-semibold text-gray-700" for="isDefault">Set as default address</label>
+</div>
+<div class="pt-3">
+<button class="w-full bg-[#0B3D2E] text-white py-3 rounded-xl font-bold text-xs shadow hover:bg-green-800 transition" id="saveAddrBtn" type="submit">Save Address</button>
+</div>
+</form>
+</div>
+</div>
+<!-- MAP SELECTOR MODAL -->
+<div class="fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center p-4" id="mapModal" style="display: none;">
+<div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative">
+<button class="absolute top-4 right-4 text-gray-400 hover:text-black font-bold text-2xl" onclick="closeMapModal()">×</button>
+<h3 class="text-xl font-bold text-[#0B3D2E] mb-2">Select Location on Map</h3>
+<p class="text-xs text-gray-500 mb-3">Type PIN code or area to search and update map</p>
+<input class="w-full border px-4 py-2 rounded-xl text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-[#0B3D2E] font-bold" id="mapSearchInput" oninput="searchMapLocation(this.value)" placeholder="Enter PIN code or area (e.g. 800001, Ara, Patna)..." type="text"/>
+<div class="w-full h-64 bg-gray-100 rounded-2xl relative overflow-hidden mb-4 border shadow-inner">
+<iframe class="w-full h-full border-0" id="mapIframe" loading="lazy" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3597.7788481234!2d85.1376!3d25.5941!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjXCsDM1JzM4LjgiTiA4NcKwMDgnMTUuNCJF!5e0!3m2!1sen!2sin!4v1600000000000!5m2!1sen!2sin"></iframe>
+<div class="absolute bottom-3 left-3 right-3 bg-white bg-opacity-95 backdrop-blur p-2.5 rounded-xl shadow border text-center">
+<p class="text-[11px] font-bold text-[#0B3D2E]" id="mapSelectedText">📍 Selected: Patna, Bihar</p>
+<p class="text-[9px] text-gray-500" id="mapCoordText">Coordinates: Dynamic GPS</p>
+</div>
+</div>
+<div class="flex gap-3">
+<button class="w-1/2 border py-2.5 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50" onclick="closeMapModal()">Cancel</button>
+<button class="w-1/2 bg-[#0B3D2E] text-white py-2.5 rounded-xl text-xs font-bold hover:bg-green-800 transition" onclick="confirmMapLocation()">Set Location</button>
+</div>
+</div>
+</div>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 bg-[#0B3D2E] text-white py-2 px-6 flex justify-between items-center shadow-lg z-50">
+<a class="flex flex-col items-center text-gray-300 hover:text-white" href="Home.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center text-gray-300 hover:text-white" href="services.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1">Services</span>
+</a>
+<a class="flex flex-col items-center text-gray-300 hover:text-white" href="my-bookings.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1">My Bookings</span>
+</a>
+<a class="flex flex-col items-center text-[#D4AF37]" href="manage-addresses.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1 font-bold">Addresses</span>
+</a>
+<a class="flex flex-col items-center text-gray-300 hover:text-white" href="settings.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1">Profile</span>
+</a>
+</nav>
+<!-- JavaScript Logic with Strict All-District PIN Code Mapping -->
+
+
+<script src="js/manage-addresses.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Backend Secrets & Local Env
+.env
+.env.*
+!.env.example
+!.env.cloud.example
+*.env.cloud
+*.env.local
+
+# Virtual Environments
+venv/
+env/
+.pytest_cache/
+
+# Bytecode & Caches
+__pycache__/
+*.py[cod]
+
+# Static & Database
+staticfiles/
+*.sqlite3
+*.db
+*.log

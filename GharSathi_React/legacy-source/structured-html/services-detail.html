@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/services-detail.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Book a Service | Ghar Sathi</title>
+<meta content="Book trusted home repair services with Ghar Sathi." name="description"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- FIREBASE SDK SCRIPTS -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+</head>
+<body>
+<!-- HEADER WITH LOGO -->
+<header>
+<a class="brand" href="Home.html">
+<img alt="Ghar Sathi Logo" class="h-12 w-auto" src="images/GHARSATHI_LOGO-removebg-preview.png" style="height: 45px;"/>
+<div>
+<span style="font-size: 20px; font-weight: bold; color: white; display: block;">Ghar Sathi</span>
+<span style="font-size: 9px; color: var(--gold); text-transform: uppercase; display: block;">Har Ghar Ka Apna Sathi</span>
+</div>
+</a>
+<div style="display:flex;align-items:center;gap:12px;margin-left:auto;">
+<a class="back" href="services.html">← All Services</a>
+<div class="gs-profile-wrap" id="gsProfileWrap">
+<button aria-expanded="false" aria-label="Customer profile" class="gs-profile-button" id="gsProfileButton" onclick="gsToggleProfile()" type="button">
+<span id="gsProfileInitial">G</span>
+</button>
+<div class="gs-profile-dropdown" hidden="" id="gsProfileDropdown">
+<div class="gs-profile-avatar" id="gsProfileLargeAvatar"><span id="gsProfileLargeInitial">G</span></div>
+<label class="gs-profile-photo-action">Change Photo
+            <input accept="image/*" id="gsProfileImageInput" onchange="gsUpdateProfilePhoto(event)" style="display:none" type="file"/>
+</label>
+<button id="gsRemoveProfilePhoto" onclick="gsRemoveProfilePhoto()" style="display:none" type="button">Remove Photo</button>
+<div class="gs-profile-name" id="gsProfileName">Customer</div>
+<div class="gs-profile-phone" id="gsProfilePhone"></div>
+<a href="my-bookings.html">🗓 My Bookings</a>
+<a href="manage-addresses.html">📍 Address</a>
+<a href="settings.html">⚙️ Settings</a>
+<button class="gs-logout" onclick="gsLogout()" type="button">↪ Logout</button>
+</div>
+</div>
+</div>
+</header>
+<section class="hero">
+<h1>Book Your Home Service</h1>
+<p>Trusted technicians. Convenient booking across Bihar.</p>
+</section>
+<main class="container">
+<div class="success" id="successMessage" role="status"></div>
+<!-- BOOKING FORM -->
+<form id="bookingForm">
+<section class="card">
+<h2>1. Select Service &amp; Multiple Sub-Services</h2>
+<div class="form-grid">
+<div class="field full">
+<label for="service">Main Service Category</label>
+<select id="service" name="service" required=""></select>
+</div>
+</div>
+<div style="margin-top: 16px;">
+<label class="mb-2">Select Required Sub-Services (You can select multiple):</label>
+<div class="space-y-2 border border-gray-200 p-4 rounded-xl bg-gray-50 max-h-60 overflow-y-auto" id="subServicesCheckboxContainer">
+<!-- Dynamic checkboxes will load here -->
+</div>
+</div>
+<div class="price-box">
+<div>
+<strong>Total Calculated Price</strong>
+<div class="muted">Based on all selected sub-services.</div>
+</div>
+<div class="price" id="priceDisplay">₹0</div>
+</div>
+</section>
+<section class="card" id="savedAddressSection">
+<h2>2. Select Your Address</h2>
+<p class="muted" style="margin:-8px 0 14px;">Choose one of your saved addresses for this booking. Your details will be filled in automatically.</p>
+<div class="space-y-3" id="savedAddressOptions">
+<p class="muted">Loading your saved addresses...</p>
+</div>
+<a href="manage-addresses.html" style="display:inline-block;margin-top:14px;color:var(--green);font-weight:bold;text-decoration:underline;">+ Add or Manage Addresses</a>
+</section>
+<section class="card">
+<h2>2. Your Details</h2>
+<div class="form-grid">
+<div class="field">
+<label for="customerName">Full name</label>
+<input autocomplete="name" id="customerName" maxlength="100" name="customerName" placeholder="Enter your full name" required="" type="text"/>
+</div>
+<div class="field">
+<label for="mobile">Mobile number</label>
+<input autocomplete="tel" id="mobile" inputmode="numeric" maxlength="10" name="mobile" pattern="[6-9][0-9]{9}" placeholder="10-digit mobile number" required="" type="tel"/>
+</div>
+<!-- STATE, DISTRICT, CITY, PIN CODE -->
+<div class="field">
+<label for="state">State</label>
+<select id="state" name="state" required="">
+<option value="Bihar">Bihar</option>
+</select>
+</div>
+<div class="field">
+<label for="district">District (Bihar)</label>
+<select id="district" name="district" required="">
+<option value="">Select District</option>
+</select>
+</div>
+<div class="field">
+<label for="city">City / Area</label>
+<select id="city" name="city" required="">
+<option value="">Select City / Area first</option>
+</select>
+</div>
+<div class="field">
+<label for="pincode">Pin Code</label>
+<input id="pincode" inputmode="numeric" maxlength="6" name="pincode" pattern="[0-9]{6}" placeholder="Enter 6-digit Pin Code" required="" type="text"/>
+</div>
+<div class="field full">
+<label for="address">Full House Address / Landmark</label>
+<textarea autocomplete="street-address" id="address" maxlength="500" name="address" placeholder="House number, street, area, landmark" required=""></textarea>
+</div>
+<div class="field">
+<label for="bookingDate">Preferred date</label>
+<input id="bookingDate" name="bookingDate" required="" type="date"/>
+</div>
+<div class="field">
+<label for="bookingTime">Preferred time</label>
+<select id="bookingTime" name="bookingTime" required="">
+<option value="">Select time</option>
+<option>8 AM - 10 AM</option>
+<option>10 AM - 12 PM</option>
+<option>12 PM - 2 PM</option>
+<option>2 PM - 4 PM</option>
+<option>4 PM - 6 PM</option>
+<option>6 PM - 8 PM</option>
+</select>
+</div>
+</div>
+</section>
+<section class="card">
+<h2>3. Payment Method</h2>
+<div class="payment-options">
+<label class="payment-option">
+<input checked="" name="paymentMethod" required="" type="radio" value="Cash"/>
+<span><strong>Cash</strong><br/><span class="muted">Pay for the service in cash</span></span>
+</label>
+<label class="payment-option">
+<input name="paymentMethod" required="" type="radio" value="Online"/>
+<span><strong>Online</strong><br/><span class="muted">Online payment gateway</span></span>
+</label>
+</div>
+</section>
+<section class="card">
+<h2>4. Confirm Booking Details</h2>
+<button class="main-btn" type="submit">Submit Booking Request</button>
+</section>
+</form>
+</main>
+<footer>
+    © Ghar Sathi | Home Services at Your Doorstep
+  </footer>
+
+
+
+<script src="js/services-detail.js"></script>
+</body>
+</html>

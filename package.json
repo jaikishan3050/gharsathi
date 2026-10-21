@@ -1,0 +1,13 @@
+{
+  "name": "gharsathi-fullstack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ghar Sathi - Production Full-Stack Home Services Platform",
+  "scripts": {
+    "build": "npm --prefix GharSathi_React run build && node -e \"const fs=require('fs'); fs.cpSync('GharSathi_React/dist', 'dist', {recursive:true}); console.log('? Successfully copied dist/ to root for Firebase Hosting.');\"",
+    "dev": "npm --prefix GharSathi_React run dev",
+    "test": "npm --prefix GharSathi_React test",
+    "firebase:login": "npx firebase-tools login",
+    "deploy:hosting": "npm run build && npx firebase-tools deploy --only hosting"
+  }
+}

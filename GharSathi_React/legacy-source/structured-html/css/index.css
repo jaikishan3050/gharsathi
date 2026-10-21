@@ -1,0 +1,285 @@
+:root {
+    --green: #0B3D2E;
+    --deep-green: #06291F;
+    --gold: #D4AF37;
+    --text: #26352F;
+    --muted: #68756E;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #F3F6F3;
+    color: var(--text);
+}
+
+/* FULL SOFA BACKGROUND */
+.hero {
+    min-height: 340px;
+    padding: 25px 18px 0;
+    background:
+        linear-gradient(
+            rgba(6,41,31,0.15),
+            rgba(6,41,31,0.45)
+        ),
+        url("images/sofa.jpg") center center / cover no-repeat;
+}
+
+/* LOGO BRANDING */
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 500px;
+    margin: auto;
+}
+
+.brand img {
+    width: 55px;
+    height: 55px;
+    object-fit: contain;
+}
+
+.brand h1 {
+    color: white;
+    font-size: 27px;
+}
+
+.brand h1 span {
+    color: var(--gold);
+}
+
+.brand p {
+    color: white;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+/* LOGIN CARD OVER SOFA IMAGE */
+.login-wrap {
+    max-width: 460px;
+    margin: -115px auto 0;
+    padding: 0 15px;
+    position: relative;
+    z-index: 2;
+}
+
+.login-card {
+    background: white;
+    padding: 28px 23px;
+    border-radius: 22px;
+    border: 1px solid #E3EAE4;
+    box-shadow: 0 15px 45px rgba(0,0,0,0.15);
+}
+
+.user-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--green);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 31px;
+    margin: 0 auto 17px;
+    overflow: hidden;
+}
+
+.user-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.login-card h2 {
+    text-align: center;
+    color: var(--green);
+    font-size: 25px;
+    margin-bottom: 9px;
+}
+
+.subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 25px;
+}
+
+/* INPUTS */
+.form-group {
+    margin-bottom: 17px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.form-group input {
+    width: 100%;
+    min-height: 51px;
+    padding: 14px;
+    font-size: 16px;
+    border: 1px solid #D5DED8;
+    border-radius: 10px;
+    outline: none;
+    background: #FCFDFC;
+}
+
+.form-group input:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(11,61,46,0.09);
+}
+
+/* INPUT WITH BUTTON (OTP) */
+.input-with-btn {
+    display: flex;
+    gap: 8px;
+}
+
+.input-with-btn input {
+    flex: 1;
+}
+
+.otp-send-btn, .otp-verify-btn {
+    padding: 0 16px;
+    background: var(--green);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.otp-send-btn:hover, .otp-verify-btn:hover {
+    background: var(--deep-green);
+}
+
+.otp-send-btn:disabled, .otp-verify-btn:disabled {
+    background: #a5b5ad;
+    cursor: not-allowed;
+}
+
+/* STATUS MESSAGES */
+.status-msg {
+    font-size: 12px;
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+.msg-success { color: #0f5132; }
+.msg-error { color: #842029; }
+
+/* BUTTON */
+.login-btn {
+    width: 100%;
+    min-height: 52px;
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    color: white;
+    background: linear-gradient(
+        135deg,
+        var(--green),
+        var(--deep-green)
+    );
+    font-size: 17px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.login-btn:hover {
+    opacity: 0.95;
+}
+
+/* BELOW CONTENT */
+.below-content {
+    max-width: 650px;
+    margin: 30px auto;
+    padding: 0 20px 30px;
+    text-align: center;
+}
+
+.below-content h2 {
+    color: var(--green);
+    font-size: 23px;
+    margin-bottom: 10px;
+}
+
+.below-content > p {
+    color: var(--muted);
+    line-height: 1.7;
+    font-size: 14px;
+}
+
+.features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 25px 0;
+}
+
+.feature {
+    background: white;
+    padding: 17px 8px;
+    border-radius: 14px;
+    border: 1px solid #E3EAE4;
+}
+
+.feature-icon {
+    font-size: 28px;
+    margin-bottom: 9px;
+}
+
+.feature p {
+    color: var(--green);
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: bold;
+}
+
+.privacy {
+    background: #E8F1EB;
+    border-radius: 12px;
+    padding: 17px;
+    color: var(--green);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* RESPONSIVE DESIGN */
+@media (min-width: 768px) {
+    .hero {
+        min-height: 440px;
+        padding-top: 30px;
+        background-position: center 55%;
+    }
+
+    .brand {
+        max-width: 700px;
+    }
+
+    .login-wrap {
+        margin-top: -145px;
+    }
+
+    .login-card {
+        padding: 35px;
+    }
+
+    .below-content {
+        margin-top: 40px;
+    }
+}

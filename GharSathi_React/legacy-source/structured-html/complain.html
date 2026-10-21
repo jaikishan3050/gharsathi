@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/complain.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Register a Complaint | Ghar Sathi</title>
+<meta content="Register your home service complaint with Ghar Sathi customer support." name="description"/>
+
+
+</head>
+<body>
+<header class="header">
+<a class="brand" href="Home.html">
+<img alt="Ghar Sathi Logo" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+<div>
+<h2>Ghar Sathi</h2>
+<p>HAR GHAR KA SATHI</p>
+</div>
+</a>
+<nav class="nav">
+<a href="Home.html">Home</a>
+<a href="services.html">Services</a>
+<a href="about.html">About Us</a>
+<a href="contact.html">Contact</a>
+</nav>
+</header>
+<section class="hero">
+<div class="hero-content">
+<div class="hero-tag">Customer Care &amp; Support</div>
+<h1>We're Here to <span>Listen.</span></h1>
+<p>
+            Your experience matters to us. Share your concern with
+            Ghar Sathi so we can understand the issue and help you
+            with the next steps.
+        </p>
+</div>
+</section>
+<main class="main">
+<section class="form-card">
+<div class="form-heading">
+<h2>Register Your Complaint</h2>
+<p>Please provide the details below so we can understand your concern.</p>
+<p class="required-note">* Required fields</p>
+</div>
+<form id="complaintForm">
+<div class="form-grid">
+<div class="field">
+<label for="name">Full Name <span>*</span></label>
+<input id="name" maxlength="80" name="name" placeholder="Enter your full name" required="" type="text"/>
+</div>
+<div class="field">
+<label for="phone">Mobile Number <span>*</span></label>
+<input id="phone" inputmode="numeric" maxlength="10" name="phone" pattern="[6-9][0-9]{9}" placeholder="10-digit mobile number" required="" type="tel"/>
+</div>
+<div class="field">
+<label for="bookingId">Booking ID</label>
+<input id="bookingId" name="bookingId" placeholder="Enter booking ID if available" type="text"/>
+<p class="form-hint">Optional — if you have a booking ID.</p>
+</div>
+<div class="field">
+<label for="location">Service Location <span>*</span></label>
+<select id="location" name="location" required="">
+<option value="">Select your location</option>
+<option>Maner</option>
+<option>Bihta</option>
+<option>Ara</option>
+<option>Patna</option>
+<option>Other</option>
+</select>
+</div>
+<div class="field">
+<label for="service">Service Type <span>*</span></label>
+<select id="service" name="service" required="">
+<option value="">Choose a service</option>
+<option>AC Service &amp; Repair</option>
+<option>Washing Machine</option>
+<option>Refrigerator</option>
+<option>RO Service</option>
+<option>Cooler</option>
+<option>Electrician</option>
+<option>Geyser</option>
+<option>Kitchen Chimney</option>
+<option>Other Home Repair</option>
+</select>
+</div>
+<div class="field">
+<label for="category">Complaint Category <span>*</span></label>
+<select id="category" name="category" required="">
+<option value="">Select complaint category</option>
+<option>Service Quality</option>
+<option>Technician Behaviour</option>
+<option>Late Arrival or Delay</option>
+<option>Payment or Pricing Issue</option>
+<option>Incomplete Service</option>
+<option>Technician Did Not Arrive</option>
+<option>Other Issue</option>
+</select>
+</div>
+<div class="field full">
+<label for="details">Describe Your Complaint <span>*</span></label>
+<textarea id="details" maxlength="1500" minlength="10" name="details" placeholder="Please explain what happened and how we can help..." required=""></textarea>
+<p class="form-hint">Please enter at least 10 characters.</p>
+</div>
+</div>
+<div class="privacy-note">
+<div class="privacy-icon">◆</div>
+<p>
+<strong>Your information matters.</strong><br/>
+                    The details you provide should only be used to
+                    understand and follow up on your complaint.
+                </p>
+</div>
+<button class="submit-btn" type="submit">
+                Submit Complaint
+            </button>
+</form>
+<a class="back-home" href="Home.html">← Back to Home</a>
+</section>
+</main>
+<footer class="footer">
+    © <span id="year"></span> <span>Ghar Sathi</span>.
+    Har Ghar Ka Sathi.
+</footer>
+
+
+<script src="js/complain.js"></script>
+</body>
+</html>

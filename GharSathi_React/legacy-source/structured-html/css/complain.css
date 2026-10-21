@@ -1,0 +1,372 @@
+:root {
+    --green: #0B3D2E;
+    --deep-green: #06291F;
+    --gold: #D4AF37;
+    --cream: #F7F8F3;
+    --white: #FFFFFF;
+    --text: #26352E;
+    --muted: #718078;
+    --border: #E0E7E1;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    line-height: 1.6;
+}
+
+/* HEADER */
+.header {
+    background: var(--deep-green);
+    padding: 14px 6%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--gold);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+}
+
+.brand img {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+}
+
+.brand h2 {
+    color: var(--gold);
+    font-size: 23px;
+    line-height: 1.3;
+}
+
+.brand p {
+    color: #E7EDE8;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+}
+
+.nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+}
+
+.nav a {
+    color: #FFFFFF;
+    font-size: 14px;
+    text-decoration: none;
+    transition: 0.2s;
+}
+
+.nav a:hover {
+    color: var(--gold);
+}
+
+/* HERO BACKGROUND */
+.hero {
+    position: relative;
+    overflow: hidden;
+    text-align: left;
+    padding: 75px 7%;
+    min-height: 390px;
+    display: flex;
+    align-items: center;
+    color: #FFFFFF;
+
+    background:
+        linear-gradient(
+            90deg,
+            rgba(4, 30, 23, 0.97) 0%,
+            rgba(11, 61, 46, 0.88) 42%,
+            rgba(6, 41, 31, 0.30) 100%
+        ),
+        url("../images/complaint-sofa.jpg") center / cover no-repeat;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    max-width: 620px;
+    margin: 0;
+}
+
+.hero h1 {
+    font-size: clamp(32px, 5vw, 48px);
+    line-height: 1.2;
+    margin-bottom: 17px;
+    font-weight: 700;
+}
+
+.hero h1 span {
+    color: #D4AF37;
+}
+
+.hero p {
+    max-width: 540px;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.8;
+    color: #E0EAE3;
+}
+
+@media (max-width: 700px) {
+    .hero {
+        min-height: 360px;
+        padding: 50px 22px;
+        background-position: 65% center;
+        background-image:
+            linear-gradient(
+                90deg,
+                rgba(4, 30, 23, 0.94),
+                rgba(6, 41, 31, 0.60)
+            ),
+            url("../images/complaint-sofa.jpg");
+        background-size: cover;
+        background-repeat: no-repeat;
+    }
+}
+
+/* MAIN LAYOUT */
+.main {
+    width: min(1050px, 92%);
+    margin: -42px auto 65px;
+    position: relative;
+    z-index: 2;
+}
+
+.form-card {
+    background: var(--white);
+    border: 1px solid rgba(11,61,46,0.07);
+    border-radius: 18px;
+    padding: 36px;
+    box-shadow: 0 18px 55px rgba(6,41,31,0.11);
+}
+
+.form-heading {
+    padding-bottom: 22px;
+    margin-bottom: 26px;
+    border-bottom: 1px solid var(--border);
+}
+
+.form-heading h2 {
+    color: var(--green);
+    font-size: 26px;
+    margin-bottom: 6px;
+}
+
+.form-heading p {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.form-heading .required-note {
+    color: #A34C3F;
+    font-size: 12px;
+    margin-top: 8px;
+}
+
+/* FORM FIELDS */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.field.full {
+    grid-column: 1 / -1;
+}
+
+label {
+    font-size: 13px;
+    font-weight: 650;
+    color: #34483D;
+}
+
+label span {
+    color: #B54736;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 14px 13px;
+    border: 1px solid #DCE5DE;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: #FCFDFB;
+    outline: none;
+    transition: border 0.2s, box-shadow 0.2s;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #9AA69E;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(11,61,46,0.08);
+}
+
+textarea {
+    min-height: 145px;
+    resize: vertical;
+}
+
+.form-hint {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+/* PRIVACY NOTE */
+.privacy-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #F3F7F3;
+    border: 1px solid #E1EAE1;
+    padding: 16px;
+    border-radius: 10px;
+    margin-top: 26px;
+}
+
+.privacy-icon {
+    color: var(--green);
+    font-size: 20px;
+}
+
+.privacy-note p {
+    font-size: 12px;
+    color: #58685E;
+}
+
+/* BUTTON */
+.submit-btn {
+    width: 100%;
+    margin-top: 25px;
+    padding: 16px 20px;
+    background: linear-gradient(100deg, #0B3D2E, #14543F);
+    border: 1px solid #D4AF37;
+    border-radius: 9px;
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.25s;
+}
+
+.submit-btn:hover {
+    background: var(--deep-green);
+    box-shadow: 0 7px 20px rgba(6,41,31,0.15);
+    transform: translateY(-1px);
+}
+
+.back-home {
+    display: block;
+    width: fit-content;
+    margin: 22px auto 0;
+    color: var(--green);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.back-home:hover {
+    color: #96771A;
+}
+
+/* FOOTER */
+.footer {
+    text-align: center;
+    padding: 26px 15px;
+    background: var(--deep-green);
+    color: #DCE7E0;
+    font-size: 13px;
+}
+
+.footer span {
+    color: var(--gold);
+}
+
+/* MOBILE */
+@media (max-width: 700px) {
+    .header {
+        padding: 13px 5%;
+    }
+
+    .brand img {
+        width: 45px;
+        height: 45px;
+    }
+
+    .brand h2 {
+        font-size: 21px;
+    }
+
+    .nav {
+        width: 100%;
+        gap: 15px;
+    }
+
+    .nav a {
+        font-size: 12px;
+    }
+
+    .hero {
+        padding: 48px 20px 75px;
+    }
+
+    .hero p {
+        font-size: 14px;
+    }
+
+    .main {
+        width: 93%;
+        margin-top: -32px;
+    }
+
+    .form-card {
+        padding: 24px 18px;
+        border-radius: 14px;
+    }
+
+    .form-heading h2 {
+        font-size: 23px;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+    }
+
+    .field.full {
+        grid-column: auto;
+    }
+
+    input, select, textarea {
+        padding: 13px 11px;
+    }
+}

@@ -1,0 +1,48 @@
+# Python & Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+*.log
+
+# Static & Media Assets
+backend/staticfiles/
+staticfiles/
+media/
+
+# Database files
+*.sqlite3
+*.db
+
+# Secrets & Environment Variables (NEVER commit secrets to Git)
+.env
+.env.*
+!.env.example
+!.env.production
+!.env.cloud.example
+*.env.cloud
+*.env.local
+
+# Node & Frontend
+node_modules/
+dist/
+.DS_Store
+.npm
+npm-debug.log*
+
+# Firebase & Cloud deployment caches
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# IDE & OS
+.vscode/
+.idea/
+Thumbs.db

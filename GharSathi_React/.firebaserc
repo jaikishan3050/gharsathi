@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "gharsathi-in",
+    "production": "gharsathi-in"
+  }
+}

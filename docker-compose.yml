@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Django REST Framework Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gharsathi_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=${DEBUG:-True}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-gharsathi-prod-key-2026-supersecret}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,backend,frontend,*}
+      - POSTGRES_DB=${POSTGRES_DB:-gharsathi}
+      - POSTGRES_USER=${POSTGRES_USER:-gharsathi_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-gharsathi_secure_pwd_2026}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_gharsathi_demo}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-gharsathi_sandbox_secret_key_12345}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/1}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - backend_static:/app/staticfiles
+      - backend_data:/app
+
+  # Redis In-Memory Datastore & Django Channels Layer
+  redis:
+    image: redis:7-alpine
+    container_name: gharsathi_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  # React + Vite Production Nginx Frontend Service
+  frontend:
+    build:
+      context: ./GharSathi_React
+      dockerfile: Dockerfile
+    container_name: gharsathi_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+      - "80:80"
+    depends_on:
+      - backend
+
+  # PostgreSQL Relational Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: gharsathi_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gharsathi}
+      POSTGRES_USER: ${POSTGRES_USER:-gharsathi_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gharsathi_secure_pwd_2026}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gharsathi_user} -d ${POSTGRES_DB:-gharsathi}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  backend_static:
+  backend_data:

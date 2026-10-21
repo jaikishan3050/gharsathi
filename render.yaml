@@ -1,0 +1,66 @@
+services:
+  # ============================================================================
+  # 1. Django REST Framework + Daphne ASGI Backend Web Service
+  # ============================================================================
+  - type: web
+    name: gharsathi-backend
+    env: python
+    region: singapore
+    plan: starter
+    rootDir: backend
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+      python manage.py migrate --noinput
+      python manage.py seed_gharsathi || true
+    startCommand: daphne -b 0.0.0.0 -p $PORT gharsathi_backend.asgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: "localhost,127.0.0.1,.onrender.com,.web.app,.firebaseapp.com,gharsathi.in,www.gharsathi.in"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gharsathi-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: gharsathi-redis
+          property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://gharsathi-in.web.app,https://gharsathi-in.firebaseapp.com,https://gharsathi.in,https://www.gharsathi.in,http://localhost:5173"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://gharsathi-in.web.app,https://gharsathi-in.firebaseapp.com,https://gharsathi.in,https://www.gharsathi.in,https://*.onrender.com"
+      - key: RAZORPAY_KEY_ID
+        value: "rzp_test_gharsathi_demo"
+      - key: RAZORPAY_KEY_SECRET
+        value: "gharsathi_sandbox_secret_key_12345"
+      - key: FAST2SMS_API_KEY
+        value: "SVzK89RnU4hOsGxt5DqlHXCoQpFLcfbEuMryvAwgJZ21edkPTBpQZLtB2MkqUTdmSEP8C1xOa4gNyzu7"
+      - key: SMS_PROVIDER
+        value: "fast2sms"
+
+  # ============================================================================
+  # 2. Redis In-Memory Datastore for Django Channels & WebSockets
+  # ============================================================================
+  - type: redis
+    name: gharsathi-redis
+    region: singapore
+    plan: starter
+    ipAllowList: [] # internal access only
+
+databases:
+  # ============================================================================
+  # 3. Managed PostgreSQL Database
+  # ============================================================================
+  - name: gharsathi-postgres
+    region: singapore
+    plan: starter
+    databaseName: gharsathi
+    user: gharsathi_user

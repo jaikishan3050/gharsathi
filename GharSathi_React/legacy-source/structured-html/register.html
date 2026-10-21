@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/register.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sign Up | Ghar Sathi</title>
+<!-- GOOGLE MAPS & PLACES API -->
+<script src="https://gharsathi-live-default-rtdb.asia-southeast1.firebasedatabase.app/"></script>
+
+</head>
+<body>
+<!-- HERO HEADER -->
+<section class="hero">
+<div class="brand">
+<img alt="Ghar Sathi Logo" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+<div>
+<h1>Ghar <span>Sathi</span></h1>
+<p>Har Ghar ka Sathi</p>
+</div>
+</div>
+<div style="position:absolute;top:18px;right:18px;z-index:5;">
+<div class="gs-profile-wrap" id="gsProfileWrap">
+<button aria-expanded="false" aria-label="Customer profile" class="gs-profile-button" id="gsProfileButton" onclick="gsToggleProfile()" type="button">
+<span id="gsProfileInitial">G</span>
+</button>
+<div class="gs-profile-dropdown" hidden="" id="gsProfileDropdown">
+<div class="gs-profile-avatar" id="gsProfileLargeAvatar"><span id="gsProfileLargeInitial">G</span></div>
+<div class="gs-profile-name" id="gsProfileName">Customer</div>
+<div class="gs-profile-phone" id="gsProfilePhone"></div>
+<a href="profile.html">👤 My Profile</a>
+<a href="my-bookings.html">🗓 My Booking</a>
+<a href="manage-addresses.html">📍 Manage Addresses</a>
+<a href="settings.html">⚙️ Settings</a>
+<button class="gs-logout" onclick="gsLogout()" type="button">↪ Logout</button>
+</div>
+</div>
+</div>
+</section>
+<!-- SIGNUP PANEL -->
+<main class="register-wrap">
+<section class="register-card">
+<div aria-hidden="true" class="user-icon">
+<img alt="Ghar Sathi Logo" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+</div>
+<h2>Create an Account</h2>
+<p class="subtitle">Enter your details and verify OTP to join Ghar Sathi</p>
+<form id="signupForm">
+<!-- Full Name -->
+<div class="form-group">
+<label for="fullName">Full Name *</label>
+<input id="fullName" placeholder="Enter your full name" required="" type="text"/>
+</div>
+<!-- Mobile Number & Get OTP -->
+<div class="form-group">
+<label for="phone">Mobile Number *</label>
+<div class="input-with-btn">
+<input id="phone" maxlength="10" placeholder="Enter 10-digit number" required="" type="tel"/>
+<button class="otp-send-btn" id="sendOtpBtn" onclick="sendOTP()" type="button">
+                        Send OTP
+                    </button>
+</div>
+<div class="status-msg" id="otpNotice"></div>
+</div>
+<!-- OTP Input & Verify Button -->
+<div class="form-group" id="otpGroup" style="display: none;">
+<label for="otpInput">Enter 4-Digit OTP *</label>
+<div class="input-with-btn">
+<input id="otpInput" maxlength="4" placeholder="Enter OTP (Test OTP: 1234)" type="text"/>
+<button class="otp-verify-btn" onclick="verifyOTP()" type="button">
+                        Verify OTP
+                    </button>
+</div>
+<div class="status-msg" id="otpVerifyNotice"></div>
+</div>
+<!-- Email (Optional) -->
+<div class="form-group">
+<label for="email">Email Address (Optional)</label>
+<input id="email" placeholder="Enter your email" type="email"/>
+</div>
+<!-- Service Pincode Input -->
+<div class="form-group">
+<label for="pincode">Area Pincode *</label>
+<input id="pincode" maxlength="6" onkeyup="validatePincode()" placeholder="Enter 6-digit Pincode (e.g., 800001)" required="" type="text"/>
+<div class="status-msg" id="pincodeNotice"></div>
+</div>
+<!-- Auto GPS & Drag Map Spot -->
+<div class="form-group">
+<label>Service Spot Location (Auto-Detected GPS) *</label>
+<div class="gps-status" id="gpsStatus">Detecting live location via GPS...</div>
+<div id="map"></div>
+<p style="font-size: 11px; color: var(--muted); margin-top: 5px;">
+                    * You can drag the red marker or search landmark below to update location.
+                </p>
+<!-- Hidden GPS Coordinates -->
+<input id="latitude" type="hidden"/>
+<input id="longitude" type="hidden"/>
+</div>
+<!-- Editable Full Address with Google Places Autocomplete -->
+<div class="form-group">
+<label for="address">Full Address &amp; Nearby Landmark *</label>
+<input id="address" onchange="searchAddressToMap()" placeholder="Search school, shop, street, house no. or landmark..." required="" type="text"/>
+</div>
+<!-- Terms & Conditions -->
+<div class="terms-wrap">
+<input id="terms" required="" type="checkbox"/>
+<label for="terms">I agree to the <a href="#">Terms &amp; Conditions</a> and Privacy Policy</label>
+</div>
+<button class="signup-btn" type="submit">
+                Create Account   →
+            </button>
+</form>
+<div class="divider">OR</div>
+<p class="login-link">
+            Already have an account?
+            <a href="login.html">Login Here</a>
+</p>
+</section>
+</main>
+<!-- SIGNUP SCRIPT -->
+
+
+<script src="js/register.js"></script>
+</body>
+</html>

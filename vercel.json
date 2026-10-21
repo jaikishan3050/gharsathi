@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "framework": "vite",
+  "rootDirectory": "GharSathi_React",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://gharsathi-backend.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

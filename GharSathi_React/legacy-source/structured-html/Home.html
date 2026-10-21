@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/Home.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Ghar Sathi - Har Ghar Ka Sathi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+<!-- Navbar -->
+<nav class="bg-white shadow-md p-4 sticky top-0 z-50">
+<div class="max-w-7xl mx-auto flex justify-between items-center">
+<div class="flex items-center gap-3">
+<img alt="Ghar Sathi Logo" class="h-16 w-auto" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+<span class="text-2xl md:text-3xl font-extrabold text-[#0f5132] tracking-wide">Ghar Sathi</span>
+</div>
+<!-- Center Links -->
+<div class="hidden md:flex space-x-6">
+<a class="text-[#0f5132] font-semibold border-b-2 border-[#0f5132]" href="Home.html">Home</a>
+<a class="hover:text-[#0f5132]" href="services.html">Services</a>
+<a class="hover:text-[#0f5132]" href="about.html">About Us</a>
+<a class="hover:text-[#0f5132]" href="reviews.html">Feedback</a>
+<a class="hover:text-[#0f5132]" href="contact.html">Contact</a>
+</div>
+<!-- Right Side: Download Button & Profile -->
+<div class="flex items-center gap-4">
+<a class="hidden sm:block bg-[#0f5132] text-white px-6 py-2 rounded-full font-semibold hover:bg-green-800 transition" download="GharSathi.apk" href="gharsathi.apk">Download App</a>
+<!-- Profile Section -->
+<div class="relative">
+<button class="flex items-center gap-2 focus:outline-none" id="profileBtn">
+<div class="w-10 h-10 rounded-full bg-[#0f5132] text-white flex items-center justify-center font-bold shadow-md cursor-pointer border-2 border-white hover:border-gray-200 overflow-hidden transition" id="navAvatarContainer">
+<span id="navUserInitial">U</span>
+</div>
+</button>
+<!-- Profile Dropdown Card -->
+<div class="hidden absolute right-0 mt-3 w-64 bg-white rounded-xl shadow-2xl border p-5 z-50" id="profileDropdown">
+<div class="text-center mb-4">
+<div class="w-16 h-16 rounded-full bg-[#0f5132] text-white flex items-center justify-center font-bold text-2xl mx-auto mb-2 shadow-inner overflow-hidden relative group" id="dropAvatarContainer">
+<span id="dropUserInitial">U</span>
+</div>
+<!-- Upload Profile Photo Option -->
+<label class="block text-xs text-[#0f5132] font-bold cursor-pointer hover:underline mb-2">
+                                📷 Change Photo
+                                <input accept="image/*" class="hidden" id="profileImageInput" onchange="updateProfileImage(event)" type="file"/>
+</label>
+<button class="hidden text-xs text-red-600 font-semibold hover:underline mb-2" id="removeProfilePhotoBtn" onclick="removeProfilePhoto()" type="button">Remove Photo</button>
+<h3 class="font-bold text-lg text-gray-800" id="profileName">User Name</h3>
+<p class="text-sm text-gray-500 font-medium" id="profilePhone">+91 0000000000</p>
+<p class="text-xs text-gray-400 mt-1" id="profileEmail">user@email.com</p>
+</div>
+<div class="border-t pt-3 space-y-1">
+<!-- Frontend Links for Booking, Address, Settings -->
+<a class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-[#0f5132] font-semibold rounded transition" href="my-bookings.html">🗓 My Bookings</a>
+<a class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-[#0f5132] font-semibold rounded transition" href="manage-addresses.html">📍 Address</a>
+<a class="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-[#0f5132] font-semibold rounded transition" href="settings.html">⚙️ Setting</a>
+<button class="w-full text-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 rounded mt-3 border border-red-100 font-bold transition" onclick="logoutUser()">Logout</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<!-- Custom Banner Slider -->
+<div class="max-w-7xl mx-auto mt-4 relative rounded-lg shadow-lg group">
+<div class="flex overflow-x-auto snap-x snap-mandatory no-scrollbar cursor-grab" id="banner-container" style="scroll-behavior: smooth;">
+<div class="min-w-full snap-center flex-shrink-0">
+<img alt="Banner 1" class="w-full h-[200px] md:h-[400px] object-cover rounded-lg pointer-events-none" src="images/homebanner2.png"/>
+</div>
+<div class="min-w-full snap-center flex-shrink-0">
+<img alt="Banner 2" class="w-full h-[200px] md:h-[400px] object-cover rounded-lg pointer-events-none" src="images/homebanner3.png"/>
+</div>
+<div class="min-w-full snap-center flex-shrink-0">
+<img alt="Banner 3" class="w-full h-[200px] md:h-[400px] object-cover rounded-lg pointer-events-none" src="images/homebanner4.png"/>
+</div>
+<div class="min-w-full snap-center flex-shrink-0">
+<img alt="Banner 4" class="w-full h-[200px] md:h-[400px] object-cover rounded-lg pointer-events-none" src="images/homebanner5.png"/>
+</div>
+<div class="min-w-full snap-center flex-shrink-0">
+<img alt="Banner 5" class="w-full h-[200px] md:h-[400px] object-cover rounded-lg pointer-events-none" src="images/homebanner1.png"/>
+</div>
+</div>
+<button class="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-70 hover:bg-[#0f5132] hover:text-white text-black w-10 h-10 rounded-full font-bold shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" onclick="scrollBanner(-1)">❮</button>
+<button class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-70 hover:bg-[#0f5132] hover:text-white text-black w-10 h-10 rounded-full font-bold shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" onclick="scrollBanner(1)">❯</button>
+</div>
+<!-- Hero Section -->
+<header class="max-w-7xl mx-auto px-4 py-12 flex flex-col md:flex-row items-center">
+<div class="md:w-1/2 mb-8 md:mb-0">
+<h1 class="text-4xl md:text-5xl font-bold mt-4 mb-4 text-gray-900">Ghar ke har kaam ke liye ek hi saathi – <span class="text-[#0f5132]">Ghar Sathi</span></h1>
+<p class="text-gray-600 mb-6">AC, Washing Machine, Fridge, RO, Geyser, Electrician, Chimney aur bhi bahut kuch – ab ek hi platform par. Verified technicians ke saath, fast, safe aur trusted service.</p>
+<span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full">Verified Technicians | 24x7 Support</span>
+<div class="mt-8">
+<a class="inline-block bg-[#0f5132] text-white px-10 py-4 rounded-xl font-bold hover:bg-green-800 transition text-lg shadow-lg" href="services.html">Book Service Now →</a>
+</div>
+</div>
+<div class="md:w-1/2 flex justify-center">
+<img alt="Service Under 24 Hour" class="rounded-xl shadow-lg w-full max-w-md object-cover" src="images/homephoto1.png"/>
+</div>
+</header>
+<!-- Why Choose Us -->
+<section class="bg-[#0f5132] text-white py-16 px-4 mt-8">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-12">
+<div class="md:w-1/2">
+<h2 class="text-3xl font-bold mb-8">Why Choose Ghar Sathi?</h2>
+<div class="space-y-6">
+<div class="flex items-start">
+<div class="bg-white text-[#0f5132] p-2 rounded-full mr-4">✓</div>
+<div>
+<h3 class="font-bold text-lg">Verified Technicians</h3>
+<p class="text-gray-200">Background checked &amp; experienced</p>
+</div>
+</div>
+<div class="flex items-start">
+<div class="bg-white text-[#0f5132] p-2 rounded-full mr-4">₹</div>
+<div>
+<h3 class="font-bold text-lg">Transparent Pricing</h3>
+<p class="text-gray-200">No hidden charges</p>
+</div>
+</div>
+</div>
+</div>
+<div class="md:w-1/3">
+<img alt="Why Choose Ghar Sathi" class="rounded-3xl shadow-xl w-full" src="images/why-choose-gharsathi.png"/>
+</div>
+</div>
+</section>
+<!-- Service Areas (Patna Slider) -->
+<section class="max-w-7xl mx-auto py-16 px-4">
+<h2 class="text-2xl font-bold mb-8 text-center">Our Service Areas</h2>
+<div class="flex flex-col md:flex-row items-center justify-between bg-white p-8 rounded-2xl shadow-sm border">
+<div class="flex flex-wrap gap-4 mb-6 md:mb-0">
+<span class="border px-6 py-2 rounded-full text-gray-700 font-semibold shadow-sm">📍 All Patna</span>
+<span class="border px-6 py-2 rounded-full text-gray-700 font-semibold shadow-sm">📍 Hajipur</span>
+<span class="border px-6 py-2 rounded-full text-gray-700 font-semibold shadow-sm">📍 Ara</span>
+<span class="border px-6 py-2 rounded-full text-gray-700 font-semibold shadow-sm">📍 Bihta</span>
+<span class="bg-[#0f5132] text-white px-6 py-2 rounded-full font-semibold shadow-sm">📍 Maner</span>
+</div>
+<div class="relative w-full md:w-72 h-48 rounded-xl overflow-hidden shadow-lg border-4 border-white">
+<div class="patna-slides hidden fade">
+<img alt="Golghar" class="w-full h-full object-cover" src="images/patna ka  gaurav2.jpg"/>
+<div class="absolute bottom-0 bg-black bg-opacity-50 w-full text-white text-center py-1 font-bold">Patna Hamaar Gaurav</div>
+</div>
+<div class="patna-slides hidden fade">
+<img alt="Patna Sahib" class="w-full h-full object-cover" src="images/patna mera gaurav.jpg"/>
+<div class="absolute bottom-0 bg-black bg-opacity-50 w-full text-white text-center py-1 font-bold">Patna Hamaar Gaurav</div>
+</div>
+<div class="patna-slides hidden fade">
+<img alt="Patna Sahib" class="w-full h-full object-cover" src="images/patna ka  gaurav4.jpg"/>
+<div class="absolute bottom-0 bg-black bg-opacity-50 w-full text-white text-center py-1 font-bold">Patna Hamaar Gaurav</div>
+</div>
+<div class="patna-slides hidden fade">
+<img alt="Patna Sahib" class="w-full h-full object-cover" src="images/patna ka  gaurav5.jpg"/>
+<div class="absolute bottom-0 bg-black bg-opacity-50 w-full text-white text-center py-1 font-bold">Patna Hamaar Gaurav</div>
+</div>
+<div class="patna-slides hidden fade">
+<img alt="Patna Sahib" class="w-full h-full object-cover" src="images/patna ka gaurav3.jpg"/>
+<div class="absolute bottom-0 bg-black bg-opacity-50 w-full text-white text-center py-1 font-bold">Patna Hamaar Gaurav</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="bg-gray-100 py-12 px-4 border-t mt-12">
+<div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
+<div>
+<img alt="Ghar Sathi Logo" class="h-16 w-auto mb-4" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+<p class="text-gray-600 text-sm">Har Ghar ka Vishwas</p>
+</div>
+<div>
+<p class="text-gray-600 text-sm mb-2">📞 <a class="hover:text-[#0f5132] transition" href="tel:+919251115827">+91 9251115827</a></p>
+<p class="text-gray-600 text-sm">✉️ <a class="hover:text-[#0f5132] transition" href="contact.html">support@bookgharsathi.in</a></p>
+</div>
+<div>
+<h4 class="font-bold mb-4">Quick Links</h4>
+<ul class="text-gray-600 text-sm space-y-2">
+<li><a href="Home.html">Home</a></li>
+<li><a href="services.html">Services</a></li>
+<li><a href="about.html">About Us</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold mb-4">Follow Us</h4>
+<div class="flex space-x-4 mb-6">
+<!-- Instagram Icon & Link -->
+<a class="text-gray-600 hover:text-[#0f5132] transition" href="https://www.instagram.com/book_ghar_sathi?obrf=aHJnczg5YzY2YzZx" target="_blank" title="Instagram">
+<svg class="w-6 h-6" fill="currentColor" viewbox="0 0 24 24"><path d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.058-.975.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.882-.344 1.857-.047 1.023-.058 1.351-.058 3.807v.468c0 2.456.011 2.784.058 3.807.045.975.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.882.3 1.857.344 1.054.048 1.37.058 4.041.058h.08c2.597 0 2.917-.01 3.96-.058.976-.045 1.505-.207 1.858-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.882.344-1.857.048-1.055.058-1.37.058-4.041v-.08c0-2.597-.01-2.917-.058-3.96-.045-.976-.207-1.505-.344-1.858a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.882-.3-1.857-.344-1.023-.047-1.351-.058-3.807-.058zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z" fill-rule="evenodd"></path></svg>
+</a>
+<!-- Facebook Icon & Link (Aap yahan apna link daal sakte hain) -->
+<a class="text-gray-600 hover:text-[#0f5132] transition" href="https://www.facebook.com/share/19zAPhkzvr/" target="_blank" title="Facebook">
+<svg class="w-6 h-6" fill="currentColor" viewbox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" fill-rule="evenodd"></path></svg>
+</a>
+<!-- YouTube Icon & Link (Aap yahan apna link daal sakte hain) -->
+<a class="text-gray-600 hover:text-[#0f5132] transition" href="https://youtube.com/@gharsathiofficial?si=J65NQ6QA4wyogRQd" target="_blank" title="YouTube">
+<svg class="w-6 h-6" fill="currentColor" viewbox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" fill-rule="evenodd"></path></svg>
+</a>
+</div>
+</div>
+</div>
+<div class="text-center text-gray-500 text-sm mt-8">© 2026 Ghar Sathi. All Rights Reserved.</div>
+</footer>
+<!-- Scripts -->
+
+
+<script src="js/Home.js"></script>
+</body>
+</html>

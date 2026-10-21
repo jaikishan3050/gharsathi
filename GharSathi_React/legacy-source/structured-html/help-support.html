@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/help-support.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Help &amp; Support | Ghar Sathi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans pb-28">
+<!-- Top Header -->
+<header class="bg-[#0B3D2E] text-white p-4 sticky top-0 z-50 shadow-md">
+<div class="max-w-2xl mx-auto flex justify-between items-center">
+<div class="flex items-center gap-3">
+<img alt="Logo" class="h-12 w-auto" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+<div>
+<h1 class="text-xl font-bold">Ghar Sathi</h1>
+<p class="text-xs text-gray-200">Trusted Home Services</p>
+</div>
+</div>
+</div>
+</header>
+<!-- Page Title & Back Bar -->
+<div class="bg-[#0B3D2E] text-white px-4 pb-6 pt-2">
+<div class="max-w-2xl mx-auto flex items-center gap-4">
+<a class="text-white hover:text-gray-300" href="settings.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M10 19l-7-7m0 0l7-7m-7 7h18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</a>
+<div>
+<h2 class="text-2xl font-bold">Help &amp; Support</h2>
+<p class="text-xs text-gray-300">We are here to help you 24/7 across Bihar</p>
+</div>
+</div>
+</div>
+<!-- Main Content Container -->
+<main class="max-w-2xl mx-auto px-4 mt-4 space-y-4">
+<!-- Quick Contact Card -->
+<div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-200">
+<h3 class="font-bold text-[#0B3D2E] text-base mb-2">Need Direct Assistance?</h3>
+<p class="text-xs text-gray-600 mb-4">You can call or WhatsApp us anytime for any booking or service-related queries.</p>
+<div class="grid grid-cols-2 gap-3">
+<a class="bg-green-50 border border-green-200 text-[#0B3D2E] p-3 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs hover:bg-green-100 transition" href="tel:9251115827">
+                    📞 Call Support
+                </a>
+<a class="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-2xl flex items-center justify-center gap-2 font-bold text-xs hover:bg-emerald-100 transition" href="https://wa.me/919251115827" target="_blank">
+                    💬 WhatsApp Us
+                </a>
+</div>
+</div>
+<!-- FAQs Section -->
+<div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-200 space-y-4">
+<h3 class="font-bold text-[#0B3D2E] text-base">Frequently Asked Questions (FAQs)</h3>
+<div class="space-y-3 divide-y divide-gray-100">
+<div class="pt-3">
+<h4 class="text-xs font-bold text-gray-900 mb-1">Q: How can I cancel my service booking?</h4>
+<p class="text-[11px] text-gray-600">A: You can go to the 'My Bookings' section, click on your active booking, and submit a cancellation request.</p>
+</div>
+<div class="pt-3">
+<h4 class="text-xs font-bold text-gray-900 mb-1">Q: What should I do if the technician is late?</h4>
+<p class="text-[11px] text-gray-600">A: You can call our official support number or contact the assigned technician directly through the app.</p>
+</div>
+<div class="pt-3">
+<h4 class="text-xs font-bold text-gray-900 mb-1">Q: Are services available across all districts of Bihar?</h4>
+<p class="text-[11px] text-gray-600">A: Yes, Ghar Sathi provides verified home services across all 38 districts of Bihar.</p>
+</div>
+</div>
+</div>
+<!-- Raise a Complaint Form -->
+<div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-200">
+<h3 class="font-bold text-[#0B3D2E] text-base mb-2">Raise a Complaint / Feedback</h3>
+<p class="text-xs text-gray-500 mb-4">If you are facing any issue, please fill in the details below and submit.</p>
+<form class="space-y-3" onsubmit="submitComplaint(event)">
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1"> Mobile Number *</label>
+<input class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]" id="complaintContact" placeholder="Enter your phone number" required="" type="text"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-gray-700 mb-1">Issue Description *</label>
+<textarea class="w-full border px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0B3D2E]" id="complaintDesc" placeholder="Describe your issue in detail here..." required="" rows="3"></textarea>
+</div>
+<button class="w-full bg-[#0B3D2E] text-white py-3 rounded-xl font-bold text-xs shadow hover:bg-green-800 transition" type="submit">Submit Complaint</button>
+</form>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 bg-[#0B3D2E] text-white py-2 px-6 flex justify-between items-center shadow-lg z-50">
+<a class="flex flex-col items-center text-gray-300 hover:text-white" href="Home.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center text-gray-300 hover:text-white" href="services.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1">Services</span>
+</a>
+<a class="flex flex-col items-center text-gray-300 hover:text-white" href="my-bookings.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1">My Bookings</span>
+</a>
+<a class="flex flex-col items-center text-gray-300 hover:text-white" href="manage-addresses.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1">Addresses</span>
+</a>
+<a class="flex flex-col items-center text-[#D4AF37]" href="settings.html">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="text-[10px] mt-1 font-bold">Profile</span>
+</a>
+</nav>
+<!-- JavaScript -->
+
+
+<script src="js/help-support.js"></script>
+</body>
+</html>

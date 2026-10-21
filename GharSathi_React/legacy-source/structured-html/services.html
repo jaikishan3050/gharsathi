@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/services.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Our Services | Ghar Sathi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+</head>
+<body class="bg-[#F4F8F6] text-gray-800 font-sans">
+<!-- TOP HEADER / NAVBAR -->
+<header class="bg-[#0B3D2E] text-white px-4 py-3 sticky top-0 z-50 shadow-md">
+<div class="max-w-7xl mx-auto flex justify-between items-center flex-wrap gap-4">
+<div class="flex items-center gap-3">
+<img alt="Ghar Sathi Logo" class="h-12 w-auto" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+<div>
+<span class="text-xl font-extrabold tracking-wide text-white block">Ghar Sathi</span>
+<span class="text-[10px] text-[#D4AF37] tracking-wider uppercase block">Har Ghar Ka Apna Sathi</span>
+</div>
+</div>
+<nav class="hidden md:flex items-center gap-6 text-sm font-semibold">
+<a class="hover:text-[#D4AF37] transition" href="Home.html">Home</a>
+<a class="text-[#D4AF37] border-b-2 border-[#D4AF37] pb-1" href="services.html">Services</a>
+<a class="hover:text-[#D4AF37] transition" href="about.html">About Us</a>
+<a class="hover:text-[#D4AF37] transition" href="reviews.html">Feedback</a>
+<a class="hover:text-[#D4AF37] transition" href="contact.html">Contact</a>
+</nav>
+<div class="flex items-center">
+<!-- PROFILE ICON + DROPDOWN -->
+<div class="relative ml-3">
+<button aria-expanded="false" aria-label="Open profile menu" class="w-11 h-11 rounded-full overflow-hidden border-2 border-white/80 shadow-md focus:outline-none focus:ring-2 focus:ring-[#D4AF37]" id="profileMenuButton" onclick="toggleProfileMenu()" type="button">
+<span class="profile-fallback" id="servicesProfileAvatar">G</span>
+</button>
+<div class="hidden absolute right-0 top-14 w-72 max-w-[90vw] bg-white text-gray-700 rounded-2xl shadow-2xl border border-gray-200 z-[100] overflow-hidden" id="profileDropdown">
+<div class="p-5 text-center">
+<div class="w-20 h-20 rounded-full overflow-hidden mx-auto mb-3 border border-gray-200 profile-fallback" id="servicesProfileLargeAvatar">G</div>
+<label class="block text-xs text-[#0B3D2E] font-bold cursor-pointer hover:underline mb-2">Change Photo
+                <input accept="image/*" class="hidden" id="servicesProfileImageInput" onchange="updateServicesProfileImage(event)" type="file"/>
+</label>
+<button class="hidden text-xs text-red-600 font-semibold hover:underline mb-2" id="servicesRemovePhoto" onclick="removeServicesProfileImage()" type="button">Remove Photo</button>
+<h3 class="text-lg font-extrabold text-gray-800" id="profileName">My Profile</h3>
+<p class="text-sm text-gray-500 mt-1" id="profilePhone">Manage your Ghar Sathi account</p>
+</div>
+<div class="border-t border-gray-200 mx-5"></div>
+<nav class="p-3 space-y-1 text-sm font-semibold">
+<a class="block px-4 py-3 rounded-lg hover:bg-gray-100" href="my-bookings.html">🗓️ My Bookings</a>
+<a class="block px-4 py-3 rounded-lg hover:bg-gray-100" href="manage-addresses.html">📍 Address</a>
+<a class="block px-4 py-3 rounded-lg hover:bg-gray-100" href="settings.html">⚙️ Setting</a>
+<button class="w-full text-left px-4 py-3 rounded-lg border border-red-100 text-red-600 hover:bg-red-50" onclick="logoutProfile()" type="button">Logout</button>
+</nav>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- HERO SECTION WITH PERFECT SIZED SINGLE-VIEW BANNER -->
+<section class="bg-[#0B3D2E] text-white py-6 px-4 relative overflow-hidden">
+<div class="max-w-4xl mx-auto mb-4 text-center">
+<p class="text-[#D4AF37] uppercase tracking-widest text-xs font-bold mb-1">Our Services</p>
+<h1 class="text-3xl md:text-5xl font-extrabold mb-2 leading-tight">Professional Home Services<br/>for a <span class="text-[#D4AF37]">Better Tomorrow</span></h1>
+<p class="text-gray-200 text-xs md:text-sm max-w-xl mx-auto">AC repair se lekar electrical work tak, ghar ke har kaam ke liye ab aapke paas hai Ghar Sathi. Trusted technicians, best service, reasonable price.</p>
+</div>
+<!-- Banner Container (Mobile: 220px height, Desktop: 320px height, Width: 100%) -->
+<div class="max-w-4xl mx-auto">
+<div class="flex overflow-x-auto snap-x snap-mandatory no-scrollbar cursor-grab active:cursor-grabbing rounded-2xl shadow-lg border-2 border-[#D4AF37]/40" id="bannerScroll" style="scroll-behavior: smooth;">
+<!-- Banner 1 -->
+<div class="min-w-full h-[220px] md:h-[320px] snap-center flex-shrink-0 relative">
+<img alt="Banner 1" class="w-full h-full object-cover" src="images/baner.jpeg"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6">
+<span class="bg-[#D4AF37] text-[#0B3D2E] text-[10px] font-bold px-2.5 py-1 rounded-full uppercase w-max mb-1">Special Offer</span>
+<h3 class="text-lg md:text-2xl font-bold text-white">AC Deep Cleaning &amp; Repair</h3>
+<p class="text-xs text-gray-200">Get up to 20% off on expert home services.</p>
+</div>
+</div>
+<!-- Banner 2 -->
+<div class="min-w-full h-[220px] md:h-[320px] snap-center flex-shrink-0 relative">
+<img alt="Banner 2" class="w-full h-full object-cover" src="images/homebanner2.png"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6">
+<span class="bg-[#D4AF37] text-[#0B3D2E] text-[10px] font-bold px-2.5 py-1 rounded-full uppercase w-max mb-1">Monsoon Special</span>
+<h3 class="text-lg md:text-2xl font-bold text-white">Appliance Care Package</h3>
+<p class="text-xs text-gray-200">Fridge, Washing Machine &amp; RO service at best rates.</p>
+</div>
+</div>
+<!-- Banner 3 -->
+<div class="min-w-full h-[220px] md:h-[320px] snap-center flex-shrink-0 relative">
+<img alt="Banner 3" class="w-full h-full object-cover" src="images/homebanner4.png"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6">
+<span class="bg-[#D4AF37] text-[#0B3D2E] text-[10px] font-bold px-2.5 py-1 rounded-full uppercase w-max mb-1">Expert Support</span>
+<h3 class="text-lg md:text-2xl font-bold text-white">Verified Electricians &amp; Plumbers</h3>
+<p class="text-xs text-gray-200">Fast and reliable home repairs under 24 hours.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- OUR SERVICES GRID SECTION -->
+<main class="max-w-7xl mx-auto px-4 py-12">
+<div class="text-center mb-10">
+<h2 class="text-3xl font-extrabold text-[#0B3D2E] mb-2">Our Services</h2>
+<div class="w-20 h-1 bg-[#D4AF37] mx-auto rounded-full mb-3"></div>
+<p class="text-gray-600 text-sm max-w-lg mx-auto">Choose from our wide range of home services. Click Book Now to select sub-services and customize your booking.</p>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Card 1: AC Service -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="AC Service" class="w-full h-full object-cover" src="images/GharSathi AC Cleaning Service.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">20% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">AC Service &amp; Repair</h3>
+<p class="text-xs text-gray-500 mb-4">Cooling ka full solution</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹699</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹499</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('AC Service &amp; Repair')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+<!-- Card 2: Washing Machine -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="Washing Machine" class="w-full h-full object-cover" src="images/washine.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">15% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">Washing Machine</h3>
+<p class="text-xs text-gray-500 mb-4">Repair &amp; Maintenance</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹699</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹599</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('Washing Machine')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+<!-- Card 3: Fridge -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="Fridge" class="w-full h-full object-cover" src="images/fridge.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">15% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">Fridge &amp; Refrigerator</h3>
+<p class="text-xs text-gray-500 mb-4">Cooling &amp; Repair Service</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹749</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹649</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('Fridge &amp; Refrigerator')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+<!-- Card 4: RO Service -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="RO Service" class="w-full h-full object-cover" src="images/RO SERVICE.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">17% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">RO Service &amp; Repair</h3>
+<p class="text-xs text-gray-500 mb-4">Pure Water, Healthy Life</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹599</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹499</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('RO Service &amp; Repair')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+<!-- Card 5: Cooler Repair -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="Cooler Repair" class="w-full h-full object-cover" src="images/COLLER SERVICE.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">13% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">Cooler Repair</h3>
+<p class="text-xs text-gray-500 mb-4">Service &amp; Repair</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹459</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹399</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('Cooler Repair')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+<!-- Card 6: Electrician -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="Electrician" class="w-full h-full object-cover" src="images/ELECTICIAN.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">20% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">Electrician</h3>
+<p class="text-xs text-gray-500 mb-4">Wiring &amp; Electrical Work</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹249</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹199</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('Electrician')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+<!-- Card 7: Home Cleaning -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="Home Cleaning" class="w-full h-full object-cover" src="images/home cleaning.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">15% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">All Home Cleaning</h3>
+<p class="text-xs text-gray-500 mb-4">Deep Clean &amp; Sanitization</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹1499</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹1299</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('All Home Cleaning')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+<!-- Card 8: Chimney Cleaning -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="Chimney Cleaning" class="w-full h-full object-cover" src="images/CHIMNEY.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">15% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">Chimney Cleaning</h3>
+<p class="text-xs text-gray-500 mb-4">Deep Clean &amp; Sanitization</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹899</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹749</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('Chimney Cleaning')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+<!-- Card 9: Other Work -->
+<div class="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition flex flex-col">
+<div class="relative h-48 bg-gray-100 overflow-hidden">
+<img alt="Other Work" class="w-full h-full object-cover" src="images/other work.png"/>
+<span class="absolute top-3 right-3 bg-[#D4AF37] text-[#0B3D2E] text-xs font-bold px-2.5 py-1 rounded-full shadow">15% OFF</span>
+</div>
+<div class="p-5 flex flex-col flex-1 justify-between">
+<div>
+<h3 class="font-bold text-lg text-[#0B3D2E] mb-1">Other Work</h3>
+<p class="text-xs text-gray-500 mb-4">Plumbing, fixing &amp; odd jobs</p>
+</div>
+<div class="flex items-center justify-between pt-3 border-t border-gray-100">
+<div>
+<span class="text-[10px] text-gray-400 block font-medium">Starting Price</span>
+<div>
+<span class="text-xs text-gray-400 line-through">₹299</span>
+<span class="text-lg font-extrabold text-[#0B3D2E] ml-1">₹99</span>
+</div>
+</div>
+<button class="bg-[#0B3D2E] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-green-900 transition flex items-center gap-1.5 shadow cursor-pointer" onclick="openServiceDetail('OTHER WORK')">
+              📅 Book Now →
+            </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- WHY CHOOSE US FOOTER SECTION -->
+<section class="bg-[#0B3D2E] text-white py-12 px-4 mt-12 border-t-4 border-[#D4AF37]">
+<div class="max-w-7xl mx-auto text-center mb-8">
+<h2 class="text-2xl font-bold mb-1">Why Choose Ghar Sathi?</h2>
+<p class="text-xs text-gray-300">Trusted by thousands of happy customers</p>
+</div>
+<div class="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+<div class="p-4 bg-[#14543F] rounded-xl border border-[#D4AF37]/20">
+<span class="text-2xl mb-2 block">🛡️</span>
+<h4 class="font-bold text-sm mb-1">100% Verified</h4>
+<p class="text-[11px] text-gray-300">&amp; Trained Technicians</p>
+</div>
+<div class="p-4 bg-[#14543F] rounded-xl border border-[#D4AF37]/20">
+<span class="text-2xl mb-2 block">₹</span>
+<h4 class="font-bold text-sm mb-1">Transparent</h4>
+<p class="text-[11px] text-gray-300">Pricing</p>
+</div>
+<div class="p-4 bg-[#14543F] rounded-xl border border-[#D4AF37]/20">
+<span class="text-2xl mb-2 block">⏱️</span>
+<h4 class="font-bold text-sm mb-1">Service Completed</h4>
+<p class="text-[11px] text-gray-300">Under 24 Hours</p>
+</div>
+<div class="p-4 bg-[#14543F] rounded-xl border border-[#D4AF37]/20">
+<span class="text-2xl mb-2 block">🎧</span>
+<h4 class="font-bold text-sm mb-1">Dedicated</h4>
+<p class="text-[11px] text-gray-300">Customer Support</p>
+</div>
+</div>
+</section>
+<!-- FOOTER -->
+<footer class="bg-gray-900 text-gray-400 py-6 text-center text-xs">
+<p>© 2026 Ghar Sathi. All Rights Reserved.</p>
+</footer>
+<!-- SCRIPTS -->
+
+
+<script src="js/services.js"></script>
+</body>
+</html>

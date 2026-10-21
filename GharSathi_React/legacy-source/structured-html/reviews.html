@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="css/reviews.css">
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Customer Feedback | Ghar Sathi</title>
+<meta content="Share your experience with Ghar Sathi home services. Your feedback helps us improve." name="description"/>
+
+
+</head>
+<body>
+<!-- HEADER -->
+<header class="navbar">
+<a class="brand" href="Home.html">
+<div class="logo-img">
+<img alt="Ghar Sathi Logo" src="images/GHARSATHI_LOGO-removebg-preview.png"/>
+</div>
+<div class="brand-text">
+<h2>Ghar Sathi</h2>
+<p>HAR GHAR KA SATHI</p>
+</div>
+</a>
+<nav class="nav-links">
+<a href="Home.html">Home</a>
+<a href="services.html">Services</a>
+
+<a href="complain.html">Complain</a>
+<a href="services.html">Book Service</a>
+</nav>
+</header>
+<!-- HERO SECTION -->
+<section class="hero">
+<div class="eyebrow">YOUR VOICE MATTERS</div>
+<h1>Your Feedback Builds a<br/>
+<span>Better Ghar Sathi</span>
+</h1>
+<p>
+            Aapka feedback hamare liye bahut important hai.
+            Apna experience share karein aur humein aur behtar
+            service dene mein madad karein.
+        </p>
+</section>
+<!-- MAIN CONTENT -->
+<main class="main-container">
+<section class="feedback-card">
+<div class="section-heading">
+<h2>Share Your Experience</h2>
+<p>Apni service ke baare mein kuch batayein.</p>
+</div>
+<form class="feedback-form" id="feedbackForm">
+<div class="form-group">
+<label for="customerName">Full Name *</label>
+<input autocomplete="name" id="customerName" name="customerName" placeholder="Enter your full name" required="" type="text"/>
+</div>
+<div class="form-group">
+<label for="mobile">Mobile Number *</label>
+<input autocomplete="tel" id="mobile" inputmode="numeric" maxlength="10" name="mobile" pattern="[6-9][0-9]{9}" placeholder="10-digit mobile number" required="" type="tel"/>
+</div>
+<div class="form-group">
+<label for="serviceType">Service Taken *</label>
+<select id="serviceType" name="serviceType" required="">
+<option value="">Select your service</option>
+<option value="AC Service/Repair">AC Service / Repair</option>
+<option value="Washing Machine">Washing Machine</option>
+<option value="Refrigerator">Fridge / Refrigerator</option>
+<option value="RO Service">RO Service</option>
+<option value="Electrician">Electrician</option>
+<option value="Cooler">Cooler</option>
+<option value="Geyser">Geyser</option>
+<option value="Chimney">Chimney</option>
+<option value="Other">Other</option>
+</select>
+</div>
+<div class="form-group">
+<label for="technicianBehaviour">Technician Behaviour *</label>
+<select id="technicianBehaviour" name="technicianBehaviour" required="">
+<option value="">Select an option</option>
+<option value="Excellent">Excellent</option>
+<option value="Good">Good</option>
+<option value="Average">Average</option>
+<option value="Needs Improvement">Needs Improvement</option>
+</select>
+</div>
+<div class="form-group full-width">
+<label>Rate Your Experience *</label>
+<div class="rating-options">
+<label>
+<input name="rating" required="" type="radio" value="5"/>
+                            ⭐ 5 - Excellent
+                        </label>
+<label>
+<input name="rating" type="radio" value="4"/>
+                            ⭐ 4 - Good
+                        </label>
+<label>
+<input name="rating" type="radio" value="3"/>
+                            ⭐ 3 - Average
+                        </label>
+<label>
+<input name="rating" type="radio" value="2"/>
+                            ⭐ 2 - Poor
+                        </label>
+<label>
+<input name="rating" type="radio" value="1"/>
+                            ⭐ 1 - Bad
+                        </label>
+</div>
+</div>
+<div class="form-group full-width">
+<label for="comments">Your Feedback *</label>
+<textarea id="comments" name="comments" placeholder="Tell us about your experience..." required=""></textarea>
+</div>
+<p class="form-note">
+                    * Required fields. Please do not share OTPs,
+                    passwords, or sensitive personal information.
+                </p>
+<div aria-live="polite" id="form-message" role="status"></div>
+<button class="submit-btn" type="submit">
+                    Submit Your Feedback
+                </button>
+</form>
+</section>
+<!-- TRUST SECTION -->
+<section class="trust-section">
+<h2>Thank You for Trusting Ghar Sathi</h2>
+<p>
+                Har feedback humein apni service ko behtar banane
+                ka mauka deta hai.
+            </p>
+<div class="trust-grid">
+<div class="trust-item">
+<div class="trust-icon">🏠</div>
+<h3>Customer First</h3>
+<p>Aapki satisfaction hamari priority hai.</p>
+</div>
+<div class="trust-item">
+<div class="trust-icon">🛠️</div>
+<h3>Trusted Technicians</h3>
+<p>Behtar service aur professional behaviour par focus.</p>
+</div>
+<div class="trust-item">
+<div class="trust-icon">💚</div>
+<h3>Your Trust Matters</h3>
+<p>Aapke sujhav se hum lagatar improve karte hain.</p>
+</div>
+</div>
+</section>
+</main>
+<!-- FOOTER -->
+<footer class="footer">
+<h3>Ghar Sathi</h3>
+<p>Har Ghar Ka Sathi</p>
+<p>Reliable Home Services, Made Simple.</p>
+<p>
+<a href="Home.html">Home</a> |
+            <a href="services.html">Services</a> |
+            <a href="login.html">Login</a> |
+            <a href="complain.html">Complain</a>
+</p>
+<p class="copyright">
+            © <span id="currentYear"></span> Ghar Sathi.
+            All rights reserved.
+        </p>
+</footer>
+
+
+<script src="js/reviews.js"></script>
+</body>
+</html>
