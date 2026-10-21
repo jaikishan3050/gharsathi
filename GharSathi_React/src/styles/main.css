@@ -4036,54 +4036,198 @@
    TRANSACTIONAL SMS & 6-DIGIT OTP MODAL STYLES
    ========================================================================== */
 .otp-modal-wrapper {
-  max-width: 480px;
+  max-width: 490px;
   width: 92%;
-  border-radius: 16px;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.22);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 25px 60px rgba(6, 41, 31, 0.28);
+  overflow: hidden;
+}
+
+.otp-modal-wrapper .modal-header {
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid #eef2ef;
+}
+
+.otp-modal-wrapper .auth-tab-switch {
+  margin: 18px 26px 0 26px;
+}
+
+.otp-modal-wrapper .auth-form-body {
+  padding: 18px 26px 26px;
+}
+
+.auth-intro {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #4b6354;
+  margin: 0 0 18px 0;
+}
+
+/* Individual Form Field Blocks */
+.field-block {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 7px !important;
+  margin-bottom: 15px !important;
+  width: 100% !important;
+  text-align: left !important;
+}
+
+.field-label {
+  display: flex !important;
+  align-items: center !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #1a4231 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  margin: 0 !important;
+}
+
+.field-label .req {
+  color: #dc2626 !important;
+  margin-left: 4px !important;
+  font-weight: 800 !important;
+}
+
+/* Styled Inputs, Selects, and Textareas */
+.field-block input,
+.field-block select,
+.field-block textarea,
+.modal-form-input,
+.modal-form-select,
+.modal-form-textarea {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border: 1.5px solid #cbd5e1 !important;
+  background: #fbfdfb !important;
+  color: #1e293b !important;
+  border-radius: 10px !important;
+  padding: 11px 14px !important;
+  font-size: 13.5px !important;
+  font-family: inherit !important;
+  outline: none !important;
+  transition: all 0.2s ease !important;
+  line-height: 1.4 !important;
+}
+
+.field-block input:focus,
+.field-block select:focus,
+.field-block textarea:focus,
+.modal-form-input:focus,
+.modal-form-select:focus,
+.modal-form-textarea:focus {
+  border-color: #0b3d2e !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(11, 61, 46, 0.12) !important;
+}
+
+.field-block input::placeholder,
+.field-block textarea::placeholder,
+.modal-form-input::placeholder,
+.modal-form-textarea::placeholder {
+  color: #94a3b8 !important;
+  font-weight: 400 !important;
+}
+
+.field-block select,
+.modal-form-select {
+  cursor: pointer !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 14px center !important;
+  padding-right: 38px !important;
+}
+
+.field-block textarea,
+.modal-form-textarea {
+  min-height: 68px !important;
+  resize: vertical !important;
+  line-height: 1.5 !important;
+}
+
+.field-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+}
+
+.field-hint {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 5px;
+  line-height: 1.4;
 }
 
 .phone-prefix-input-wrap {
   display: flex;
   align-items: center;
-  background: #ffffff;
+  background: #fbfdfb;
   border: 1.5px solid #cbd5e1;
   border-radius: 10px;
   overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .phone-prefix-input-wrap:focus-within {
-  border-color: #d4af37;
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+  border-color: #0b3d2e;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(11, 61, 46, 0.12);
 }
 
 .phone-prefix-badge {
   background: #f1f5f9;
   color: #334155;
   font-weight: 700;
-  font-size: 13px;
-  padding: 10px 14px;
+  font-size: 12.5px;
+  padding: 11px 14px;
   border-right: 1.5px solid #cbd5e1;
   user-select: none;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
-.phone-styled-input {
+.phone-styled-input,
+.phone-prefix-input-wrap input.phone-styled-input {
   border: none !important;
   box-shadow: none !important;
-  font-size: 16px;
-  letter-spacing: 1px;
-  font-weight: 600;
-  padding: 10px 14px;
-  flex: 1;
+  background: transparent !important;
+  font-size: 15px !important;
+  letter-spacing: 0.5px !important;
+  font-weight: 600 !important;
+  padding: 11px 14px !important;
+  flex: 1 !important;
+  min-height: auto !important;
+  width: 100% !important;
 }
 
-.field-grid-2col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+@media (max-width: 480px) {
+  .otp-modal-wrapper {
+    width: 95%;
+  }
+  .otp-modal-wrapper .modal-header {
+    padding: 16px 18px 14px;
+  }
+  .otp-modal-wrapper .auth-tab-switch {
+    margin: 14px 18px 0 18px;
+  }
+  .otp-modal-wrapper .auth-form-body {
+    padding: 14px 18px 20px;
+  }
+  .field-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
 }
 
 .otp-verification-banner {

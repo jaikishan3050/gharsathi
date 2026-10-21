@@ -324,6 +324,7 @@ export default function OtpModal({
                     value={signupData.name}
                     onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
                     placeholder="Apna poora naam"
+                    className="modal-form-input"
                   />
                 </div>
 
@@ -351,6 +352,7 @@ export default function OtpModal({
                     <select
                       value={signupData.area}
                       onChange={(e) => setSignupData({ ...signupData, area: e.target.value })}
+                      className="modal-form-select"
                     >
                       {areas.map((a) => (
                         <option key={a} value={a}>
@@ -369,6 +371,7 @@ export default function OtpModal({
                         setSignupData({ ...signupData, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })
                       }
                       placeholder="e.g. 801103"
+                      className="modal-form-input"
                     />
                   </div>
                 </div>
@@ -381,6 +384,7 @@ export default function OtpModal({
                     value={signupData.address}
                     onChange={(e) => setSignupData({ ...signupData, address: e.target.value })}
                     placeholder="House/Flat No, Street, Landmark..."
+                    className="modal-form-textarea"
                   />
                 </div>
 
