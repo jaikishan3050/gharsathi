@@ -33,7 +33,7 @@ class JobWebSocketService {
       if (hostname.includes('gharsathi.in') || hostname.endsWith('.web.app') || hostname.endsWith('.firebaseapp.com')) {
         return `${protocol}//${window.location.host}/ws/jobs${areaSuffix}`;
       }
-      return `wss://gharsathi-backend.onrender.com/ws/jobs${areaSuffix}`;
+      return `wss://gharsathi-a9er.onrender.com/ws/jobs${areaSuffix}`;
     }
 
     const port = '8000';

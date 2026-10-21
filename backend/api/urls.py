@@ -8,6 +8,7 @@ from .views import (
     AdminWithdrawalViewSet,
     AdminAnalyticsView,
     ResetDemoView,
+    SetupSuperuserView,
     RazorpayCreateOrderView,
     RazorpayVerifyPaymentView,
     CustomerProfileViewSet,
@@ -33,4 +34,6 @@ urlpatterns = [
     path('payments/razorpay/verify/', RazorpayVerifyPaymentView.as_view(), name='razorpay-verify-alias'),
     path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin-analytics'),
     path('admin/reset-demo/', ResetDemoView.as_view(), name='admin-reset-demo'),
+    path('admin/setup-superuser/', SetupSuperuserView.as_view(), name='admin-setup-superuser'),
+    path('auth/setup-admin/', SetupSuperuserView.as_view(), name='auth-setup-admin'),
 ]

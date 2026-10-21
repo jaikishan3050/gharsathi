@@ -734,6 +734,57 @@ class ResetDemoView(APIView):
         })
 
 
+class SetupSuperuserView(APIView):
+    """Creates or updates the default superuser for Django Admin."""
+
+    def get(self, request):
+        return self._process(request)
+
+    def post(self, request):
+        return self._process(request)
+
+    def _process(self, request):
+        from django.contrib.auth.models import User
+        from django.contrib.auth import authenticate
+
+        data = request.data if request.method == 'POST' and request.data else request.query_params
+        username = data.get('username') or 'admin'
+        password = data.get('password') or 'GharSathi@2026'
+        email = data.get('email') or 'admin@gharsathi.in'
+
+        user = User.objects.filter(username=username).first()
+        created = False
+        if not user:
+            user = User.objects.create_superuser(
+                username=username,
+                email=email,
+                password=password
+            )
+            created = True
+        else:
+            user.set_password(password)
+            user.is_staff = True
+            user.is_superuser = True
+            user.is_active = True
+            user.save()
+
+        auth_check = authenticate(username=username, password=password)
+        return Response({
+            'success': True,
+            'message': f"Superuser '{username}' configured successfully.",
+            'created': created,
+            'auth_verified': auth_check is not None,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'is_staff': user.is_staff,
+                'is_superuser': user.is_superuser,
+                'is_active': user.is_active,
+            }
+        })
+
+
 class RazorpayCreateOrderView(APIView):
     """
     Creates a Razorpay Order for online customer booking checkout.

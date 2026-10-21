@@ -16,8 +16,8 @@ export function getApiBaseUrl() {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://127.0.0.1:8000/api';
     }
-    // Deployed production environment (e.g. Vercel, Netlify, Render)
-    return 'https://gharsathi-backend.onrender.com/api';
+    // Deployed production environment on Render
+    return 'https://gharsathi-a9er.onrender.com/api';
   }
 
   return 'http://127.0.0.1:8000/api';
