@@ -320,10 +320,13 @@ export const api = {
     });
   },
 
-  rechargeWallet: async (technicianPk, amount) => {
+  rechargeWallet: async (technicianPk, rechargeData) => {
+    const payload = typeof rechargeData === 'object'
+      ? rechargeData
+      : { amount: rechargeData, description: 'Razorpay Wallet Top-up' };
     return await apiRequest(`/technicians/${technicianPk}/recharge/`, {
       method: 'POST',
-      body: JSON.stringify({ amount, description: 'UPI Instant Wallet Top-up (Recharge)' }),
+      body: JSON.stringify(payload),
     });
   },
 

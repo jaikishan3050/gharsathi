@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useGharSathi } from '../context/AppDataContext.jsx';
+import api from '../services/api.js';
 
 export function Brand({ compact = false }) {
   return (
@@ -1030,12 +1031,15 @@ export function PinVerificationModal({ booking, onClose, onVerify }) {
 }
 
 /**
- * Interactive Demo UPI / QR Wallet Recharge Modal for Technicians
+ * Authentic Razorpay Payment Gateway Wallet Recharge Modal for Technicians.
+ * Strictly verifies payments through Razorpay Live Gateway (Cards, UPI, Netbanking).
+ * ZERO simulated free credits. Money is transferred directly to Ghar Sathi account.
  */
 export function WalletRechargeModal({ technician, onClose, onRecharge }) {
   const [amount, setAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
   if (!technician) return null;
 
@@ -1058,7 +1062,22 @@ export function WalletRechargeModal({ technician, onClose, onRecharge }) {
     }
   };
 
-  const handleConfirmRecharge = (e) => {
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleConfirmRecharge = async (e) => {
     e.preventDefault();
     const finalAmount = Number(amount);
     if (!finalAmount || finalAmount < 50) {
@@ -1067,11 +1086,88 @@ export function WalletRechargeModal({ technician, onClose, onRecharge }) {
     }
 
     setIsProcessing(true);
-    setTimeout(() => {
-      onRecharge(finalAmount);
+    setStatusMessage('Razorpay secure gateway se connect ho raha hai…');
+
+    try {
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded || typeof window.Razorpay === 'undefined') {
+        throw new Error('Razorpay Checkout SDK load nahi ho saka. Kripya apna internet connection check karein.');
+      }
+
+      // Step 1: Create live Razorpay Order on backend
+      const orderRes = await api.createRazorpayOrder({
+        amount: finalAmount,
+        bookingId: technician.partner_id || technician.id || `tech_${Date.now()}`,
+        serviceName: 'Partner Wallet Top-up',
+        customerName: technician.name || 'Technician Partner',
+        customerEmail: technician.email || 'partner@gharsathi.in',
+        customerContact: technician.phone || '',
+      });
+
+      if (!orderRes || !orderRes.order_id) {
+        throw new Error('Payment server par order create nahi ho saka. Kripya punah prayas karein.');
+      }
+
+      setStatusMessage('Razorpay payment gateway khul raha hai…');
+
+      // Step 2: Open official Razorpay Checkout popup
+      const options = {
+        key: orderRes.key_id || 'rzp_live_Tr00Y2gS1bC4Rv',
+        amount: orderRes.amount,
+        currency: orderRes.currency || 'INR',
+        name: 'Ghar Sathi',
+        description: `Partner Wallet Top-up (₹${finalAmount})`,
+        image: '/images/gharsathi-logo.png',
+        order_id: orderRes.order_id,
+        prefill: {
+          name: technician.name || '',
+          contact: technician.phone || '',
+          email: technician.email || '',
+        },
+        theme: {
+          color: '#0d5c43',
+        },
+        handler: async function (response) {
+          try {
+            setStatusMessage('Payment verify ho raha hai, wallet credit ho raha hai…');
+            // Step 3: Only when Razorpay confirms real payment capture
+            const result = await onRecharge({
+              amount: finalAmount,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+
+            setIsProcessing(false);
+            if (result && result.success !== false) {
+              onClose();
+            }
+          } catch (err) {
+            setIsProcessing(false);
+            setStatusMessage('');
+            alert('Payment verification fail ho gaya: ' + (err.message || 'Error occurred.'));
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessing(false);
+            setStatusMessage('');
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (resp) {
+        setIsProcessing(false);
+        setStatusMessage('');
+        alert('Payment nahi ho paya: ' + (resp?.error?.description || 'Bank transaction decline hua ya cancel ho gaya.'));
+      });
+      rzp.open();
+    } catch (err) {
       setIsProcessing(false);
-      onClose();
-    }, 450);
+      setStatusMessage('');
+      alert(err.message || 'Razorpay payment shuru nahi ho saka.');
+    }
   };
 
   return (
@@ -1079,13 +1175,13 @@ export function WalletRechargeModal({ technician, onClose, onRecharge }) {
       <div className="modal-card recharge-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <p className="eyebrow eyebrow-gold">TECHNICIAN FINTECH WALLET</p>
+            <p className="eyebrow eyebrow-gold">TECHNICIAN PARTNER WALLET</p>
             <h3>Recharge Partner Wallet</h3>
             <p className="modal-sub">
-              Partner: <strong>{technician.name}</strong> · ID: {technician.id}
+              Partner: <strong>{technician.name}</strong> · ID: {technician.partner_id || technician.id}
             </p>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={onClose} disabled={isProcessing}>
             ×
           </button>
         </div>
@@ -1121,6 +1217,7 @@ export function WalletRechargeModal({ technician, onClose, onRecharge }) {
                   <button
                     key={q}
                     type="button"
+                    disabled={isProcessing}
                     className={`amount-pill ${amount === q && !customAmount ? 'selected' : ''}`}
                     onClick={() => handleSelectAmount(q)}
                   >
@@ -1140,39 +1237,106 @@ export function WalletRechargeModal({ technician, onClose, onRecharge }) {
                   placeholder="e.g. 750"
                   value={customAmount}
                   onChange={handleCustomChange}
+                  disabled={isProcessing}
                   min="50"
-                  max="10000"
+                  max="50000"
                 />
               </div>
             </div>
 
-            {/* Simulated UPI QR Card */}
-            <div className="simulated-upi-card">
-              <div className="upi-qr-box">
-                <div className="demo-qr-graphic">
-                  <div className="qr-box-inner">
-                    <span>⚡ UPI QR</span>
-                  </div>
-                </div>
+            {/* Official Razorpay Security Badge Card */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #0d5c43 0%, #063c2c 100%)',
+                color: '#ffffff',
+                padding: '14px 16px',
+                borderRadius: '12px',
+                margin: '16px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '14px',
+                boxShadow: '0 4px 14px rgba(13, 92, 67, 0.25)',
+              }}
+            >
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '20px',
+                  flexShrink: 0,
+                }}
+              >
+                🔒
               </div>
-              <div className="upi-details-col">
-                <small>INSTANT DEMO UPI GATEWAY</small>
-                <strong>VPA: gharsathi.partner@upi</strong>
-                <p>Simulated instant payment settlement with zero transaction charges.</p>
-                <span className="instant-credit-tag">⚡ Instant Wallet Top-up</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      letterSpacing: '0.06em',
+                      color: '#85e3b3',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Official Payment Gateway
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '9px',
+                      background: '#ffffff',
+                      color: '#0d5c43',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      fontWeight: 800,
+                    }}
+                  >
+                    RAZORPAY LIVE
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', opacity: 0.95, lineHeight: 1.3 }}>
+                  UPI (GPay / PhonePe / Paytm), Debit/Credit Cards & Netbanking
+                </div>
+                <div style={{ fontSize: '11px', color: '#c7edd8', marginTop: '2px' }}>
+                  Direct payment to Ghar Sathi account • Instant automated wallet top-up
+                </div>
               </div>
             </div>
 
-            <div className="modal-actions" style={{ marginTop: '20px' }}>
-              <button type="button" className="button button-outline" onClick={onClose}>
+            {statusMessage && (
+              <div
+                style={{
+                  padding: '8px 12px',
+                  marginBottom: '12px',
+                  background: '#f4fbf7',
+                  border: '1px solid #b7ebcf',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#0d5c43',
+                  textAlign: 'center',
+                  fontWeight: 600,
+                }}
+              >
+                {statusMessage}
+              </div>
+            )}
+
+            <div className="modal-actions" style={{ marginTop: '16px' }}>
+              <button type="button" className="button button-outline" onClick={onClose} disabled={isProcessing}>
                 Cancel
               </button>
               <button
                 type="submit"
                 className="button button-gold recharge-confirm-btn"
                 disabled={isProcessing || !amount || amount < 50}
+                style={{ minWidth: '220px', fontWeight: 700 }}
               >
-                {isProcessing ? 'Processing UPI Transfer…' : `Simulate Instant UPI (₹${amount}) ⚡`}
+                {isProcessing ? 'Connecting Razorpay…' : `Pay ₹${amount} with Razorpay 💳`}
               </button>
             </div>
           </form>

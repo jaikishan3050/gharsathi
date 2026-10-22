@@ -1856,10 +1856,11 @@ export function AppDataProvider({ children }) {
     [backendStatus, data.bookings, currentTechnician, addActivity, sendStepNotification, addToast]
   );
 
-  // Recharge Technician Wallet (Simulated Demo UPI / QR)
+  // Recharge Technician Wallet (via Verified Razorpay Online Payment)
   const rechargeTechnicianWallet = useCallback(
-    (technicianId, amount) => {
-      const numAmount = Number(amount);
+    async (technicianId, rechargePayload) => {
+      const amountVal = typeof rechargePayload === 'object' ? rechargePayload.amount : rechargePayload;
+      const numAmount = Number(amountVal);
       if (!Number.isFinite(numAmount) || numAmount <= 0) {
         addToast({
           title: 'Invalid Amount',
@@ -1869,14 +1870,29 @@ export function AppDataProvider({ children }) {
         return { success: false, error: 'Invalid amount' };
       }
 
+      let backendRes = null;
       if (backendStatus === 'live') {
-        api.rechargeWallet(technicianId, numAmount).catch((err) => {
-          console.warn('Backend rechargeWallet sync warning:', err);
-        });
+        try {
+          const payload = typeof rechargePayload === 'object'
+            ? rechargePayload
+            : { amount: numAmount };
+          backendRes = await api.rechargeWallet(technicianId, payload);
+        } catch (err) {
+          console.error('Backend rechargeWallet verification failed:', err);
+          const errDetail = err?.error || err?.message || 'Payment verification failed.';
+          addToast({
+            title: 'Recharge Failed ❌',
+            message: `Payment verify nahi hua: ${errDetail}. Wallet credit nahi hua.`,
+            type: 'error',
+          });
+          return { success: false, error: errDetail };
+        }
       }
 
       let finalBalance = 0;
-      const txId = `WTX-${Date.now().toString().slice(-6)}`;
+      const paymentRef = (typeof rechargePayload === 'object' && rechargePayload.razorpay_payment_id)
+        ? rechargePayload.razorpay_payment_id
+        : `WTX-${Date.now().toString().slice(-6)}`;
 
       setData((current) => {
         let updatedCurrentTech = null;
@@ -1887,14 +1903,16 @@ export function AppDataProvider({ children }) {
           const currentBal = Number.isFinite(Number(t.walletBalance))
             ? Number(t.walletBalance)
             : Number(t.wallet || 0);
-          const newBal = currentBal + numAmount;
+          const newBal = backendRes?.technician?.wallet_balance != null
+            ? Number(backendRes.technician.wallet_balance)
+            : currentBal + numAmount;
           finalBalance = newBal;
 
           const tx = {
-            id: txId,
+            id: paymentRef,
             type: 'credit',
             amount: numAmount,
-            description: `UPI Instant Wallet Top-up (Recharge)`,
+            description: `Razorpay Online Wallet Top-up (${paymentRef})`,
             timestamp: new Date().toISOString(),
           };
 
@@ -1921,7 +1939,7 @@ export function AppDataProvider({ children }) {
           technicians,
           activity: [
             addActivity(
-              `Technician ${technicianId} recharged wallet with ₹${numAmount}. New balance: ₹${finalBalance}`
+              `Technician ${technicianId} recharged wallet with ₹${numAmount} via Razorpay. New balance: ₹${finalBalance}`
             ),
             ...current.activity,
           ].slice(0, 50),
@@ -1929,12 +1947,12 @@ export function AppDataProvider({ children }) {
       });
 
       addToast({
-        title: 'Wallet Recharged! ⚡',
-        message: `₹${numAmount} credited successfully! Current balance: ₹${finalBalance}. You can now accept new bookings.`,
+        title: 'Wallet Recharged! 💳',
+        message: `₹${numAmount} credited successfully via Razorpay! Current balance: ₹${finalBalance}. Aap ab naye bookings accept kar sakte hain.`,
         type: 'success',
       });
 
-      return { success: true, balance: finalBalance };
+      return { success: true, balance: finalBalance, amount: numAmount };
     },
     [backendStatus, currentTechnician, addActivity, addToast]
   );

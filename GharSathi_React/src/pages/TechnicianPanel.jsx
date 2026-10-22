@@ -333,11 +333,12 @@ export default function TechnicianPanel() {
     return res;
   };
 
-  const handleWalletRecharge = (amount) => {
+  const handleWalletRecharge = async (payload) => {
     if (!currentTechnician) return { success: false };
-    const res = rechargeTechnicianWallet(currentTechnician.id, amount);
-    if (res.success) {
-      setNotice(`Wallet recharged with ₹${amount}! New balance: ₹${res.balance}. Aap ab naye jobs accept kar sakte hain.`);
+    const res = await rechargeTechnicianWallet(currentTechnician.id, payload);
+    if (res && res.success) {
+      const creditedAmount = res.amount || (typeof payload === 'object' ? payload.amount : payload);
+      setNotice(`Wallet recharged with ₹${creditedAmount}! New balance: ₹${res.balance}. Aap ab naye jobs accept kar sakte hain.`);
     }
     return res;
   };
@@ -816,7 +817,7 @@ export default function TechnicianPanel() {
               <div className="warning-banner-content">
                 <strong>Low Wallet Balance! Minimum ₹150 required to accept new bookings.</strong>
                 <p>
-                  Aapke wallet mein abhi ₹{techWalletBalance} hain. Customer jobs accept karne ke liye demo UPI se instant recharge karein.
+                  Aapke wallet mein abhi ₹{techWalletBalance} hain. Customer jobs accept karne ke liye Razorpay se instant recharge karein.
                 </p>
               </div>
               <button
@@ -1093,7 +1094,7 @@ export default function TechnicianPanel() {
                 className="button button-gold button-large recharge-hero-btn"
                 onClick={() => setRechargeModalOpen(true)}
               >
-                <span>⚡</span> Recharge Wallet (Demo UPI)
+                <span>💳</span> Recharge Wallet (Razorpay)
               </button>
             </div>
           </div>
@@ -1105,7 +1106,7 @@ export default function TechnicianPanel() {
               <div className="warning-banner-content">
                 <strong>Low Wallet Balance! Minimum ₹150 required to accept new bookings.</strong>
                 <p>
-                  Aapke wallet mein abhi ₹{techWalletBalance} hain. Unassigned jobs accept karne ke liye demo UPI se instant recharge karein.
+                  Aapke wallet mein abhi ₹{techWalletBalance} hain. Unassigned jobs accept karne ke liye Razorpay se instant recharge karein.
                 </p>
               </div>
               <button

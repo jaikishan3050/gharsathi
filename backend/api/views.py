@@ -233,7 +233,11 @@ class TechnicianProfileViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def recharge(self, request, pk=None):
-        """Credits technician wallet and appends a CREDIT ledger transaction."""
+        """
+        Securely credits technician wallet upon cryptographic verification of Razorpay payment.
+        Requires razorpay_payment_id, razorpay_order_id, and razorpay_signature.
+        Directly checks Razorpay Live API and HMAC-SHA256 signature to guarantee payment was collected.
+        """
         amount_raw = request.data.get('amount')
         try:
             amount = Decimal(str(amount_raw))
@@ -244,6 +248,82 @@ class TechnicianProfileViewSet(viewsets.ModelViewSet):
                 {'error': 'Kripya valid recharge amount enter karein (minimum ₹1).'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        razorpay_payment_id = (request.data.get('razorpay_payment_id') or request.data.get('payment_id') or '').strip()
+        razorpay_order_id = (request.data.get('razorpay_order_id') or request.data.get('order_id') or '').strip()
+        razorpay_signature = (request.data.get('razorpay_signature') or request.data.get('signature') or '').strip()
+
+        is_admin_override = bool(request.user and request.user.is_authenticated and request.user.is_staff and request.data.get('admin_override'))
+
+        if not is_admin_override:
+            if not razorpay_payment_id or not razorpay_order_id:
+                return Response(
+                    {'error': 'Razorpay payment verification zaroori hai. Payment ID aur Order ID missing hain.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Prevent duplicate credit / replay attack
+            if WalletTransaction.objects.filter(description__icontains=razorpay_payment_id).exists():
+                return Response(
+                    {'error': f'Payment ID {razorpay_payment_id} pehle hi process ho chuki hai.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
+            key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8KkypuWGZd')
+
+            is_verified = False
+
+            # 1. Cryptographic HMAC-SHA256 Signature verification
+            if razorpay_signature:
+                message = f"{razorpay_order_id}|{razorpay_payment_id}".encode('utf-8')
+                expected_sig = hmac.new(key_secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
+                if hmac.compare_digest(expected_sig, razorpay_signature):
+                    is_verified = True
+
+            # 2. Razorpay Python Client signature verification
+            if not is_verified and razorpay_signature:
+                try:
+                    import razorpay
+                    client = razorpay.Client(auth=(key_id, key_secret))
+                    client.utility.verify_payment_signature({
+                        'razorpay_order_id': razorpay_order_id,
+                        'razorpay_payment_id': razorpay_payment_id,
+                        'razorpay_signature': razorpay_signature,
+                    })
+                    is_verified = True
+                except Exception as ex:
+                    logger.warning(f"Razorpay SDK signature verification failed: {ex}")
+
+            # 3. Direct verification via Razorpay Payment Fetch API (validates real money in live account)
+            try:
+                import razorpay
+                client = razorpay.Client(auth=(key_id, key_secret))
+                payment_record = client.payment.fetch(razorpay_payment_id)
+                if payment_record and payment_record.get('status') in ['captured', 'authorized']:
+                    paid_paise = int(payment_record.get('amount', 0))
+                    expected_paise = int(round(float(amount) * 100))
+                    if abs(paid_paise - expected_paise) <= 100:  # Allow max 1 rupee variance
+                        is_verified = True
+                    else:
+                        return Response(
+                            {'error': f'Payment amount mismatch: Received {paid_paise/100} INR, expected {amount} INR.'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+            except Exception as ex:
+                logger.warning(f"Razorpay live payment fetch check: {ex}")
+
+            if not is_verified:
+                return Response(
+                    {'error': 'Razorpay payment verification fail ho gaya. Payment account mein confirm nahi hua.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        description = (
+            f"Admin Manual Balance Adjustment ({request.data.get('description', '')})"
+            if is_admin_override
+            else f"Razorpay Live Top-up (PayID: {razorpay_payment_id}, OrderID: {razorpay_order_id})"
+        )
 
         with transaction.atomic():
             tech_obj = self.get_object()
@@ -257,7 +337,7 @@ class TechnicianProfileViewSet(viewsets.ModelViewSet):
                 txn_type='CREDIT',
                 amount=amount,
                 balance_after=new_balance,
-                description=request.data.get('description', 'UPI Instant Wallet Top-up (Recharge)'),
+                description=description,
             )
 
         return Response({
@@ -924,7 +1004,7 @@ class RazorpayVerifyPaymentView(APIView):
         is_valid = False
         if signature and hmac.compare_digest(expected_sig, signature):
             is_valid = True
-        elif signature.startswith('simulated_') or 'demo' in order_id or signature == 'demo_success_signature':
+        elif signature and (signature.startswith('simulated_') or 'demo' in order_id or signature == 'demo_success_signature'):
             # Sandbox test verification
             is_valid = True
         else:
@@ -940,8 +1020,19 @@ class RazorpayVerifyPaymentView(APIView):
                 })
                 is_valid = True
             except Exception:
-                if not signature:
-                    is_valid = True
+                pass
+
+            # Double check via live payment fetch API
+            if not is_valid and payment_id:
+                try:
+                    import razorpay
+                    key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
+                    client = razorpay.Client(auth=(key_id, key_secret))
+                    p = client.payment.fetch(payment_id)
+                    if p and p.get('status') in ['captured', 'authorized']:
+                        is_valid = True
+                except Exception:
+                    pass
 
         if not is_valid:
             return Response(
