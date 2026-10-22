@@ -38,7 +38,7 @@ services:
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://gharsathi-in.web.app,https://gharsathi-in.firebaseapp.com,https://gharsathi.in,https://www.gharsathi.in,https://*.onrender.com"
       - key: RAZORPAY_KEY_ID
-        value: "rzp_test_gharsathi_demo"
+        value: "rzp_live_Tr00Y2gS1bC4Rv"
       - key: RAZORPAY_KEY_SECRET
         value: "ETgvqsAaKu3tQi8KkypuWGZd"
       - key: FAST2SMS_API_KEY

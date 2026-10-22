@@ -856,8 +856,8 @@ class RazorpayCreateOrderView(APIView):
 
         receipt = f"rcpt_{booking_id or int(timezone.now().timestamp())}"
         order_data = None
-        key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_test_gharsathi_demo')
-        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'gharsathi_sandbox_secret_key_12345')
+        key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
+        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8KkypuWGZd')
 
         # Try official Razorpay API client if live credentials supplied
         try:
@@ -915,7 +915,7 @@ class RazorpayVerifyPaymentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'gharsathi_sandbox_secret_key_12345')
+        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8KkypuWGZd')
 
         # Compute expected HMAC-SHA256 signature
         message = f"{order_id}|{payment_id}".encode('utf-8')
@@ -931,7 +931,7 @@ class RazorpayVerifyPaymentView(APIView):
             # Also attempt razorpay library verification if possible
             try:
                 import razorpay
-                key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_test_gharsathi_demo')
+                key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
                 client = razorpay.Client(auth=(key_id, key_secret))
                 client.utility.verify_payment_signature({
                     'razorpay_order_id': order_id,

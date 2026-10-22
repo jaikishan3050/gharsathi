@@ -7,9 +7,10 @@ def root_health_check(request):
     return JsonResponse({
         'status': 'online',
         'platform': 'Ghar Sathi Production API',
-        'version': '1.0.3',
+        'version': '1.0.4',
         'database': 'PostgreSQL Connected',
         'superuser': 'prabhat@gharsathi.in',
+        'gateway': 'Razorpay Live Production (rzp_live_Tr00Y2gS1bC4Rv)',
         'endpoints': {
             'services': '/api/services/',
             'technicians': '/api/technicians/',

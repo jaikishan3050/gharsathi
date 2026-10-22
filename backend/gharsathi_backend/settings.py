@@ -275,9 +275,9 @@ if not DEBUG:
         SECURE_HSTS_PRELOAD = True
 
 
-# Razorpay Sandbox / Production Gateway Settings
-RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', 'rzp_test_gharsathi_demo')
-RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', 'gharsathi_sandbox_secret_key_12345')
+# Razorpay Production Gateway Settings
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8KkypuWGZd')
 
 
 # SMS OTP Gateway Settings (Fast2SMS / MSG91 / Twilio)
