@@ -312,6 +312,47 @@ export default function CustomerPanel() {
 
         setRazorpayOrderData(orderRes);
         setPendingBookingPayload(bookingPayload);
+
+        // Official Razorpay Checkout Modal (Opens real UPI, Cards & Netbanking directly to your bank account)
+        const isRealRazorpayKey = orderRes.key_id && orderRes.key_id.startsWith('rzp_') && !orderRes.key_id.includes('gharsathi_demo');
+        if (isRealRazorpayKey && typeof window !== 'undefined' && window.Razorpay) {
+          const options = {
+            key: orderRes.key_id,
+            amount: orderRes.amount,
+            currency: orderRes.currency || 'INR',
+            name: 'Ghar Sathi Home Services',
+            description: currentSubcategory?.name || service.name,
+            image: '/images/gharsathi-logo.png',
+            order_id: orderRes.order_id,
+            handler: function (response) {
+              handleRazorpaySuccess(response);
+            },
+            prefill: {
+              name: form.name || currentCustomer?.name || '',
+              contact: form.phone || currentCustomer?.phone || '',
+            },
+            notes: {
+              service: currentSubcategory?.name || service.name,
+              area: form.area,
+            },
+            theme: {
+              color: '#0b3d2e',
+            },
+            modal: {
+              ondismiss: function () {
+                handleRazorpayFailure({ error: { description: 'Payment window was closed.' } });
+              },
+            },
+          };
+          const rzp = new window.Razorpay(options);
+          rzp.on('payment.failed', function (resp) {
+            handleRazorpayFailure(resp);
+          });
+          rzp.open();
+          return;
+        }
+
+        // Sandbox simulator fallback when demo keys are active
         setRazorpayModalOpen(true);
       } catch (err) {
         console.error('Error creating Razorpay order:', err);

@@ -874,7 +874,8 @@ class RazorpayCreateOrderView(APIView):
                     'platform': 'Ghar Sathi Home Services'
                 }
             })
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Razorpay live order creation fallback: {e}")
             # Fallback to sandbox simulated order
             rand_suffix = random.randint(100000, 999999)
             order_data = {
