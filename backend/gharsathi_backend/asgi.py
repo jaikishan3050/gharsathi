@@ -3,6 +3,14 @@ ASGI config for gharsathi_backend project with Django Channels & WebSockets.
 """
 
 import os
+import sys
+from pathlib import Path
+
+# Add backend directory to sys.path so gharsathi_backend and api are discoverable
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gharsathi_backend.settings')
