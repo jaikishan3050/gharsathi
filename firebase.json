@@ -10,7 +10,7 @@
       {
         "source": "/api/:path*",
         "destination": "https://gharsathi-a9er.onrender.com/api/:path*",
-        "type": 302
+        "type": 307
       }
     ],
     "headers": [

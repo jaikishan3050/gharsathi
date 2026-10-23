@@ -35,6 +35,12 @@ urlpatterns = [
     path('technicians/reset-password-otp/', TechnicianResetPasswordView.as_view(), name='technician-reset-password-otp'),
     path('technicians/login/', LoginView.as_view(), name='technician-login'),
 
+    # Auth aliases for bulletproof routing
+    path('auth/technicians/forgot-password/', TechnicianForgotPasswordView.as_view(), name='auth-technician-forgot-password'),
+    path('auth/technicians/reset-password-otp/', TechnicianResetPasswordView.as_view(), name='auth-technician-reset-password-otp'),
+    path('auth/forgot-password/', TechnicianForgotPasswordView.as_view(), name='auth-forgot-password'),
+    path('auth/reset-password-otp/', TechnicianResetPasswordView.as_view(), name='auth-reset-password-otp'),
+
     # General Auth Endpoints
     path('auth/send-otp/', SendOTPView.as_view(), name='auth-send-otp'),
     path('auth/verify-otp/', VerifyOTPView.as_view(), name='auth-verify-otp'),

@@ -604,24 +604,46 @@ export const api = {
   forgotPasswordTechnician: async (phone) => {
     const raw = String(phone || '').replace(/\D/g, '');
     const cleanPhone = (raw.length === 12 && raw.startsWith('91')) ? raw.slice(2) : (raw.length === 11 && raw.startsWith('0')) ? raw.slice(1) : raw.slice(-10);
-    return await apiRequest('/technicians/forgot-password/', {
-      method: 'POST',
-      body: JSON.stringify({ phone: cleanPhone, phone_number: cleanPhone }),
-    });
+    const payload = { phone: cleanPhone, phone_number: cleanPhone };
+    try {
+      return await apiRequest('/technicians/forgot-password/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      if (err.status === 405 || err.status === 404) {
+        return await apiRequest('/auth/forgot-password/', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      }
+      throw err;
+    }
   },
 
   resetPasswordTechnician: async (phone, otpCode, newPassword) => {
     const raw = String(phone || '').replace(/\D/g, '');
     const cleanPhone = (raw.length === 12 && raw.startsWith('91')) ? raw.slice(2) : (raw.length === 11 && raw.startsWith('0')) ? raw.slice(1) : raw.slice(-10);
-    return await apiRequest('/technicians/reset-password-otp/', {
-      method: 'POST',
-      body: JSON.stringify({
-        phone: cleanPhone,
-        phone_number: cleanPhone,
-        otp_code: String(otpCode).trim(),
-        new_password: newPassword,
-      }),
-    });
+    const payload = {
+      phone: cleanPhone,
+      phone_number: cleanPhone,
+      otp_code: String(otpCode).trim(),
+      new_password: newPassword,
+    };
+    try {
+      return await apiRequest('/technicians/reset-password-otp/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      if (err.status === 405 || err.status === 404) {
+        return await apiRequest('/auth/reset-password-otp/', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      }
+      throw err;
+    }
   },
 };
 
