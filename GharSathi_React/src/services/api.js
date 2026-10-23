@@ -216,6 +216,8 @@ export function normalizeServiceFromDjango(s) {
     category: categoryName,
     categoryId: catKey,
     price: Number(s.base_price || 0),
+    commissionFee: Number(s.commission_fee ?? 149),
+    commission_fee: Number(s.commission_fee ?? 149),
     oldPrice: Math.round(Number(s.base_price || 0) * 1.25),
     discount: '20% OFF',
     icon: s.icon || '🧰',
@@ -243,6 +245,7 @@ export const api = {
       name: serviceData.name,
       category: (serviceData.categoryId || serviceData.category || 'general').toLowerCase(),
       base_price: Number(serviceData.price || serviceData.base_price || 0),
+      commission_fee: Number(serviceData.commissionFee ?? serviceData.commission_fee ?? 149),
       description: serviceData.description || '',
       icon: serviceData.icon || '✦',
       image: serviceData.image || '',
@@ -254,10 +257,14 @@ export const api = {
     });
   },
 
-  updateServicePrice: async (serviceId, newPrice) => {
+  updateServicePrice: async (serviceId, newPrice, commissionFee) => {
+    const payload = { base_price: Number(newPrice) };
+    if (commissionFee !== undefined && commissionFee !== null) {
+      payload.commission_fee = Number(commissionFee);
+    }
     return await apiRequest(`/services/${serviceId}/`, {
       method: 'PATCH',
-      body: JSON.stringify({ base_price: Number(newPrice) }),
+      body: JSON.stringify(payload),
     });
   },
 

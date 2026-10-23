@@ -1350,25 +1350,30 @@ export function AppDataProvider({ children }) {
     });
   }, [backendStatus, addActivity, currentTechnician]);
 
-  // Update Service Price (Admin)
-  const updateServicePrice = useCallback((id, price) => {
+  // Update Service Price & Dynamic Commission (Admin)
+  const updateServicePrice = useCallback((id, price, commissionFee) => {
     const amount = Number(price);
+    const commFee = commissionFee !== undefined && commissionFee !== null && commissionFee !== '' ? Number(commissionFee) : undefined;
     if (!Number.isFinite(amount) || amount < 0) return;
 
     if (backendStatus === 'live') {
-      api.updateServicePrice(id, amount).catch((err) => {
+      api.updateServicePrice(id, amount, commFee).catch((err) => {
         console.warn('Backend updateServicePrice sync warning:', err);
       });
     }
 
     setData((current) => ({
       ...current,
-      services: current.services.map((service) => (service.id === id ? { ...service, price: amount } : service)),
-      activity: [addActivity(`Price updated for ${id}`), ...current.activity].slice(0, 50),
+      services: current.services.map((service) => (service.id === id ? {
+        ...service,
+        price: amount,
+        ...(commFee !== undefined ? { commissionFee: commFee, commission_fee: commFee } : {}),
+      } : service)),
+      activity: [addActivity(`Price and commission updated for ${id}`), ...current.activity].slice(0, 50),
     }));
     addToast({
-      title: 'Price Updated! 💰',
-      message: `Service starting rate set to ₹${amount}`,
+      title: 'Pricing Updated! 💰',
+      message: `Starting rate: ₹${amount}${commFee !== undefined ? ` · Commission: ₹${commFee}` : ''}`,
       type: 'success',
     });
   }, [backendStatus, addActivity, addToast]);
@@ -1419,6 +1424,7 @@ export function AppDataProvider({ children }) {
     }
 
     const price = Number(form.price || form.base_price || 299);
+    const commissionFee = Number(form.commissionFee ?? form.commission_fee ?? 149);
     const category = form.category || 'Appliance Repair';
     const categoryId = (form.categoryId || form.category || 'appliance').toLowerCase();
     const icon = form.icon || '✦';
@@ -1446,6 +1452,8 @@ export function AppDataProvider({ children }) {
       category,
       categoryId,
       price,
+      commissionFee,
+      commission_fee: commissionFee,
       oldPrice: Math.round(price * 1.25),
       discount: '20% OFF',
       icon,

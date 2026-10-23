@@ -72,6 +72,7 @@ export default function AdminPanel() {
   const [adminServiceSearch, setAdminServiceSearch] = useState('');
   const [adminServiceCategory, setAdminServiceCategory] = useState('all');
   const [priceDrafts, setPriceDrafts] = useState({});
+  const [commissionDrafts, setCommissionDrafts] = useState({});
   const [subPriceDrafts, setSubPriceDrafts] = useState({});
   const [addingSubserviceFor, setAddingSubserviceFor] = useState(null);
   const [newSubForm, setNewSubForm] = useState({
@@ -295,13 +296,19 @@ export default function AdminPanel() {
 
   const savePrice = (service) => {
     const raw = priceDrafts[service.id] ?? service.price;
+    const rawCommission = commissionDrafts[service.id] ?? (service.commission_fee ?? service.commissionFee ?? 149);
     const amount = Number(raw);
+    const commAmount = Number(rawCommission);
     if (!Number.isFinite(amount) || amount < 0) {
       setNotice('Price zero ya positive number hona chahiye.');
       return;
     }
-    updateServicePrice(service.id, amount);
-    setNotice(`${service.name} ka starting price update ho gaya.`);
+    if (!Number.isFinite(commAmount) || commAmount < 0) {
+      setNotice('Commission fee zero ya positive number hona chahiye.');
+      return;
+    }
+    updateServicePrice(service.id, amount, commAmount);
+    setNotice(`${service.name} ka price (₹${amount}) aur commission (₹${commAmount}) update ho gaya.`);
   };
 
   const saveSubPrice = (serviceId, sub) => {
@@ -1482,36 +1489,61 @@ export default function AdminPanel() {
                     </div>
 
                     <div className="admin-base-price-box">
-                      <label htmlFor={`base-price-${service.id}`}>Starting Base Price (₹)</label>
-                      <div className="price-edit-row">
-                        <span className="currency-prefix">₹</span>
-                        <input
-                          id={`base-price-${service.id}`}
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={priceDrafts[service.id] ?? service.price}
-                          onChange={(e) =>
-                            setPriceDrafts({ ...priceDrafts, [service.id]: e.target.value })
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="button button-small button-primary"
-                          onClick={() => savePrice(service)}
-                          title="Save starting base rate"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          className="button button-small button-danger"
-                          style={{ marginLeft: '6px' }}
-                          onClick={() => setDeleteServiceModal(service)}
-                          title={`Permanently delete ${service.name}`}
-                        >
-                          🗑️ Delete
-                        </button>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        <div>
+                          <label htmlFor={`base-price-${service.id}`} style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary, #6b7280)', marginBottom: '4px' }}>Price (₹)</label>
+                          <div className="price-edit-row">
+                            <span className="currency-prefix">₹</span>
+                            <input
+                              id={`base-price-${service.id}`}
+                              type="number"
+                              min="0"
+                              step="1"
+                              style={{ width: '85px' }}
+                              value={priceDrafts[service.id] ?? service.price}
+                              onChange={(e) =>
+                                setPriceDrafts({ ...priceDrafts, [service.id]: e.target.value })
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label htmlFor={`comm-fee-${service.id}`} style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary, #6b7280)', marginBottom: '4px' }}>Commission Fee (₹)</label>
+                          <div className="price-edit-row">
+                            <span className="currency-prefix">₹</span>
+                            <input
+                              id={`comm-fee-${service.id}`}
+                              type="number"
+                              min="0"
+                              step="1"
+                              style={{ width: '85px' }}
+                              value={commissionDrafts[service.id] ?? (service.commission_fee ?? service.commissionFee ?? 149)}
+                              onChange={(e) =>
+                                setCommissionDrafts({ ...commissionDrafts, [service.id]: e.target.value })
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            className="button button-small button-primary"
+                            onClick={() => savePrice(service)}
+                            title="Save starting base rate & commission"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-small button-danger"
+                            onClick={() => setDeleteServiceModal(service)}
+                            title={`Permanently delete ${service.name}`}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2691,6 +2723,7 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
   const [category, setCategory] = useState('Appliance Repair');
   const [categoryId, setCategoryId] = useState('appliance');
   const [price, setPrice] = useState('499');
+  const [commissionFee, setCommissionFee] = useState('149');
   const [icon, setIcon] = useState('❄️');
   const [description, setDescription] = useState('');
   const [subservices, setSubservices] = useState([
@@ -2749,6 +2782,12 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
       return;
     }
 
+    const commissionFeeNum = Number(commissionFee);
+    if (!Number.isFinite(commissionFeeNum) || commissionFeeNum < 0) {
+      setFormError('Please enter a valid commission fee.');
+      return;
+    }
+
     // Format subservices with valid IDs
     const slugBase =
       name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') ||
@@ -2770,6 +2809,8 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
       category,
       categoryId,
       price: basePriceNum,
+      commission_fee: commissionFeeNum,
+      commissionFee: commissionFeeNum,
       icon: icon.trim() || '✦',
       description: description.trim(),
       slug: slugBase,
@@ -2837,6 +2878,20 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
               />
             </Field>
 
+            <Field label="Commission Fee (₹)" hint="Admin platform margin deducted on completion">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="149"
+                value={commissionFee}
+                onChange={(e) => setCommissionFee(e.target.value)}
+                required
+              />
+            </Field>
+          </div>
+
+          <div className="form-grid" style={{ marginBottom: '14px' }}>
             <Field label="Service Icon / Emoji" hint="Click an emoji below or type custom">
               <div className="icon-picker-input-wrap">
                 <input

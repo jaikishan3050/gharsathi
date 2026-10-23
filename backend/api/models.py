@@ -17,6 +17,7 @@ class Service(models.Model):
     name = models.CharField(max_length=120)
     category = models.CharField(max_length=60, choices=CATEGORY_CHOICES, default='appliance')
     base_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('499.00'))
+    commission_fee = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('149.00'))
     description = models.TextField(blank=True, default='')
     icon = models.CharField(max_length=30, blank=True, default='🧰')
     image = models.CharField(max_length=255, blank=True, default='')
@@ -167,6 +168,8 @@ class Booking(models.Model):
             self.invoice_number = f"INV-{rand_inv}"
         if not self.service_name and self.service:
             self.service_name = self.service.name
+        if self.service and hasattr(self.service, 'commission_fee') and (self.platform_fee is None or self.platform_fee == Decimal('149.00')):
+            self.platform_fee = self.service.commission_fee
         if not self.total_amount:
             self.total_amount = self.base_price
         super().save(*args, **kwargs)

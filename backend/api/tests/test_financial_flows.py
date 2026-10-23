@@ -128,7 +128,73 @@ class TestFinancialAndOperationalFlows:
         # Verify booking status
         active_booking.refresh_from_db()
         assert active_booking.status == "Completed"
-        assert active_booking.platform_fee == Decimal("149.00")
+
+    def test_dynamic_custom_service_commission_deduction(self, api_client, verified_technician):
+        """
+        Tests that when a service has a custom commission fee (e.g. ₹250.00),
+        the completion endpoint deducts exactly ₹250.00 from the technician wallet.
+        """
+        custom_service = Service.objects.create(
+            name="Premium Chimney Deep Clean",
+            slug="premium-chimney-clean",
+            category="cleaning",
+            base_price=Decimal("1299.00"),
+            commission_fee=Decimal("250.00"),
+        )
+        custom_booking = Booking.objects.create(
+            booking_code="GS-CUSTOM-COMM-01",
+            service=custom_service,
+            service_name=custom_service.name,
+            customer_name="Priya Kumari",
+            customer_phone="9876543299",
+            address="Kankarbagh, Patna",
+            area="Patna",
+            base_price=Decimal("1299.00"),
+            total_amount=Decimal("1299.00"),
+            status="In Progress",
+            service_pin="7788",
+            technician=verified_technician,
+        )
+
+        initial_balance = verified_technician.wallet_balance
+        url = f"/api/bookings/{custom_booking.id}/complete/"
+
+        response = api_client.post(url, {"service_pin": "7788"}, format="json")
+        assert response.status_code == 200
+        assert response.data["success"] is True
+
+        verified_technician.refresh_from_db()
+        assert verified_technician.wallet_balance == initial_balance - Decimal("250.00")
+
+        custom_booking.refresh_from_db()
+        assert custom_booking.platform_fee == Decimal("250.00")
+        assert custom_booking.status == "Completed"
+
+    def test_service_crud_with_dynamic_commission(self, api_client):
+        """
+        Tests creating and updating a service with a dynamic commission_fee.
+        """
+        create_payload = {
+            "name": "Microwave Diagnostic & Repair",
+            "category": "appliance",
+            "base_price": "599.00",
+            "commission_fee": "175.00",
+            "description": "Magnetron and board testing",
+        }
+        res = api_client.post("/api/services/", create_payload, format="json")
+        assert res.status_code == 201
+        assert Decimal(str(res.data["commission_fee"])) == Decimal("175.00")
+
+        service_id = res.data["id"]
+
+        # Test PATCH updating the commission_fee
+        patch_res = api_client.patch(
+            f"/api/services/{service_id}/",
+            {"commission_fee": "220.00"},
+            format="json",
+        )
+        assert patch_res.status_code == 200
+        assert Decimal(str(patch_res.data["commission_fee"])) == Decimal("220.00")
 
     def test_invalid_happy_code_rejected_without_deduction(self, api_client, active_booking, verified_technician):
         """

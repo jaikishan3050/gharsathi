@@ -534,15 +534,21 @@ class BookingViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            platform_fee = (
+                booking.service.commission_fee
+                if booking.service and hasattr(booking.service, 'commission_fee')
+                else (booking.platform_fee or FIXED_PLATFORM_FEE)
+            )
+
             booking.status = 'Completed'
             booking.completed_at = timezone.now()
-            booking.platform_fee = FIXED_PLATFORM_FEE
+            booking.platform_fee = platform_fee
             booking.save()
 
             txn = None
             if booking.technician:
                 tech = TechnicianProfile.objects.select_for_update().get(pk=booking.technician.id)
-                new_balance = tech.wallet_balance - FIXED_PLATFORM_FEE
+                new_balance = tech.wallet_balance - platform_fee
                 tech.wallet_balance = new_balance
                 tech.completed_jobs += 1
                 tech.save(update_fields=['wallet_balance', 'completed_jobs', 'updated_at'])
@@ -551,16 +557,16 @@ class BookingViewSet(viewsets.ModelViewSet):
                     technician=tech,
                     booking=booking,
                     txn_type='DEBIT',
-                    amount=FIXED_PLATFORM_FEE,
+                    amount=platform_fee,
                     balance_after=new_balance,
-                    description=f'Fixed platform fee for {booking.booking_code} ({booking.service_name})',
+                    description=f'Platform commission fee for {booking.booking_code} ({booking.service_name})',
                 )
 
         broadcast_booking_event(booking, event_type='JOB_COMPLETED')
 
         return Response({
             'success': True,
-            'message': f'Happy Code verified! Booking {booking.booking_code} completed. ₹{FIXED_PLATFORM_FEE} platform fee deducted.',
+            'message': f'Happy Code verified! Booking {booking.booking_code} completed. ₹{platform_fee} platform fee deducted.',
             'booking': BookingSerializer(booking).data,
             'transaction': WalletTransactionSerializer(txn).data if txn else None,
         })
@@ -698,8 +704,8 @@ class AdminWithdrawalViewSet(viewsets.ModelViewSet):
             )
 
         with transaction.atomic():
-            completed_count = Booking.objects.filter(status='Completed').count()
-            total_platform_earnings = Decimal(str(completed_count)) * FIXED_PLATFORM_FEE
+            completed_bookings = Booking.objects.filter(status='Completed')
+            total_platform_earnings = completed_bookings.aggregate(total=Sum('platform_fee'))['total'] or Decimal('0.00')
             total_approved = (
                 AdminWithdrawal.objects.filter(status='Approved').aggregate(total=Sum('amount'))['total']
                 or Decimal('0.00')
@@ -779,7 +785,7 @@ class AdminAnalyticsView(APIView):
         completed_count = completed_bookings.count()
 
         gross_booking_value = completed_bookings.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
-        net_platform_earnings = Decimal(str(completed_count)) * FIXED_PLATFORM_FEE
+        net_platform_earnings = completed_bookings.aggregate(total=Sum('platform_fee'))['total'] or Decimal('0.00')
         technician_payouts = max(Decimal('0.00'), gross_booking_value - net_platform_earnings)
 
         # Withdrawals Breakdown
