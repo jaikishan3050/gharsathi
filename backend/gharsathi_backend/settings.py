@@ -43,9 +43,13 @@ if allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(',') if h.strip()]
 else:
     ALLOWED_HOSTS = [
+        'gharsathi-a9er.onrender.com',
+        'bookgharsathi.in',
+        'www.bookgharsathi.in',
         'gharsathi.in',
         'www.gharsathi.in',
         'api.gharsathi.in',
+        '.onrender.com',
         '.run.app',
         '.web.app',
         '.firebaseapp.com',
@@ -53,6 +57,11 @@ else:
         '127.0.0.1',
         '*',
     ]
+
+# Ensure custom domains are always guaranteed in ALLOWED_HOSTS
+for h in ['bookgharsathi.in', 'www.bookgharsathi.in', 'gharsathi.in', 'www.gharsathi.in', 'gharsathi-a9er.onrender.com', '.onrender.com', '.web.app', '.firebaseapp.com']:
+    if h not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(h)
 
 
 # Application definition
@@ -90,12 +99,16 @@ if cors_origins_env:
     CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins_env.split(',') if o.strip()]
 else:
     CORS_ALLOWED_ORIGINS = [
+        'https://bookgharsathi.in',
+        'https://www.bookgharsathi.in',
+        'http://bookgharsathi.in',
+        'http://www.bookgharsathi.in',
         'https://gharsathi.in',
         'https://www.gharsathi.in',
         'https://api.gharsathi.in',
-        'http://gharsathi.in',
-        'http://www.gharsathi.in',
-        'http://api.gharsathi.in',
+        'https://gharsathi-in.web.app',
+        'https://gharsathi-in.firebaseapp.com',
+        'https://gharsathi-a9er.onrender.com',
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'http://localhost:3000',
@@ -103,6 +116,23 @@ else:
         'http://localhost:8000',
         'http://127.0.0.1:8000',
     ]
+
+for o in [
+    'https://bookgharsathi.in',
+    'https://www.bookgharsathi.in',
+    'http://bookgharsathi.in',
+    'http://www.bookgharsathi.in',
+    'https://gharsathi.in',
+    'https://www.gharsathi.in',
+    'https://gharsathi-in.web.app',
+    'https://gharsathi-in.firebaseapp.com',
+    'https://gharsathi-a9er.onrender.com',
+]:
+    if o not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(o)
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 # Regex origins for dynamic Cloud Run, Firebase Hosting, and web.app staging URLs
 CORS_ALLOWED_ORIGIN_REGEXES = [
@@ -110,6 +140,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.web\.app$",
     r"^https://.*\.firebaseapp\.com$",
     r"^https://.*\.gharsathi\.in$",
+    r"^https://.*\.bookgharsathi\.in$",
 ]
 
 csrf_origins_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
@@ -117,12 +148,18 @@ if csrf_origins_env:
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_origins_env.split(',') if o.strip()]
 else:
     CSRF_TRUSTED_ORIGINS = [
+        'https://bookgharsathi.in',
+        'https://www.bookgharsathi.in',
+        'http://bookgharsathi.in',
+        'http://www.bookgharsathi.in',
         'https://gharsathi.in',
         'https://www.gharsathi.in',
         'https://api.gharsathi.in',
         'https://*.run.app',
         'https://*.web.app',
         'https://*.firebaseapp.com',
+        'https://*.onrender.com',
+        'https://gharsathi-a9er.onrender.com',
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'http://localhost:8000',
@@ -131,7 +168,20 @@ else:
         'http://127.0.0.1:3000',
     ]
 
-CORS_ALLOW_CREDENTIALS = True
+for c in [
+    'https://bookgharsathi.in',
+    'https://www.bookgharsathi.in',
+    'http://bookgharsathi.in',
+    'http://www.bookgharsathi.in',
+    'https://gharsathi.in',
+    'https://www.gharsathi.in',
+    'https://gharsathi-in.web.app',
+    'https://gharsathi-in.firebaseapp.com',
+    'https://gharsathi-a9er.onrender.com',
+    'https://*.onrender.com',
+]:
+    if c not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(c)
 
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
