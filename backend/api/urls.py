@@ -30,21 +30,30 @@ router.register(r'complaints', ComplaintViewSet, basename='complaint')
 router.register(r'admin/withdrawals', AdminWithdrawalViewSet, basename='admin-withdrawal')
 
 urlpatterns = [
-    path('', include(router.urls)),
+    # Specific technician auth endpoints MUST precede router.urls to avoid slug/pk clash
+    path('technicians/forgot-password/', TechnicianForgotPasswordView.as_view(), name='technician-forgot-password'),
+    path('technicians/reset-password-otp/', TechnicianResetPasswordView.as_view(), name='technician-reset-password-otp'),
+    path('technicians/login/', LoginView.as_view(), name='technician-login'),
+
+    # General Auth Endpoints
     path('auth/send-otp/', SendOTPView.as_view(), name='auth-send-otp'),
     path('auth/verify-otp/', VerifyOTPView.as_view(), name='auth-verify-otp'),
     path('auth/login/', LoginView.as_view(), name='auth-login'),
-    path('technicians/login/', LoginView.as_view(), name='technician-login'),
     path('auth/me/', AuthMeView.as_view(), name='auth-me'),
-    path('technicians/forgot-password/', TechnicianForgotPasswordView.as_view(), name='technician-forgot-password'),
-    path('technicians/reset-password-otp/', TechnicianResetPasswordView.as_view(), name='technician-reset-password-otp'),
+    path('auth/setup-admin/', SetupSuperuserView.as_view(), name='auth-setup-admin'),
+
+    # Payments Endpoints
     path('payments/create-order/', RazorpayCreateOrderView.as_view(), name='razorpay-create-order'),
     path('payments/razorpay/create-order/', RazorpayCreateOrderView.as_view(), name='razorpay-create-order-alias'),
     path('payments/verify/', RazorpayVerifyPaymentView.as_view(), name='razorpay-verify'),
     path('payments/razorpay/verify/', RazorpayVerifyPaymentView.as_view(), name='razorpay-verify-alias'),
+
+    # Admin Management & Analytics Endpoints
     path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin-analytics'),
     path('admin/reset-demo/', ResetDemoView.as_view(), name='admin-reset-demo'),
     path('admin/setup-superuser/', SetupSuperuserView.as_view(), name='admin-setup-superuser'),
-    path('auth/setup-admin/', SetupSuperuserView.as_view(), name='auth-setup-admin'),
     path('admin/purge-production-data/', PurgeProductionDataView.as_view(), name='admin-purge-production-data'),
+
+    # Router ViewSets
+    path('', include(router.urls)),
 ]

@@ -167,12 +167,24 @@ export default function TechnicianPanel() {
     }
   };
 
+  // Normalize phone helper
+  const normalizePhoneNumber = (raw) => {
+    if (!raw) return '';
+    const digits = String(raw).replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+    if (digits.length > 10) return digits.slice(-10);
+    return digits;
+  };
+
   // Handle Send Forgot Password OTP
   const handleSendForgotOtp = async (e, isResend = false) => {
     if (e) e.preventDefault();
-    const cleanPhone = forgotPhone.replace(/\D/g, '').slice(-10);
+    const cleanPhone = normalizePhoneNumber(forgotPhone);
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-      setAuthError('Kripya valid 10-digit Indian mobile number daalein.');
+      const errMsg = 'Kripya valid 10-digit Indian mobile number daalein (e.g. 9876500001).';
+      setAuthError(errMsg);
+      addToast({ title: 'Invalid Mobile Number', message: errMsg, type: 'error' });
       return;
     }
     setForgotLoading(true);
@@ -182,34 +194,49 @@ export default function TechnicianPanel() {
       setForgotLoading(false);
       setForgotStep(2);
       setForgotCountdown(60);
-      if (res.debug_otp) {
+      if (res?.debug_otp) {
         setDebugForgotOtp(res.debug_otp);
       }
-      setNotice(`Naya OTP code +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} par bhej diya gaya hai.`);
+      const successMsg = res?.message || `OTP code +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} par bhej diya gaya hai.`;
+      setNotice(successMsg);
+      addToast({
+        title: 'OTP Sent! 📲',
+        message: successMsg,
+        type: 'success',
+      });
     } catch (err) {
       setForgotLoading(false);
-      setAuthError(err?.error || err?.message || 'OTP send karne mein samasya aayi.');
+      const errMsg = err?.data?.error || err?.data?.detail || err?.error || err?.message || 'OTP send karne mein samasya aayi. Kripya number verify karein.';
+      setAuthError(errMsg);
+      addToast({ title: 'Account Not Found', message: errMsg, type: 'error' });
     }
   };
 
   // Handle Reset Password via OTP
   const handleResetPasswordOtp = async (e) => {
     e.preventDefault();
-    const cleanPhone = forgotPhone.replace(/\D/g, '').slice(-10);
-    if (!forgotOtp.trim()) {
-      setAuthError('Kripya 6-digit OTP code enter karein.');
+    const cleanPhone = normalizePhoneNumber(forgotPhone);
+    const cleanOtp = forgotOtp.replace(/\D/g, '').trim();
+    if (!cleanOtp || cleanOtp.length < 4) {
+      const errMsg = 'Kripya 6-digit OTP code enter karein.';
+      setAuthError(errMsg);
+      addToast({ title: 'Invalid OTP', message: errMsg, type: 'error' });
       return;
     }
     if (!newPassword || newPassword.length < 4) {
-      setAuthError('Naya password kam se kam 4 characters ka hona chahiye.');
+      const errMsg = 'Naya password kam se kam 4 characters ka hona chahiye.';
+      setAuthError(errMsg);
+      addToast({ title: 'Weak Password', message: errMsg, type: 'error' });
       return;
     }
     setForgotLoading(true);
     setAuthError('');
     try {
-      const res = await api.resetPasswordTechnician(cleanPhone, forgotOtp, newPassword);
+      const res = await api.resetPasswordTechnician(cleanPhone, cleanOtp, newPassword);
       setForgotLoading(false);
-      setNotice(res.message || 'Password successfully update ho gaya hai!');
+      const successMsg = res?.message || 'Password successfully update ho gaya hai!';
+      setNotice(successMsg);
+      addToast({ title: 'Password Reset! 🔑', message: successMsg, type: 'success' });
       setLoginForm({ phone: cleanPhone, password: newPassword });
       setAuthMode('login');
       setForgotStep(1);
@@ -217,7 +244,9 @@ export default function TechnicianPanel() {
       setNewPassword('');
     } catch (err) {
       setForgotLoading(false);
-      setAuthError(err?.error || err?.message || 'Password reset fail ho gaya. Kripya OTP check karein.');
+      const errMsg = err?.data?.error || err?.data?.detail || err?.error || err?.message || 'Password reset fail ho gaya. Kripya OTP check karein.';
+      setAuthError(errMsg);
+      addToast({ title: 'Reset Failed', message: errMsg, type: 'error' });
     }
   };
 
@@ -567,14 +596,14 @@ export default function TechnicianPanel() {
 
               {forgotStep === 1 ? (
                 <form onSubmit={handleSendForgotOtp}>
-                  <Field label="Registered Mobile Number *" hint="10-digit mobile number">
+                  <Field label="Registered Mobile Number *" hint="Enter 10-digit mobile number">
                     <input
                       required
                       type="tel"
-                      maxLength="10"
+                      maxLength="16"
                       value={forgotPhone}
-                      onChange={(e) => setForgotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      placeholder="e.g. 9876500001"
+                      onChange={(e) => setForgotPhone(e.target.value)}
+                      placeholder="e.g. 9876500001 or +91 98765 00001"
                       disabled={forgotLoading}
                     />
                   </Field>
@@ -583,7 +612,7 @@ export default function TechnicianPanel() {
                     type="submit"
                     className="button button-gold button-wide"
                     style={{ marginTop: '16px' }}
-                    disabled={forgotLoading || forgotPhone.length !== 10}
+                    disabled={forgotLoading || forgotPhone.replace(/\D/g, '').length < 10}
                   >
                     {forgotLoading ? 'Sending SMS OTP…' : 'Send Reset OTP 📲'}
                   </button>
@@ -614,11 +643,27 @@ export default function TechnicianPanel() {
                       color: '#166534',
                     }}
                   >
-                    OTP sent to <strong>+91 {forgotPhone.slice(0, 2)}******{forgotPhone.slice(-2)}</strong>
+                    OTP sent to <strong>+91 {normalizePhoneNumber(forgotPhone).slice(0, 2)}******{normalizePhoneNumber(forgotPhone).slice(-2)}</strong>
                     {debugForgotOtp && (
-                      <span style={{ display: 'block', marginTop: '4px', fontWeight: 700 }}>
-                        [DEBUG OTP: {debugForgotOtp}]
-                      </span>
+                      <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700 }}>[DEBUG OTP: {debugForgotOtp}]</span>
+                        <button
+                          type="button"
+                          style={{
+                            marginLeft: '8px',
+                            background: '#0d5c43',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '2px 8px',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => setForgotOtp(debugForgotOtp)}
+                        >
+                          Auto-fill
+                        </button>
+                      </div>
                     )}
                   </div>
 

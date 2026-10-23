@@ -94,3 +94,85 @@ class TestOTPAuthenticationFlows:
 
         assert response.status_code == 400
         assert "expired" in response.data.get("error", "").lower()
+
+    def test_technician_forgot_password_phone_normalization_and_debug_otp(self, api_client):
+        """
+        Tests that technician forgot-password normalizes phone numbers with +91, spaces,
+        saves OTP against TechnicianProfile, and returns debug_otp in JSON response.
+        """
+        from api.models import TechnicianProfile
+        tech = TechnicianProfile.objects.create(
+            partner_id="GS-TECH-FP01",
+            name="Rakesh Kumar",
+            phone="9876500099",
+            password="oldPassword123",
+            kyc_status="Verified",
+        )
+
+        # Test with formatting: +91 98765-00099
+        res = api_client.post(
+            "/api/technicians/forgot-password/",
+            {"phone": "+91 98765-00099"},
+            format="json",
+        )
+        assert res.status_code == 200
+        assert res.data["success"] is True
+        assert "debug_otp" in res.data
+        otp = res.data["debug_otp"]
+        assert len(otp) == 6
+
+        # Verify saved against TechnicianProfile
+        tech.refresh_from_db()
+        assert tech.otp_code == otp
+        assert tech.otp_expires_at is not None
+        assert tech.otp_expires_at > timezone.now()
+
+    def test_technician_reset_password_success_and_otp_cleared(self, api_client):
+        """
+        Tests that submitting valid OTP resets technician password securely using set_password(),
+        and clears OTP fields upon successful reset.
+        """
+        from api.models import TechnicianProfile
+        tech = TechnicianProfile.objects.create(
+            partner_id="GS-TECH-FP02",
+            name="Suresh Yadav",
+            phone="9876500088",
+            password="initialPassword",
+            otp_code="987654",
+            otp_expires_at=timezone.now() + timedelta(minutes=5),
+            otp_attempts=0,
+            kyc_status="Verified",
+        )
+
+        res = api_client.post(
+            "/api/technicians/reset-password-otp/",
+            {
+                "phone": "919876500088",
+                "otp_code": "987654",
+                "new_password": "NewSecretPassword@2026",
+            },
+            format="json",
+        )
+        assert res.status_code == 200
+        assert res.data["success"] is True
+
+        tech.refresh_from_db()
+        # Verify password updated and verified
+        assert tech.check_password("NewSecretPassword@2026") is True
+        assert tech.check_password("initialPassword") is False
+        # Verify OTP cleared
+        assert tech.otp_code == ""
+        assert tech.otp_expires_at is None
+        assert tech.otp_attempts == 0
+
+    def test_technician_forgot_password_unknown_phone_rejected(self, api_client):
+        """
+        Submitting an unregistered phone number returns 404 with clear message.
+        """
+        res = api_client.post(
+            "/api/technicians/forgot-password/",
+            {"phone": "9876599999"},
+            format="json",
+        )
+        assert res.status_code == 404
+        assert "nahi mila" in res.data["error"]

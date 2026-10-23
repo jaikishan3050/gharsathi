@@ -602,19 +602,22 @@ export const api = {
   },
 
   forgotPasswordTechnician: async (phone) => {
-    const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+    const raw = String(phone || '').replace(/\D/g, '');
+    const cleanPhone = (raw.length === 12 && raw.startsWith('91')) ? raw.slice(2) : (raw.length === 11 && raw.startsWith('0')) ? raw.slice(1) : raw.slice(-10);
     return await apiRequest('/technicians/forgot-password/', {
       method: 'POST',
-      body: JSON.stringify({ phone: cleanPhone }),
+      body: JSON.stringify({ phone: cleanPhone, phone_number: cleanPhone }),
     });
   },
 
   resetPasswordTechnician: async (phone, otpCode, newPassword) => {
-    const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+    const raw = String(phone || '').replace(/\D/g, '');
+    const cleanPhone = (raw.length === 12 && raw.startsWith('91')) ? raw.slice(2) : (raw.length === 11 && raw.startsWith('0')) ? raw.slice(1) : raw.slice(-10);
     return await apiRequest('/technicians/reset-password-otp/', {
       method: 'POST',
       body: JSON.stringify({
         phone: cleanPhone,
+        phone_number: cleanPhone,
         otp_code: String(otpCode).trim(),
         new_password: newPassword,
       }),

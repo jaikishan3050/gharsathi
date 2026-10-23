@@ -62,6 +62,9 @@ class TechnicianProfile(models.Model):
     is_online = models.BooleanField(default=True)
     live_location = models.JSONField(blank=True, null=True, default=dict)
     live_image = models.TextField(blank=True, default='')
+    otp_code = models.CharField(max_length=6, blank=True, default='')
+    otp_expires_at = models.DateTimeField(null=True, blank=True)
+    otp_attempts = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
