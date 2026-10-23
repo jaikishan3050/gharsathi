@@ -56,6 +56,15 @@ export default function TechnicianPanel() {
   // Login Form
   const [loginForm, setLoginForm] = useState({ phone: '', password: '' });
 
+  // Forgot Password States
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [forgotStep, setForgotStep] = useState(1); // 1 = enter phone, 2 = enter otp & new password
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotCountdown, setForgotCountdown] = useState(60);
+  const [debugForgotOtp, setDebugForgotOtp] = useState('');
+
   // Registration Form States
   const [regForm, setRegForm] = useState({
     name: '',
@@ -89,6 +98,19 @@ export default function TechnicianPanel() {
       if (timer) clearInterval(timer);
     };
   }, [regOtpStep, regCountdown]);
+
+  // Countdown timer for Forgot Password SMS OTP
+  useEffect(() => {
+    let timer = null;
+    if (forgotStep === 2 && forgotCountdown > 0) {
+      timer = setInterval(() => {
+        setForgotCountdown((prev) => (prev <= 1 ? 0 : prev - 1));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [forgotStep, forgotCountdown]);
 
   // Work Assigned Ring Alert State
   const [assignedRingingJob, setAssignedRingingJob] = useState(null);
@@ -134,14 +156,68 @@ export default function TechnicianPanel() {
   }, [myJobs, currentTechnician, assignedRingingJob]);
 
   // Handle Login
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
-    const res = loginTechnician(loginForm.phone, loginForm.password);
+    const res = await loginTechnician(loginForm.phone, loginForm.password);
     if (!res.success) {
       setAuthError(res.error);
     } else {
       setNotice(`Namaste ${res.technician.name}, login successful!`);
+    }
+  };
+
+  // Handle Send Forgot Password OTP
+  const handleSendForgotOtp = async (e, isResend = false) => {
+    if (e) e.preventDefault();
+    const cleanPhone = forgotPhone.replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      setAuthError('Kripya valid 10-digit Indian mobile number daalein.');
+      return;
+    }
+    setForgotLoading(true);
+    setAuthError('');
+    try {
+      const res = await api.forgotPasswordTechnician(cleanPhone);
+      setForgotLoading(false);
+      setForgotStep(2);
+      setForgotCountdown(60);
+      if (res.debug_otp) {
+        setDebugForgotOtp(res.debug_otp);
+      }
+      setNotice(`Naya OTP code +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} par bhej diya gaya hai.`);
+    } catch (err) {
+      setForgotLoading(false);
+      setAuthError(err?.error || err?.message || 'OTP send karne mein samasya aayi.');
+    }
+  };
+
+  // Handle Reset Password via OTP
+  const handleResetPasswordOtp = async (e) => {
+    e.preventDefault();
+    const cleanPhone = forgotPhone.replace(/\D/g, '').slice(-10);
+    if (!forgotOtp.trim()) {
+      setAuthError('Kripya 6-digit OTP code enter karein.');
+      return;
+    }
+    if (!newPassword || newPassword.length < 4) {
+      setAuthError('Naya password kam se kam 4 characters ka hona chahiye.');
+      return;
+    }
+    setForgotLoading(true);
+    setAuthError('');
+    try {
+      const res = await api.resetPasswordTechnician(cleanPhone, forgotOtp, newPassword);
+      setForgotLoading(false);
+      setNotice(res.message || 'Password successfully update ho gaya hai!');
+      setLoginForm({ phone: cleanPhone, password: newPassword });
+      setAuthMode('login');
+      setForgotStep(1);
+      setForgotOtp('');
+      setNewPassword('');
+    } catch (err) {
+      setForgotLoading(false);
+      setAuthError(err?.error || err?.message || 'Password reset fail ho gaya. Kripya OTP check karein.');
     }
   };
 
@@ -443,6 +519,29 @@ export default function TechnicianPanel() {
                 />
               </Field>
 
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#0d5c43',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                  }}
+                  onClick={() => {
+                    setAuthMode('forgot');
+                    setForgotPhone(loginForm.phone);
+                    setForgotStep(1);
+                    setAuthError('');
+                  }}
+                >
+                  Forgot Password? (पासवर्ड भूल गए?)
+                </button>
+              </div>
+
               <button type="submit" className="button button-gold button-wide" style={{ marginTop: '16px' }}>
                 Login to Technician Dashboard <span>→</span>
               </button>
@@ -454,7 +553,142 @@ export default function TechnicianPanel() {
             </form>
           )}
 
-          {/* 2. TECHNICIAN REGISTRATION FORM */}
+          {/* 2. FORGOT PASSWORD VIA MOBILE OTP */}
+          {authMode === 'forgot' && (
+            <div className="technician-auth-form">
+              <div style={{ marginBottom: '14px', textAlign: 'center' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: '#1b4332' }}>
+                  Reset Password via SMS OTP
+                </h3>
+                <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                  Apne registered mobile number par OTP prapt karein aur naya password banayein.
+                </p>
+              </div>
+
+              {forgotStep === 1 ? (
+                <form onSubmit={handleSendForgotOtp}>
+                  <Field label="Registered Mobile Number *" hint="10-digit mobile number">
+                    <input
+                      required
+                      type="tel"
+                      maxLength="10"
+                      value={forgotPhone}
+                      onChange={(e) => setForgotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="e.g. 9876500001"
+                      disabled={forgotLoading}
+                    />
+                  </Field>
+
+                  <button
+                    type="submit"
+                    className="button button-gold button-wide"
+                    style={{ marginTop: '16px' }}
+                    disabled={forgotLoading || forgotPhone.length !== 10}
+                  >
+                    {forgotLoading ? 'Sending SMS OTP…' : 'Send Reset OTP 📲'}
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                    <button
+                      type="button"
+                      className="button button-outline button-small"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setAuthError('');
+                      }}
+                    >
+                      ← Back to Login
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleResetPasswordOtp}>
+                  <div
+                    style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      marginBottom: '14px',
+                      fontSize: '12px',
+                      color: '#166534',
+                    }}
+                  >
+                    OTP sent to <strong>+91 {forgotPhone.slice(0, 2)}******{forgotPhone.slice(-2)}</strong>
+                    {debugForgotOtp && (
+                      <span style={{ display: 'block', marginTop: '4px', fontWeight: 700 }}>
+                        [DEBUG OTP: {debugForgotOtp}]
+                      </span>
+                    )}
+                  </div>
+
+                  <Field label="Enter 6-Digit SMS OTP *" hint="Check your mobile SMS">
+                    <input
+                      required
+                      type="tel"
+                      maxLength="6"
+                      value={forgotOtp}
+                      onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter 6-digit OTP"
+                      disabled={forgotLoading}
+                    />
+                  </Field>
+
+                  <Field label="Create New Password *" hint="Min 4 characters">
+                    <input
+                      required
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new strong password"
+                      disabled={forgotLoading}
+                    />
+                  </Field>
+
+                  <button
+                    type="submit"
+                    className="button button-gold button-wide"
+                    style={{ marginTop: '16px' }}
+                    disabled={forgotLoading || forgotOtp.length < 4 || newPassword.length < 4}
+                  >
+                    {forgotLoading ? 'Updating Password…' : 'Reset Password & Save 🔑'}
+                  </button>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+                    <button
+                      type="button"
+                      className="button button-outline button-small"
+                      onClick={() => {
+                        setForgotStep(1);
+                        setAuthError('');
+                      }}
+                      disabled={forgotLoading}
+                    >
+                      Change Number
+                    </button>
+
+                    <button
+                      type="button"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: forgotCountdown > 0 ? '#9ca3af' : '#0d5c43',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: forgotCountdown > 0 ? 'default' : 'pointer',
+                      }}
+                      disabled={forgotCountdown > 0 || forgotLoading}
+                      onClick={(e) => handleSendForgotOtp(e, true)}
+                    >
+                      {forgotCountdown > 0 ? `Resend OTP in ${forgotCountdown}s` : 'Resend OTP 🔄'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* 3. TECHNICIAN REGISTRATION FORM */}
           {authMode === 'register' && (
             <div className="technician-reg-container">
               {!regOtpStep ? (

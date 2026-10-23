@@ -577,6 +577,42 @@ export const api = {
       body: JSON.stringify({}),
     });
   },
+
+  // Authentication & Session Persistence
+  login: async ({ phone, password, role = 'technician', username }) => {
+    return await apiRequest('/auth/login/', {
+      method: 'POST',
+      body: JSON.stringify({ phone: phone || username, password, role, username }),
+    });
+  },
+
+  getMe: async (token) => {
+    return await apiRequest('/auth/me/', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  },
+
+  forgotPasswordTechnician: async (phone) => {
+    const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+    return await apiRequest('/technicians/forgot-password/', {
+      method: 'POST',
+      body: JSON.stringify({ phone: cleanPhone }),
+    });
+  },
+
+  resetPasswordTechnician: async (phone, otpCode, newPassword) => {
+    const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+    return await apiRequest('/technicians/reset-password-otp/', {
+      method: 'POST',
+      body: JSON.stringify({
+        phone: cleanPhone,
+        otp_code: String(otpCode).trim(),
+        new_password: newPassword,
+      }),
+    });
+  },
 };
 
 export default api;

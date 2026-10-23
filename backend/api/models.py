@@ -70,6 +70,26 @@ class TechnicianProfile(models.Model):
     def __str__(self):
         return f"{self.partner_id} - {self.name} ({self.kyc_status}, ₹{self.wallet_balance})"
 
+    def set_password(self, raw_password):
+        """Sets and hashes the technician password using standard Django password hashing."""
+        from django.contrib.auth.hashers import make_password
+        self.password = make_password(raw_password)
+        self.save(update_fields=['password', 'updated_at'])
+
+    def check_password(self, raw_password):
+        """Validates raw password against stored password using Django's check_password."""
+        from django.contrib.auth.hashers import check_password
+        if not self.password or not raw_password:
+            return False
+        # If stored as plain-text (e.g. initial demo password123), auto-upgrade to standard Django hash
+        if self.password == raw_password:
+            self.set_password(raw_password)
+            return True
+        try:
+            return check_password(raw_password, self.password)
+        except Exception:
+            return False
+
     def save(self, *args, **kwargs):
         if not self.partner_id:
             rand_suffix = random.randint(100, 999)

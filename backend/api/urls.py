@@ -15,6 +15,10 @@ from .views import (
     CustomerProfileViewSet,
     SendOTPView,
     VerifyOTPView,
+    LoginView,
+    AuthMeView,
+    TechnicianForgotPasswordView,
+    TechnicianResetPasswordView,
 )
 
 router = DefaultRouter()
@@ -29,6 +33,11 @@ urlpatterns = [
     path('', include(router.urls)),
     path('auth/send-otp/', SendOTPView.as_view(), name='auth-send-otp'),
     path('auth/verify-otp/', VerifyOTPView.as_view(), name='auth-verify-otp'),
+    path('auth/login/', LoginView.as_view(), name='auth-login'),
+    path('technicians/login/', LoginView.as_view(), name='technician-login'),
+    path('auth/me/', AuthMeView.as_view(), name='auth-me'),
+    path('technicians/forgot-password/', TechnicianForgotPasswordView.as_view(), name='technician-forgot-password'),
+    path('technicians/reset-password-otp/', TechnicianResetPasswordView.as_view(), name='technician-reset-password-otp'),
     path('payments/create-order/', RazorpayCreateOrderView.as_view(), name='razorpay-create-order'),
     path('payments/razorpay/create-order/', RazorpayCreateOrderView.as_view(), name='razorpay-create-order-alias'),
     path('payments/verify/', RazorpayVerifyPaymentView.as_view(), name='razorpay-verify'),

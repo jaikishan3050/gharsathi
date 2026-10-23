@@ -18,6 +18,7 @@ const STORAGE_KEY = 'gharsathi_react_v2_data';
 const CUSTOMER_AUTH_KEY = 'gharsathi_customer_session';
 const TECH_AUTH_KEY = 'gharsathi_tech_session';
 const ADMIN_AUTH_KEY = 'gharsathi_admin_session';
+const AUTH_TOKEN_KEY = 'gharsathi_auth_token';
 
 export const initialDemoData = {
   bookings: [
@@ -663,6 +664,40 @@ export function AppDataProvider({ children }) {
     } catch {}
   }, [isAdminLoggedIn]);
 
+  // Session Persistence on Mount: Verify auth token against /api/auth/me/ to prevent unwanted redirects
+  useEffect(() => {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) return;
+
+    let isMounted = true;
+    api
+      .getMe(token)
+      .then((res) => {
+        if (!isMounted || !res || !res.success) return;
+        if (res.role === 'technician' && res.technician) {
+          const normalized = normalizeTechnicianFromDjango(res.technician);
+          setCurrentTechnician(normalized);
+          localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
+        } else if (res.role === 'customer' && res.user) {
+          setCurrentCustomer(res.user);
+          localStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(res.user));
+        } else if (res.role === 'admin') {
+          setIsAdminLoggedIn(true);
+          localStorage.setItem(ADMIN_AUTH_KEY, 'true');
+        }
+      })
+      .catch((err) => {
+        console.warn('Session verification notice (/api/auth/me/):', err?.message);
+        if (err?.status === 401 || err?.message?.includes('expired') || err?.message?.includes('Invalid')) {
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const addActivity = useCallback((message) => ({
     id: `ACT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     message,
@@ -846,13 +881,47 @@ export function AppDataProvider({ children }) {
     return technician;
   }, [addActivity, addToast]);
 
-  const loginTechnician = useCallback((phone, password) => {
+  const loginTechnician = useCallback(async (phone, password) => {
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+
+    // 1. Attempt official Django authentication via API
+    try {
+      const res = await api.login({ phone: cleanPhone, password, role: 'technician' });
+      if (res && res.success && res.technician) {
+        const normalized = normalizeTechnicianFromDjango(res.technician);
+        if (res.token) {
+          localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+        }
+        localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
+        setCurrentTechnician(normalized);
+        addToast({
+          title: `Namaste, ${normalized.name}! 🧰`,
+          message: 'Technician partner portal active.',
+          type: 'success',
+        });
+        return { success: true, technician: normalized, token: res.token };
+      }
+    } catch (err) {
+      console.warn('Backend login attempt notice:', err);
+      // If server specifically returned an invalid password / credential error, display it
+      const errorMsg = err?.error || err?.message;
+      if (errorMsg && (errorMsg.includes('password') || errorMsg.includes('Galat') || errorMsg.includes('Invalid'))) {
+        addToast({
+          title: 'Login Failed',
+          message: errorMsg,
+          type: 'error',
+        });
+        return { success: false, error: errorMsg };
+      }
+    }
+
+    // 2. Local fallback if offline or demo fallback
     const tech = data.technicians.find(
       (t) => t.phone.replace(/\D/g, '').slice(-10) === cleanPhone && (!t.password || t.password === password)
     );
     if (tech) {
       setCurrentTechnician(tech);
+      localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(tech));
       addToast({
         title: `Namaste, ${tech.name}! 🧰`,
         message: 'Technician partner portal active.',
@@ -870,6 +939,8 @@ export function AppDataProvider({ children }) {
 
   const logoutTechnician = useCallback(() => {
     setCurrentTechnician(null);
+    localStorage.removeItem(TECH_AUTH_KEY);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
     addToast({
       title: 'Logged Out',
       message: 'Technician session closed.',
