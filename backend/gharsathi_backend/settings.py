@@ -180,7 +180,7 @@ else:
     }
 
 
-# Database configuration - PostgreSQL exclusively
+# Database configuration - PostgreSQL for production / SQLite fallback for CI testing
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
     import dj_database_url
@@ -190,6 +190,13 @@ if DATABASE_URL:
             conn_max_age=600,
             conn_health_checks=True,
         )
+    }
+elif 'test' in sys.argv or 'pytest' in sys.modules or os.environ.get('USE_SQLITE_TEST') == 'true':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'test_db.sqlite3',
+        }
     }
 else:
     DATABASES = {

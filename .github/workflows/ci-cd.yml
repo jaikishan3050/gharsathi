@@ -11,6 +11,7 @@ env:
   SECRET_KEY: django-insecure-gharsathi-ci-cd-test-key-2026
   DEBUG: "True"
   ALLOWED_HOSTS: "localhost,127.0.0.1,*"
+  DATABASE_URL: "sqlite:///test.db"
   SMS_PROVIDER: "sandbox"
   FAST2SMS_API_KEY: "sandbox"
   RAZORPAY_KEY_ID: "rzp_test_gharsathi_demo"
