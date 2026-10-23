@@ -118,7 +118,7 @@ export function PanelShell({ role, title, description, active, onChange, items, 
             <span>✦</span>
             <strong>Ghar Sathi</strong>
             <p>Har ghar ka vishwas.</p>
-            <small>Fixed ₹149 Commission Model</small>
+            <small>Trusted Quality & Service Assurance</small>
           </div>
         </aside>
         <main className="panel-main">
@@ -134,7 +134,7 @@ export function PanelShell({ role, title, description, active, onChange, items, 
       </div>
       <footer className="app-footer">
         © {new Date().getFullYear()} Ghar Sathi · Har Ghar Ka Sathi
-        <span>Fair ₹149 fixed technician commission · Multi-panel ecosystem</span>
+        <span>100% Quality Guaranteed · Verified Professional Ecosystem</span>
       </footer>
     </div>
   );

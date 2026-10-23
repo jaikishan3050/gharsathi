@@ -212,12 +212,12 @@ export const movingOffers = [
   },
   {
     id: 'offer-3',
-    badge: 'FIXED COMMISSION 🛡️',
-    title: 'Technician Welfare: Transparent ₹149 Flat Platform Fee',
-    description: 'No hidden percentage cuts! Our technicians earn what they deserve.',
-    code: 'FAIRPAY',
+    badge: 'QUALITY ASSURED 🛡️',
+    title: '30-Day Service Warranty & Verified Professionals',
+    description: 'Guaranteed satisfaction! Free re-work within 30 days if you are not 100% satisfied.',
+    code: 'ASSURED',
     serviceId: 'washing',
-    highlight: 'Strict ₹149 platform fee',
+    highlight: '100% Quality & Workmanship Guarantee',
     banner: '/images/why-choose-gharsathi.png',
   },
   {

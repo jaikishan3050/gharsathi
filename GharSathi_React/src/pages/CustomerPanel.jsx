@@ -1584,7 +1584,7 @@ export default function CustomerPanel() {
                 Agar koi samasya hai ya technician se related complaint karni hai, yahan submit karein.
                 Admin dashboard se 24 ghante ke andar action liya jayega.
               </p>
-              <div className="support-point"><span>✓</span> 100% Fixed Commission transparency</div>
+              <div className="support-point"><span>✓</span> 100% Transparent & Upfront Pricing</div>
               <div className="support-point"><span>✓</span> Direct technician replacement assistance</div>
               <div className="support-point"><span>✓</span> 30-day service warranty</div>
             </div>
