@@ -390,3 +390,50 @@ class TestFinancialAndOperationalFlows:
         assert verified_technician.wallet_balance == initial_balance - Decimal("250.00")
         assert verified_technician.wallet_balance == Decimal("250.00")
 
+    def test_technician_registration_initial_zero_wallet_balance(self, api_client, db):
+        """
+        Tests that all newly registered technicians explicitly start with a ₹0.00 wallet balance.
+        Any client-supplied wallet balance in registration payload is ignored.
+        """
+        # 1. Model default creation
+        tech_model = TechnicianProfile.objects.create(
+            name="New Tech Model",
+            phone="9800000001",
+            partner_id="GS-TECH-NEW01",
+        )
+        assert tech_model.wallet_balance == Decimal("0.00")
+
+        # 2. Registration via API endpoint without wallet_balance supplied
+        res = api_client.post(
+            "/api/technicians/",
+            {
+                "name": "Amit Kumar",
+                "phone": "9800000002",
+                "trade": "AC Repair",
+                "area": "Danapur",
+            },
+            format="json",
+        )
+        assert res.status_code == 201
+        tech_id = res.data["id"]
+        tech = TechnicianProfile.objects.get(pk=tech_id)
+        assert tech.wallet_balance == Decimal("0.00")
+        assert Decimal(str(res.data["wallet_balance"])) == Decimal("0.00")
+
+        # 3. Registration via API endpoint attempting to inject dummy wallet balance
+        res_inject = api_client.post(
+            "/api/technicians/",
+            {
+                "name": "Injection Test",
+                "phone": "9800000003",
+                "trade": "Plumbing",
+                "wallet_balance": 600.00,
+            },
+            format="json",
+        )
+        assert res_inject.status_code == 201
+        tech_inject = TechnicianProfile.objects.get(pk=res_inject.data["id"])
+        assert tech_inject.wallet_balance == Decimal("0.00")
+        assert Decimal(str(res_inject.data["wallet_balance"])) == Decimal("0.00")
+
+

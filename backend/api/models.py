@@ -75,7 +75,7 @@ class TechnicianProfile(models.Model):
     document_type = models.CharField(max_length=60, blank=True, default='Aadhaar Card')
     upi_id = models.CharField(max_length=80, blank=True, default='gharsathi.partner@upi')
     kyc_remarks = models.TextField(blank=True, default='')
-    wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('600.00'))
+    wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     rating_avg = models.DecimalField(max_digits=3, decimal_places=2, default=Decimal('5.00'))
     rating_count = models.IntegerField(default=0)
     completed_jobs = models.IntegerField(default=0)

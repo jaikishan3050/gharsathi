@@ -334,7 +334,7 @@ export const api = {
       address: techData.address || '',
       aadhaar_masked: techData.aadhaar || '',
       kyc_status: 'Pending',
-      wallet_balance: 600,
+      wallet_balance: 0.00,
     };
     return await apiRequest('/technicians/', {
       method: 'POST',

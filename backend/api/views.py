@@ -290,6 +290,10 @@ class TechnicianProfileViewSet(viewsets.ModelViewSet):
             qs = qs.filter(partner_id=partner_id)
         return qs
 
+    def perform_create(self, serializer):
+        # Explicitly enforce 0.00 wallet balance upon technician registration
+        serializer.save(wallet_balance=Decimal('0.00'))
+
     @action(detail=True, methods=['post'])
     def recharge(self, request, pk=None):
         """
@@ -1319,6 +1323,7 @@ class VerifyOTPView(APIView):
                     phone=clean_phone,
                     area=request.data.get('area', 'Patna to Danapur'),
                     trade=request.data.get('skills', 'Home Services'),
+                    wallet_balance=Decimal('0.00'),
                 )
             user_profile_data = TechnicianProfileSerializer(tech).data
             user_profile_data['userType'] = 'technician'

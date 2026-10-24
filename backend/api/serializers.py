@@ -60,9 +60,21 @@ class TechnicianProfileSerializer(serializers.ModelSerializer):
             'completed_jobs', 'is_online', 'live_location', 'live_image',
             'created_at', 'updated_at', 'wallet_transactions'
         ]
+        read_only_fields = ['wallet_balance', 'rating_avg', 'rating_count', 'completed_jobs']
         extra_kwargs = {
+            'partner_id': {'required': False},
             'password': {'write_only': True, 'required': False}
         }
+
+    def create(self, validated_data):
+        # Explicitly ensure newly registered technicians start with 0.00 wallet balance
+        validated_data['wallet_balance'] = Decimal('0.00')
+        raw_password = validated_data.pop('password', None)
+        instance = super().create(validated_data)
+        if raw_password:
+            instance.set_password(raw_password)
+            instance.save(update_fields=['password'])
+        return instance
 
 
 class BookingSerializer(serializers.ModelSerializer):
