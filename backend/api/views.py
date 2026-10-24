@@ -1251,10 +1251,6 @@ class SendOTPView(APIView):
             'provider': sms_result.get('provider', 'fast2sms'),
         }
 
-        # Include debug OTP ONLY if fallback or sandbox mode is active
-        if sms_result.get('provider') in ('sandbox', 'sandbox_fallback'):
-            resp_data['debug_otp'] = otp_code
-
         return Response(resp_data, status=status.HTTP_200_OK)
 
 
@@ -1283,39 +1279,35 @@ class VerifyOTPView(APIView):
             .first()
         )
 
-        # Master demo test codes for fast testing (123456, 1234)
-        is_master_demo_otp = settings.DEBUG and otp_input in ('123456', '1234')
-
-        if not otp_record and not is_master_demo_otp:
+        if not otp_record:
             return Response(
                 {'error': 'No active OTP request found for this phone number. Please request a new OTP.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if otp_record:
-            if otp_record.attempts >= 5:
-                return Response(
-                    {'error': 'Maximum verification attempts exceeded. Please request a new OTP.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        if otp_record.attempts >= 5:
+            return Response(
+                {'error': 'Maximum verification attempts exceeded. Please request a new OTP.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            otp_record.attempts += 1
-            otp_record.save(update_fields=['attempts'])
+        otp_record.attempts += 1
+        otp_record.save(update_fields=['attempts'])
 
-            if otp_record.is_expired():
-                return Response(
-                    {'error': 'This OTP has expired. Please click Resend OTP to get a new code.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        if otp_record.is_expired():
+            return Response(
+                {'error': 'This OTP has expired. Please click Resend OTP to get a new code.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            if otp_record.otp_code != otp_input and not is_master_demo_otp:
-                return Response(
-                    {'error': 'Invalid OTP code. Please enter the correct 6-digit code.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        if otp_record.otp_code != otp_input:
+            return Response(
+                {'error': 'Invalid OTP code. Please enter the correct 6-digit code received via SMS.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-            otp_record.is_verified = True
-            otp_record.save(update_fields=['is_verified'])
+        otp_record.is_verified = True
+        otp_record.save(update_fields=['is_verified'])
 
         # User Authentication & Profile Resolution
         user_profile_data = {}
@@ -1623,7 +1615,7 @@ class TechnicianForgotPasswordView(APIView):
     POST /api/technicians/forgot-password/
     Accepts: { "phone": "9876500001" }
     Normalizes phone number, generates 6-digit OTP, saves to TechnicianProfile with 5-minute expiry,
-    and returns debug_otp in JSON response for reliability.
+    and dispatches OTP via Fast2SMS SMS gateway.
     """
 
     def post(self, request):
@@ -1671,9 +1663,7 @@ class TechnicianForgotPasswordView(APIView):
             expires_at=expires_at,
         )
 
-        # Console fallback logging (explicitly required)
-        print(f"[DEBUG OTP] Technician forgot password OTP for {clean_phone}: {otp_code}")
-        logger.info(f"[DEBUG OTP] Technician forgot password OTP for {clean_phone}: {otp_code}")
+        logger.info(f"Technician forgot password OTP generated for {clean_phone}")
 
         # Send via transactional SMS
         sms_result = send_sms_otp(clean_phone, otp_code)
@@ -1684,7 +1674,6 @@ class TechnicianForgotPasswordView(APIView):
             'phone': clean_phone,
             'expires_in_seconds': expiry_minutes * 60,
             'provider': sms_result.get('provider', 'fast2sms'),
-            'debug_otp': otp_code,  # Reliability fallback: always provided for unblocked testing
         }
 
         return Response(resp_data, status=status.HTTP_200_OK)
@@ -1730,8 +1719,6 @@ class TechnicianResetPasswordView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        is_master_demo_otp = settings.DEBUG and otp_input in ('123456', '1234')
-
         # Check max attempts guardrail
         if tech.otp_attempts >= 5:
             return Response(
@@ -1756,7 +1743,7 @@ class TechnicianResetPasswordView(APIView):
                 otp_matched = True
 
         # 2. Fallback check against OTPVerification table
-        if not otp_matched and not is_master_demo_otp:
+        if not otp_matched:
             otp_record = (
                 OTPVerification.objects.filter(phone=clean_phone, is_verified=False)
                 .order_by('-created_at')
@@ -1773,7 +1760,7 @@ class TechnicianResetPasswordView(APIView):
                     otp_record.is_verified = True
                     otp_record.save(update_fields=['is_verified'])
 
-        if not otp_matched and not is_master_demo_otp:
+        if not otp_matched:
             return Response(
                 {'error': 'Galat OTP code! Kripya 6-digit SMS OTP check karein.'},
                 status=status.HTTP_400_BAD_REQUEST

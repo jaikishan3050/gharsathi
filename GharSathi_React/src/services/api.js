@@ -527,65 +527,27 @@ export const api = {
   // Authentication & SMS OTP Verification
   sendOtp: async (phoneNumber, role = 'customer') => {
     const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
-    try {
-      return await apiRequest('/auth/send-otp/', {
-        method: 'POST',
-        body: JSON.stringify({ phone_number: cleanPhone, role }),
-      });
-    } catch (err) {
-      console.warn('Backend send-otp fallback to simulated SMS:', err);
-      const mockOtp = String(Math.floor(100000 + Math.random() * 900000));
-      localStorage.setItem(`gharsathi_otp_${cleanPhone}`, mockOtp);
-      return {
-        success: true,
-        message: `OTP sent successfully to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} (Demo Offline Mode).`,
-        phone: cleanPhone,
-        expires_in_seconds: 300,
-        provider: 'sandbox_local',
-        debug_otp: mockOtp,
-      };
-    }
+    return await apiRequest('/auth/send-otp/', {
+      method: 'POST',
+      body: JSON.stringify({ phone_number: cleanPhone, role }),
+    });
   },
 
   verifyOtp: async ({ phoneNumber, otpCode, role = 'customer', name = '', area = '', address = '', pincode = '', skills = '' }) => {
     const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
-    try {
-      return await apiRequest('/auth/verify-otp/', {
-        method: 'POST',
-        body: JSON.stringify({
-          phone_number: cleanPhone,
-          otp_code: String(otpCode).trim(),
-          role,
-          name,
-          area,
-          address,
-          pincode,
-          skills,
-        }),
-      });
-    } catch (err) {
-      console.warn('Backend verify-otp fallback to local verification:', err);
-      const storedOtp = localStorage.getItem(`gharsathi_otp_${cleanPhone}`);
-      const trimmed = String(otpCode).trim();
-      const isValid = trimmed === '123456' || trimmed === '1234' || (storedOtp && trimmed === storedOtp);
-      if (!isValid) {
-        throw new Error(err.message || 'Invalid OTP code. Please check the code and try again.');
-      }
-      return {
-        success: true,
-        message: 'Mobile number verified successfully (Demo Mode).',
-        token: `demo_jwt_${cleanPhone}_${Date.now()}`,
+    return await apiRequest('/auth/verify-otp/', {
+      method: 'POST',
+      body: JSON.stringify({
+        phone_number: cleanPhone,
+        otp_code: String(otpCode).trim(),
         role,
-        user: {
-          phone: cleanPhone,
-          name: name || `User ${cleanPhone.slice(-4)}`,
-          area: area || 'Patna to Danapur',
-          address: address || '',
-          pincode: pincode || '801103',
-          userType: role,
-        },
-      };
-    }
+        name,
+        area,
+        address,
+        pincode,
+        skills,
+      }),
+    });
   },
 
   // Admin Analytics & Reset

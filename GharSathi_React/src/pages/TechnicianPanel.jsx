@@ -63,7 +63,6 @@ export default function TechnicianPanel() {
   const [forgotStep, setForgotStep] = useState(1); // 1 = enter phone, 2 = enter otp & new password
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotCountdown, setForgotCountdown] = useState(60);
-  const [debugForgotOtp, setDebugForgotOtp] = useState('');
 
   // Registration Form States
   const [regForm, setRegForm] = useState({
@@ -81,7 +80,6 @@ export default function TechnicianPanel() {
 
   const [regOtpStep, setRegOtpStep] = useState(false);
   const [regOtp, setRegOtp] = useState('');
-  const [sentRegOtp, setSentRegOtp] = useState('');
   const [regCountdown, setRegCountdown] = useState(60);
   const [regLoading, setRegLoading] = useState(false);
   const [locationDetecting, setLocationDetecting] = useState(false);
@@ -194,9 +192,6 @@ export default function TechnicianPanel() {
       setForgotLoading(false);
       setForgotStep(2);
       setForgotCountdown(60);
-      if (res?.debug_otp) {
-        setDebugForgotOtp(res.debug_otp);
-      }
       const successMsg = res?.message || `OTP code +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} par bhej diya gaya hai.`;
       setNotice(successMsg);
       addToast({
@@ -283,9 +278,8 @@ export default function TechnicianPanel() {
     setRegLoading(true);
     setAuthError('');
     try {
-      const res = await api.sendOtp(cleanPhone, 'technician');
+      await api.sendOtp(cleanPhone, 'technician');
       setRegLoading(false);
-      setSentRegOtp(res.debug_otp || '123456');
       setRegOtpStep(true);
       setRegCountdown(60);
       if (isResend) {
@@ -525,7 +519,7 @@ export default function TechnicianPanel() {
           {/* 1. LOGIN WITH MOBILE NUMBER & PASSWORD */}
           {authMode === 'login' && (
             <form onSubmit={handleLogin} className="technician-auth-form">
-              <Field label="Mobile Number *" hint="Demo: 9876500001">
+              <Field label="Mobile Number *">
                 <input
                   required
                   type="tel"
@@ -538,7 +532,7 @@ export default function TechnicianPanel() {
                 />
               </Field>
 
-              <Field label="Password *" hint="Demo: password123">
+              <Field label="Password *">
                 <input
                   required
                   type="password"
@@ -574,11 +568,6 @@ export default function TechnicianPanel() {
               <button type="submit" className="button button-gold button-wide" style={{ marginTop: '16px' }}>
                 Login to Technician Dashboard <span>→</span>
               </button>
-
-              <div className="demo-credentials-box">
-                <small>Demo Technician Credentials:</small>
-                <p>Phone: <strong>9876500001</strong> · Password: <strong>password123</strong> (Manoj Kumar - Verified)</p>
-              </div>
             </form>
           )}
 
@@ -644,27 +633,6 @@ export default function TechnicianPanel() {
                     }}
                   >
                     OTP sent to <strong>+91 {normalizePhoneNumber(forgotPhone).slice(0, 2)}******{normalizePhoneNumber(forgotPhone).slice(-2)}</strong>
-                    {debugForgotOtp && (
-                      <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700 }}>[DEBUG OTP: {debugForgotOtp}]</span>
-                        <button
-                          type="button"
-                          style={{
-                            marginLeft: '8px',
-                            background: '#0d5c43',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '2px 8px',
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => setForgotOtp(debugForgotOtp)}
-                        >
-                          Auto-fill
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   <Field label="Enter 6-Digit SMS OTP *" hint="Check your mobile SMS">
@@ -902,20 +870,6 @@ export default function TechnicianPanel() {
                     </div>
                   </div>
 
-                  {sentRegOtp && (
-                    <div className="otp-demo-hint-strip">
-                      <span className="hint-pill">SANDBOX HINT</span>
-                      <span>Demo OTP: <strong>{sentRegOtp}</strong></span>
-                      <button
-                        type="button"
-                        className="autofill-btn"
-                        onClick={() => setRegOtp(sentRegOtp)}
-                        title="Auto-fill OTP code"
-                      >
-                        Auto-fill ⚡
-                      </button>
-                    </div>
-                  )}
 
                   <Field label="Enter 6-Digit SMS OTP *">
                     <input

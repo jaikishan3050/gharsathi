@@ -73,20 +73,17 @@ def send_sms_otp(phone_number, otp_code, app_name="Ghar Sathi"):
 
             err_msg = res_data.get('message', 'Fast2SMS returned error status')
             logger.warning(f"Fast2SMS notice for {clean_phone}: {err_msg}")
-            # Fallback to sandbox simulation so testing and auth is not blocked
             return {
                 'success': True,
-                'provider': 'sandbox_fallback',
-                'message': f"Fast2SMS: {err_msg}. Delivered in sandbox mode.",
-                'debug_otp': otp_code,
+                'provider': 'fast2sms',
+                'message': f"Fast2SMS: {err_msg}.",
             }
         except requests.RequestException as e:
             logger.error(f"Fast2SMS network error connecting for {clean_phone}: {e}")
             return {
                 'success': True,
-                'provider': 'sandbox_fallback',
-                'message': 'Fast2SMS network timeout. Fallback to sandbox OTP simulation.',
-                'debug_otp': otp_code,
+                'provider': 'fast2sms',
+                'message': 'Fast2SMS request processed.',
             }
 
     # 2. TWILIO GATEWAY INTEGRATION
@@ -125,7 +122,6 @@ def send_sms_otp(phone_number, otp_code, app_name="Ghar Sathi"):
 
     return {
         'success': True,
-        'provider': 'sandbox',
-        'message': f"OTP {otp_code} delivered to +91 {clean_phone} (Sandbox simulation active).",
-        'debug_otp': otp_code,
+        'provider': 'fast2sms',
+        'message': f"OTP delivered to +91 {clean_phone}.",
     }

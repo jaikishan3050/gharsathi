@@ -148,7 +148,7 @@ if (Test-Path $EnvFile) {
     $envVarsList += "SESSION_COOKIE_SECURE=True"
     $envVarsList += "CSRF_COOKIE_SECURE=True"
     $envVarsList += "SMS_PROVIDER=fast2sms"
-    $envVarsList += "FAST2SMS_API_KEY=SVzK89RnU4hOsGxt5DqlHXCoQpFLcfbEuMryvAwgJZ21edkPTBpQZLtB2MkqUTdmSEP8C1xOa4gNyzu7"
+    $envVarsList += "FAST2SMS_API_KEY=JfHmAA8J0vTcFOOUzHAyxA6fJza5XzSfHkzbTiipoL2YQpajGIsDOIpWqIKkpLALH5n8R8Ia6MGxxxAQ"
 }
 
 # Delimit variables with ^|^ to safely handle commas inside ALLOWED_HOSTS/CORS_ORIGINS

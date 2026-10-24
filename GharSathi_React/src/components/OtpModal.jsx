@@ -14,7 +14,6 @@ export default function OtpModal({
   const [step, setStep] = useState('phone'); // 'phone' | 'otp'
   const [phone, setPhone] = useState(initialPhone || '');
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [debugOtp, setDebugOtp] = useState('');
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -105,12 +104,6 @@ export default function OtpModal({
       setCanResend(false);
       setOtpDigits(['', '', '', '', '', '']);
 
-      if (res.debug_otp) {
-        setDebugOtp(res.debug_otp);
-      } else {
-        setDebugOtp('');
-      }
-
       setStatusMsg(
         isResend
           ? `Naya OTP mobile +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} par bhej diya gaya hai!`
@@ -158,14 +151,6 @@ export default function OtpModal({
       const nextIndex = Math.min(pasted.length, 5);
       inputRefs.current[nextIndex]?.focus();
     }
-  };
-
-  const handleAutoFillDebug = () => {
-    const code = debugOtp || '123456';
-    const newDigits = code.split('').slice(0, 6);
-    while (newDigits.length < 6) newDigits.push('');
-    setOtpDigits(newDigits);
-    inputRefs.current[5]?.focus();
   };
 
   // Verify OTP Handler
@@ -292,7 +277,7 @@ export default function OtpModal({
                       autoFocus
                     />
                   </div>
-                  <small className="field-hint">Demo test accounts: 9876543210 (Ramesh), 9811223344 (Anita)</small>
+                  <small className="field-hint">Enter your 10-digit mobile number to receive OTP</small>
                 </div>
 
                 <button
@@ -412,23 +397,6 @@ export default function OtpModal({
               </div>
             </div>
 
-            {/* Subtle Sandbox / Debug Hint */}
-            {debugOtp && (
-              <div className="otp-demo-hint-strip">
-                <span className="hint-pill">SANDBOX HINT</span>
-                <span>
-                  Demo SMS OTP: <strong>{debugOtp}</strong>
-                </span>
-                <button
-                  type="button"
-                  className="autofill-btn"
-                  onClick={handleAutoFillDebug}
-                  title="Auto-fill 6-digit OTP code"
-                >
-                  Auto-fill Code ⚡
-                </button>
-              </div>
-            )}
 
             <form onSubmit={handleVerifyOtp} className="otp-form-content">
               <div className="six-digit-boxes-container" onPaste={handlePaste}>

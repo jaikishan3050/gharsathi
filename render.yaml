@@ -44,7 +44,7 @@ services:
       - key: RAZORPAY_KEY_SECRET
         value: "ETgvqsAaKu3tQi8KkypuWGZd"
       - key: FAST2SMS_API_KEY
-        value: "SVzK89RnU4hOsGxt5DqlHXCoQpFLcfbEuMryvAwgJZ21edkPTBpQZLtB2MkqUTdmSEP8C1xOa4gNyzu7"
+        value: "JfHmAA8J0vTcFOOUzHAyxA6fJza5XzSfHkzbTiipoL2YQpajGIsDOIpWqIKkpLALH5n8R8Ia6MGxxxAQ"
       - key: SMS_PROVIDER
         value: "fast2sms"
 

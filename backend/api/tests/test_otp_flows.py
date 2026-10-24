@@ -95,10 +95,10 @@ class TestOTPAuthenticationFlows:
         assert response.status_code == 400
         assert "expired" in response.data.get("error", "").lower()
 
-    def test_technician_forgot_password_phone_normalization_and_debug_otp(self, api_client):
+    def test_technician_forgot_password_phone_normalization(self, api_client):
         """
         Tests that technician forgot-password normalizes phone numbers with +91, spaces,
-        saves OTP against TechnicianProfile, and returns debug_otp in JSON response.
+        saves OTP against TechnicianProfile, and dispatches SMS securely.
         """
         from api.models import TechnicianProfile
         tech = TechnicianProfile.objects.create(
@@ -117,13 +117,10 @@ class TestOTPAuthenticationFlows:
         )
         assert res.status_code == 200
         assert res.data["success"] is True
-        assert "debug_otp" in res.data
-        otp = res.data["debug_otp"]
-        assert len(otp) == 6
 
-        # Verify saved against TechnicianProfile
+        # Verify saved securely against TechnicianProfile
         tech.refresh_from_db()
-        assert tech.otp_code == otp
+        assert len(tech.otp_code) == 6
         assert tech.otp_expires_at is not None
         assert tech.otp_expires_at > timezone.now()
 

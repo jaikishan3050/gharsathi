@@ -342,7 +342,7 @@ RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8Kkyp
 SMS_PROVIDER = os.environ.get('SMS_PROVIDER', 'fast2sms')
 FAST2SMS_API_KEY = os.environ.get(
     'FAST2SMS_API_KEY',
-    'SVzK89RnU4hOsGxt5DqlHXCoQpFLcfbEuMryvAwgJZ21edkPTBpQZLtB2MkqUTdmSEP8C1xOa4gNyzu7'
+    'JfHmAA8J0vTcFOOUzHAyxA6fJza5XzSfHkzbTiipoL2YQpajGIsDOIpWqIKkpLALH5n8R8Ia6MGxxxAQ'
 ).strip()
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
