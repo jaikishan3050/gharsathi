@@ -229,6 +229,40 @@ def run_smoke_tests():
         record_result("Database Clean State", FAILED, str(e))
 
     # --------------------------------------------------------------------------
+    # Test 6: Technician Initial Zero Wallet Balance Verification
+    # --------------------------------------------------------------------------
+    print("\n--- Test 6: Technician Initial Zero Wallet Balance ---")
+    try:
+        test_tech_phone = "9899001122"
+        reg_payload = {
+            "name": "Live Smoke Test Tech",
+            "phone": test_tech_phone,
+            "trade": "AC Repair",
+            "wallet_balance": 600.00,  # Deliberate attempt to inject non-zero balance
+        }
+        r_tech = session.post(f"{BASE_URL}/technicians/", json=reg_payload, timeout=15)
+        if r_tech.status_code == 201:
+            tech_data = r_tech.json()
+            wb = float(tech_data.get("wallet_balance", -1))
+            assert wb == 0.0, f"Expected 0.00 wallet balance, got {wb}"
+            record_result(
+                "Technician Zero Wallet Balance",
+                PASSED,
+                f"Newly registered technician initialized with ₹{wb:.2f} wallet balance (attempted 600 injection strictly overridden)."
+            )
+            # Cleanup test technician
+            if admin_token and tech_data.get("id"):
+                session.delete(
+                    f"{BASE_URL}/technicians/{tech_data['id']}/",
+                    headers={"Authorization": f"Bearer {admin_token}"},
+                    timeout=10,
+                )
+        else:
+            record_result("Technician Zero Wallet Balance", FAILED, f"HTTP {r_tech.status_code}: {r_tech.text[:200]}")
+    except Exception as e:
+        record_result("Technician Zero Wallet Balance", FAILED, str(e))
+
+    # --------------------------------------------------------------------------
     # SUMMARY REPORT
     # --------------------------------------------------------------------------
     print("\n" + "=" * 80)
