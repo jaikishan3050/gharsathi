@@ -1,7 +1,7 @@
 import random
 from decimal import Decimal
 from django.utils import timezone
-from .models import Service, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal
+from .models import Service, SubService, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal
 
 SERVICES_DATA = [
     {
@@ -487,7 +487,7 @@ def purge_database():
     Preserves official services and provisions production superusers.
     """
     from .models import (
-        Service, TechnicianProfile, Booking, WalletTransaction,
+        Service, SubService, TechnicianProfile, Booking, WalletTransaction,
         Complaint, AdminWithdrawal, CustomerProfile, OTPVerification
     )
 
@@ -508,6 +508,7 @@ def purge_database():
                 name=s_data['name'],
                 category=s_data['category'],
                 base_price=s_data['base_price'],
+                commission_fee=s_data.get('commission_fee', Decimal('149.00')),
                 description=s_data['description'],
                 icon=s_data['icon'],
                 image=s_data['image'],
@@ -515,11 +516,40 @@ def purge_database():
                 is_active=True,
             )
 
-    # 3. Ensure production superusers
+    # 3. Synchronize SubService table for all services with commission fees
+    for svc in Service.objects.all():
+        subs = svc.subcategories or []
+        updated_subs = []
+        for idx, sub in enumerate(subs):
+            comm = sub.get('commission_fee')
+            if comm is None:
+                comm = float(getattr(svc, 'commission_fee', 149.00))
+                sub['commission_fee'] = comm
+            updated_subs.append(sub)
+            sub_id = sub.get('id') or f"{svc.slug}-{idx + 1}"
+            sub_price = Decimal(str(sub.get('price', svc.base_price)))
+            sub_old_price = Decimal(str(sub.get('oldPrice', round(float(sub_price) * 1.25))))
+            SubService.objects.update_or_create(
+                service=svc,
+                sub_id=sub_id,
+                defaults={
+                    'name': sub.get('name', f"Package {idx + 1}"),
+                    'price': sub_price,
+                    'old_price': sub_old_price,
+                    'commission_fee': Decimal(str(comm)),
+                    'time': sub.get('time', '45 mins'),
+                    'description': sub.get('description', ''),
+                }
+            )
+        svc.subcategories = updated_subs
+        svc.save()
+
+    # 4. Ensure production superusers
     ensure_production_superuser()
 
     return {
         'services': Service.objects.count(),
+        'subservices': SubService.objects.count(),
         'technicians': TechnicianProfile.objects.count(),
         'bookings': Booking.objects.count(),
         'transactions': WalletTransaction.objects.count(),

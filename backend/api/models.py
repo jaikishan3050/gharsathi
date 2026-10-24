@@ -30,7 +30,27 @@ class Service(models.Model):
         ordering = ['id']
 
     def __str__(self):
-        return f"{self.name} (₹{self.base_price})"
+        return f"{self.name} (₹{self.base_price}, Commission: ₹{self.commission_fee})"
+
+
+class SubService(models.Model):
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='subservices', null=True, blank=True)
+    sub_id = models.CharField(max_length=100, blank=True, default='')
+    name = models.CharField(max_length=150)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('499.00'))
+    old_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    commission_fee = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('149.00'))
+    time = models.CharField(max_length=50, blank=True, default='45 mins')
+    description = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.name} (₹{self.price}, Comm: ₹{self.commission_fee})"
 
 
 class TechnicianProfile(models.Model):
@@ -171,8 +191,32 @@ class Booking(models.Model):
             self.invoice_number = f"INV-{rand_inv}"
         if not self.service_name and self.service:
             self.service_name = self.service.name
-        if self.service and hasattr(self.service, 'commission_fee') and (self.platform_fee is None or self.platform_fee == Decimal('149.00')):
+
+        # Determine dynamic platform fee: Subservice commission -> Service commission -> 149.00 default
+        sub_comm = None
+        if self.service and (self.subcategory_id or self.subcategory_name):
+            for sub in (self.service.subcategories or []):
+                if str(sub.get('id')) == str(self.subcategory_id) or sub.get('name') == str(self.subcategory_name):
+                    if sub.get('commission_fee') is not None:
+                        try:
+                            sub_comm = Decimal(str(sub.get('commission_fee')))
+                        except Exception:
+                            pass
+                    break
+            if sub_comm is None:
+                matched_sub = SubService.objects.filter(service=self.service).filter(
+                    models.Q(sub_id=self.subcategory_id) | models.Q(name=self.subcategory_name)
+                ).first()
+                if matched_sub and matched_sub.commission_fee is not None:
+                    sub_comm = matched_sub.commission_fee
+
+        if sub_comm is not None and (self.platform_fee is None or self.platform_fee == Decimal('149.00')):
+            self.platform_fee = sub_comm
+        elif self.service and hasattr(self.service, 'commission_fee') and (self.platform_fee is None or self.platform_fee == Decimal('149.00')):
             self.platform_fee = self.service.commission_fee
+        elif self.platform_fee is None:
+            self.platform_fee = Decimal('149.00')
+
         if not self.total_amount:
             self.total_amount = self.base_price
         super().save(*args, **kwargs)

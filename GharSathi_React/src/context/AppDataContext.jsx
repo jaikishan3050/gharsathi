@@ -1378,13 +1378,13 @@ export function AppDataProvider({ children }) {
     });
   }, [backendStatus, addActivity, addToast]);
 
-  // Update Subservice Price (Admin)
-  const updateSubservicePrice = useCallback((serviceId, subserviceId, price) => {
-    const amount = Number(price);
-    if (!Number.isFinite(amount) || amount < 0) return;
+  // Update Subservice Price & Commission (Admin)
+  const updateSubservicePrice = useCallback((serviceId, subserviceId, price, commissionFee) => {
+    const amount = price !== undefined && price !== null && price !== '' ? Number(price) : null;
+    const comm = commissionFee !== undefined && commissionFee !== null && commissionFee !== '' ? Number(commissionFee) : null;
 
     if (backendStatus === 'live') {
-      api.updateSubservicePrice(serviceId, subserviceId, amount).catch((err) => {
+      api.updateSubservicePrice(serviceId, subserviceId, amount, comm).catch((err) => {
         console.warn('Backend updateSubservicePrice sync warning:', err);
       });
     }
@@ -1392,9 +1392,14 @@ export function AppDataProvider({ children }) {
     setData((current) => {
       const updatedServices = current.services.map((service) => {
         if (service.id !== serviceId && service.pk !== serviceId) return service;
-        const updatedSubs = (service.subcategories || []).map((sub) =>
-          sub.id === subserviceId ? { ...sub, price: amount } : sub
-        );
+        const updatedSubs = (service.subcategories || []).map((sub) => {
+          if (sub.id !== subserviceId) return sub;
+          return {
+            ...sub,
+            ...(amount !== null && Number.isFinite(amount) ? { price: amount } : {}),
+            ...(comm !== null && Number.isFinite(comm) ? { commission_fee: comm, commission: comm, commissionFee: comm } : {}),
+          };
+        });
         return {
           ...service,
           subcategories: updatedSubs,
@@ -1404,13 +1409,20 @@ export function AppDataProvider({ children }) {
       return {
         ...current,
         services: updatedServices,
-        activity: [addActivity(`Subservice rate updated for ${serviceId} / ${subserviceId} to ₹${amount}`), ...current.activity].slice(0, 50),
+        activity: [
+          addActivity(
+            `Subservice updated for ${serviceId} / ${subserviceId}` +
+            (amount !== null ? ` rate ₹${amount}` : '') +
+            (comm !== null ? ` commission ₹${comm}` : '')
+          ),
+          ...current.activity,
+        ].slice(0, 50),
       };
     });
 
     addToast({
-      title: 'Subservice Price Updated! 💰',
-      message: `Rate set to ₹${amount}`,
+      title: 'Subservice Rates Updated! 💰',
+      message: `${amount !== null ? `Rate: ₹${amount} ` : ''}${comm !== null ? `| Comm: ₹${comm}` : ''}`,
       type: 'success',
     });
   }, [backendStatus, addActivity, addToast]);

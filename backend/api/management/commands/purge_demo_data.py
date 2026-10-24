@@ -18,6 +18,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"Successfully purged Ghar Sathi demo dataset:\n"
                 f"  - Services: {counts['services']} active\n"
+                f"  - Subservices: {counts.get('subservices', 0)} active\n"
                 f"  - Technicians: {counts['technicians']} (0 dummy partners)\n"
                 f"  - Bookings: {counts['bookings']} (0 mock bookings)\n"
                 f"  - Complaints: {counts['complaints']} (0 mock complaints)\n"

@@ -1,6 +1,16 @@
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Service, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal, CustomerProfile, OTPVerification
+from .models import Service, SubService, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal, CustomerProfile, OTPVerification
+
+
+class SubServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubService
+        fields = [
+            'id', 'sub_id', 'service', 'name', 'price', 'old_price',
+            'commission_fee', 'time', 'description', 'is_active',
+            'created_at', 'updated_at'
+        ]
 
 
 class ServiceSerializer(serializers.ModelSerializer):

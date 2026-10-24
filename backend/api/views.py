@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 
 from .models import (
     Service,
+    SubService,
     TechnicianProfile,
     Booking,
     WalletTransaction,
@@ -27,6 +28,7 @@ from .models import (
 )
 from .serializers import (
     ServiceSerializer,
+    SubServiceSerializer,
     TechnicianProfileSerializer,
     BookingSerializer,
     WalletTransactionSerializer,
@@ -123,20 +125,36 @@ class ServiceViewSet(viewsets.ModelViewSet):
         service = self.get_object()
         sub_id = request.data.get('subservice_id') or request.data.get('subcategoryId') or request.data.get('id')
         new_price = request.data.get('price')
-        if not sub_id or new_price is None:
-            return Response({'error': 'subservice_id and price are required'}, status=status.HTTP_400_BAD_REQUEST)
+        new_commission = request.data.get('commission_fee') or request.data.get('commission')
+        if not sub_id or (new_price is None and new_commission is None):
+            return Response({'error': 'subservice_id and price or commission_fee are required'}, status=status.HTTP_400_BAD_REQUEST)
         
         subs = list(service.subcategories or [])
         found = False
         for sub in subs:
             if str(sub.get('id')) == str(sub_id) or sub.get('name') == str(sub_id):
-                sub['price'] = float(new_price)
+                if new_price is not None:
+                    sub['price'] = float(new_price)
+                if new_commission is not None:
+                    sub['commission_fee'] = float(new_commission)
                 found = True
                 break
         
         if found:
             service.subcategories = subs
             service.save()
+
+            # Synchronize with SubService model
+            update_kwargs = {}
+            if new_price is not None:
+                update_kwargs['price'] = Decimal(str(new_price))
+            if new_commission is not None:
+                update_kwargs['commission_fee'] = Decimal(str(new_commission))
+
+            SubService.objects.filter(service=service).filter(
+                Q(sub_id=sub_id) | Q(name=sub_id)
+            ).update(**update_kwargs)
+
             return Response(ServiceSerializer(service).data)
         return Response({'error': f'Subservice {sub_id} not found in {service.name}'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -145,6 +163,11 @@ class ServiceViewSet(viewsets.ModelViewSet):
         service = self.get_object()
         sub_name = request.data.get('name')
         sub_price = request.data.get('price', float(service.base_price))
+        sub_comm = (
+            request.data.get('commission_fee')
+            or request.data.get('commission')
+            or float(getattr(service, 'commission_fee', 149.00))
+        )
         sub_time = request.data.get('time', '45 mins')
         sub_desc = request.data.get('description', '')
         if not sub_name:
@@ -157,12 +180,27 @@ class ServiceViewSet(viewsets.ModelViewSet):
             'name': sub_name,
             'price': float(sub_price),
             'oldPrice': round(float(sub_price) * 1.25),
+            'commission_fee': float(sub_comm),
             'time': sub_time,
             'description': sub_desc,
         }
         subs.append(new_sub)
         service.subcategories = subs
         service.save()
+
+        # Synchronize with SubService model
+        SubService.objects.update_or_create(
+            service=service,
+            sub_id=sub_id,
+            defaults={
+                'name': sub_name,
+                'price': Decimal(str(sub_price)),
+                'old_price': Decimal(str(round(float(sub_price) * 1.25))),
+                'commission_fee': Decimal(str(sub_comm)),
+                'time': sub_time,
+                'description': sub_desc,
+            }
+        )
         return Response(ServiceSerializer(service).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):
@@ -194,12 +232,33 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if len(subs) < initial_len:
             service.subcategories = subs
             service.save()
+
+            # Synchronize with SubService model
+            SubService.objects.filter(service=service).filter(
+                Q(sub_id=sub_id) | Q(name=sub_id)
+            ).delete()
+
             return Response({
                 'success': True,
                 'message': f"Subservice '{sub_id}' deleted successfully from '{service.name}'.",
                 'service': ServiceSerializer(service).data
             }, status=status.HTTP_200_OK)
         return Response({'error': f"Subservice '{sub_id}' not found in '{service.name}'"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class SubServiceViewSet(viewsets.ModelViewSet):
+    """
+    CRUD ViewSet for individual Sub-Services with custom price & commission fee.
+    """
+    queryset = SubService.objects.all()
+    serializer_class = SubServiceSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        service_id = self.request.query_params.get('service_id') or self.request.query_params.get('service')
+        if service_id:
+            qs = qs.filter(service_id=service_id)
+        return qs
 
 
 
@@ -542,7 +601,25 @@ class BookingViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            platform_fee = (
+            # Subservice Custom Commission -> Service Commission -> Default 149.00
+            sub_fee = None
+            if booking.service and (booking.subcategory_id or booking.subcategory_name):
+                for sub in (booking.service.subcategories or []):
+                    if str(sub.get('id')) == str(booking.subcategory_id) or sub.get('name') == str(booking.subcategory_name):
+                        if sub.get('commission_fee') is not None:
+                            try:
+                                sub_fee = Decimal(str(sub.get('commission_fee')))
+                            except Exception:
+                                pass
+                        break
+                if sub_fee is None:
+                    matched_sub = SubService.objects.filter(service=booking.service).filter(
+                        Q(sub_id=booking.subcategory_id) | Q(name=booking.subcategory_name)
+                    ).first()
+                    if matched_sub and matched_sub.commission_fee is not None:
+                        sub_fee = matched_sub.commission_fee
+
+            platform_fee = sub_fee if sub_fee is not None else (
                 booking.service.commission_fee
                 if booking.service and hasattr(booking.service, 'commission_fee')
                 else (booking.platform_fee or FIXED_PLATFORM_FEE)

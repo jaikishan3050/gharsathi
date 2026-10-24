@@ -223,7 +223,14 @@ export function normalizeServiceFromDjango(s) {
     icon: s.icon || '🧰',
     image: s.image || '/images/other-service.png',
     description: s.description || '',
-    subcategories: Array.isArray(s.subcategories) ? s.subcategories : [],
+    subcategories: Array.isArray(s.subcategories)
+      ? s.subcategories.map((sub) => ({
+          ...sub,
+          price: Number(sub.price || 0),
+          commission_fee: Number(sub.commission_fee ?? sub.commission ?? s.commission_fee ?? 149),
+          commissionFee: Number(sub.commission_fee ?? sub.commission ?? s.commission_fee ?? 149),
+        }))
+      : [],
   };
 }
 
@@ -268,10 +275,18 @@ export const api = {
     });
   },
 
-  updateSubservicePrice: async (serviceId, subserviceId, price) => {
+  updateSubservicePrice: async (serviceId, subserviceId, price, commissionFee) => {
+    const payload = { subservice_id: subserviceId };
+    if (price !== undefined && price !== null && price !== '') {
+      payload.price = Number(price);
+    }
+    if (commissionFee !== undefined && commissionFee !== null && commissionFee !== '') {
+      payload.commission_fee = Number(commissionFee);
+      payload.commission = Number(commissionFee);
+    }
     return await apiRequest(`/services/${serviceId}/subservice-price/`, {
       method: 'PATCH',
-      body: JSON.stringify({ subservice_id: subserviceId, price: Number(price) }),
+      body: JSON.stringify(payload),
     });
   },
 

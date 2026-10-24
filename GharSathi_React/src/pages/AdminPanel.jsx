@@ -74,10 +74,12 @@ export default function AdminPanel() {
   const [priceDrafts, setPriceDrafts] = useState({});
   const [commissionDrafts, setCommissionDrafts] = useState({});
   const [subPriceDrafts, setSubPriceDrafts] = useState({});
+  const [subCommDrafts, setSubCommDrafts] = useState({});
   const [addingSubserviceFor, setAddingSubserviceFor] = useState(null);
   const [newSubForm, setNewSubForm] = useState({
     name: '',
     price: '',
+    commission_fee: '149',
     time: '45 mins',
     description: '',
   });
@@ -312,14 +314,20 @@ export default function AdminPanel() {
   };
 
   const saveSubPrice = (serviceId, sub) => {
-    const raw = subPriceDrafts[sub.id] ?? sub.price;
-    const amount = Number(raw);
+    const rawPrice = subPriceDrafts[sub.id] ?? sub.price;
+    const rawComm = subCommDrafts[sub.id] ?? sub.commission_fee ?? sub.commissionFee ?? sub.commission ?? 149;
+    const amount = Number(rawPrice);
+    const commAmount = Number(rawComm);
     if (!Number.isFinite(amount) || amount < 0) {
       setNotice('Price zero ya positive number hona chahiye.');
       return;
     }
-    updateSubservicePrice(serviceId, sub.id, amount);
-    setNotice(`${sub.name} ka rate ₹${amount} update ho gaya.`);
+    if (!Number.isFinite(commAmount) || commAmount < 0) {
+      setNotice('Commission fee zero ya positive number hona chahiye.');
+      return;
+    }
+    updateSubservicePrice(serviceId, sub.id, amount, commAmount);
+    setNotice(`${sub.name} ka rate ₹${amount} aur commission ₹${commAmount} update ho gaya.`);
   };
 
   const handleCreateSubservice = async (serviceId) => {
@@ -333,17 +341,23 @@ export default function AdminPanel() {
       setNotice('Valid price enter karein.');
       return;
     }
+    const comm = Number(newSubForm.commission_fee || 149);
+    if (!Number.isFinite(comm) || comm < 0) {
+      setNotice('Valid commission fee enter karein.');
+      return;
+    }
 
     await addSubservice(serviceId, {
       name: subName,
       price,
+      commission_fee: comm,
       time: newSubForm.time || '45 mins',
       description: newSubForm.description || '',
     });
 
     setAddingSubserviceFor(null);
-    setNewSubForm({ name: '', price: '', time: '45 mins', description: '' });
-    setNotice(`Naya subservice "${subName}" add ho gaya.`);
+    setNewSubForm({ name: '', price: '', commission_fee: '149', time: '45 mins', description: '' });
+    setNotice(`Naya subservice "${subName}" (Rate: ₹${price}, Comm: ₹${comm}) add ho gaya.`);
   };
 
   // Withdrawal Form Submission & FinTech Payout Controls
@@ -1562,7 +1576,7 @@ export default function AdminPanel() {
                         className="button button-small button-outline add-subservice-btn"
                         onClick={() => {
                           setAddingSubserviceFor(addingSubserviceFor === service.id ? null : service.id);
-                          setNewSubForm({ name: '', price: '', time: '45 mins', description: '' });
+                          setNewSubForm({ name: '', price: '', commission_fee: String(service.commission_fee || 149), time: '45 mins', description: '' });
                         }}
                       >
                         {addingSubserviceFor === service.id ? '✕ Close Form' : '+ Add Subservice'}
@@ -1573,7 +1587,7 @@ export default function AdminPanel() {
                     {addingSubserviceFor === service.id && (
                       <div className="inline-add-subservice-box">
                         <h5>Add New Subservice to {service.name}</h5>
-                        <div className="inline-sub-form-grid">
+                        <div className="inline-sub-form-grid" style={{ gridTemplateColumns: '1.8fr 1fr 1fr 1fr' }}>
                           <input
                             type="text"
                             placeholder="Subservice Name (e.g. Foam Jet Deep Clean)"
@@ -1587,6 +1601,14 @@ export default function AdminPanel() {
                             placeholder="Price (₹)"
                             value={newSubForm.price}
                             onChange={(e) => setNewSubForm({ ...newSubForm, price: e.target.value })}
+                            required
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Commission (₹)"
+                            value={newSubForm.commission_fee}
+                            onChange={(e) => setNewSubForm({ ...newSubForm, commission_fee: e.target.value })}
                             required
                           />
                           <input
@@ -1634,15 +1656,21 @@ export default function AdminPanel() {
                           <thead>
                             <tr>
                               <th>Subservice Name & Description</th>
-                              <th style={{ width: '110px' }}>Est. Time</th>
-                              <th style={{ width: '200px' }}>Current Price & Rate Update (₹)</th>
-                              <th style={{ width: '90px', textAlign: 'center' }}>Action</th>
+                              <th style={{ width: '90px' }}>Est. Time</th>
+                              <th style={{ width: '130px' }}>Price (₹)</th>
+                              <th style={{ width: '130px' }}>Commission (₹)</th>
+                              <th style={{ width: '120px', textAlign: 'center' }}>Action</th>
                             </tr>
                           </thead>
                           <tbody>
                             {service.subcategories.map((sub) => {
-                              const draftPrice = subPriceDrafts[sub.id] ?? sub.price;
-                              const isModified = Number(draftPrice) !== Number(sub.price);
+                              const currentPrice = sub.price ?? 0;
+                              const currentComm = sub.commission_fee ?? sub.commissionFee ?? sub.commission ?? service.commission_fee ?? 149;
+                              const draftPrice = subPriceDrafts[sub.id] ?? currentPrice;
+                              const draftComm = subCommDrafts[sub.id] ?? currentComm;
+                              const isPriceModified = Number(draftPrice) !== Number(currentPrice);
+                              const isCommModified = Number(draftComm) !== Number(currentComm);
+                              const isModified = isPriceModified || isCommModified;
                               return (
                                 <tr key={sub.id}>
                                   <td>
@@ -1661,7 +1689,7 @@ export default function AdminPanel() {
                                         type="number"
                                         min="0"
                                         step="1"
-                                        className={`subservice-price-input ${isModified ? 'price-input-dirty' : ''}`}
+                                        className={`subservice-price-input ${isPriceModified ? 'price-input-dirty' : ''}`}
                                         value={draftPrice}
                                         onChange={(e) =>
                                           setSubPriceDrafts({
@@ -1669,18 +1697,39 @@ export default function AdminPanel() {
                                             [sub.id]: e.target.value,
                                           })
                                         }
+                                        title={`Price for ${sub.name}`}
                                       />
-                                      <button
-                                        type="button"
-                                        className={`button button-small ${isModified ? 'button-gold' : 'button-outline'}`}
-                                        onClick={() => saveSubPrice(service.id, sub)}
-                                        title={`Save ${sub.name} price`}
-                                      >
-                                        {isModified ? 'Update' : 'Save'}
-                                      </button>
                                     </div>
                                   </td>
-                                  <td style={{ textAlign: 'center' }}>
+                                  <td>
+                                    <div className="subservice-price-edit-row">
+                                      <span className="sub-currency" style={{ color: '#0d9488' }}>₹</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        className={`subservice-price-input ${isCommModified ? 'price-input-dirty' : ''}`}
+                                        value={draftComm}
+                                        onChange={(e) =>
+                                          setSubCommDrafts({
+                                            ...subCommDrafts,
+                                            [sub.id]: e.target.value,
+                                          })
+                                        }
+                                        title={`Commission Fee for ${sub.name}`}
+                                      />
+                                    </div>
+                                  </td>
+                                  <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                    <button
+                                      type="button"
+                                      className={`button button-small ${isModified ? 'button-gold' : 'button-outline'}`}
+                                      onClick={() => saveSubPrice(service.id, sub)}
+                                      title={`Save ${sub.name} price & commission`}
+                                      style={{ marginRight: '6px' }}
+                                    >
+                                      {isModified ? 'Update' : 'Save'}
+                                    </button>
                                     <button
                                       type="button"
                                       className="button button-small button-danger"
@@ -2727,7 +2776,7 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
   const [icon, setIcon] = useState('❄️');
   const [description, setDescription] = useState('');
   const [subservices, setSubservices] = useState([
-    { name: '', price: '499', time: '45 mins', description: '' },
+    { name: '', price: '499', commission_fee: '149', time: '45 mins', description: '' },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -2758,7 +2807,7 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
   const handleAddSubserviceRow = () => {
     setSubservices([
       ...subservices,
-      { name: '', price: price || '299', time: '45 mins', description: '' },
+      { name: '', price: price || '299', commission_fee: commissionFee || '149', time: '45 mins', description: '' },
     ]);
   };
 
@@ -2788,7 +2837,7 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
       return;
     }
 
-    // Format subservices with valid IDs
+    // Format subservices with valid IDs and commission fees
     const slugBase =
       name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') ||
       `service-${Date.now().toString().slice(-4)}`;
@@ -2798,6 +2847,8 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
         id: `${slugBase}-sub-${idx + 1}`,
         name: s.name.trim(),
         price: Number(s.price || basePriceNum),
+        commission_fee: Number(s.commission_fee || commissionFeeNum),
+        commissionFee: Number(s.commission_fee || commissionFeeNum),
         oldPrice: Math.round(Number(s.price || basePriceNum) * 1.25),
         time: s.time || '45 mins',
         description: s.description || `${s.name.trim()} package for ${name}`,
@@ -2953,7 +3004,7 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
                     onChange={(e) => handleSubserviceChange(idx, 'name', e.target.value)}
                     required
                   />
-                  <div className="builder-price-wrap">
+                  <div className="builder-price-wrap" title="Sub-Service Price (₹)">
                     <span>₹</span>
                     <input
                       type="number"
@@ -2961,6 +3012,17 @@ function AddServiceModal({ isOpen, onClose, onAddService }) {
                       placeholder="Price"
                       value={sub.price}
                       onChange={(e) => handleSubserviceChange(idx, 'price', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="builder-price-wrap" title="Sub-Service Commission Fee (₹)">
+                    <span style={{ color: '#0d9488' }}>₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Comm"
+                      value={sub.commission_fee}
+                      onChange={(e) => handleSubserviceChange(idx, 'commission_fee', e.target.value)}
                       required
                     />
                   </div>

@@ -6,6 +6,7 @@ from django.conf import settings
 from rest_framework.test import APIClient
 from api.models import (
     Service,
+    SubService,
     TechnicianProfile,
     Booking,
     WalletTransaction,
@@ -316,3 +317,76 @@ class TestFinancialAndOperationalFlows:
 
         assert response.status_code == 400
         assert "failed" in response.data.get("error", "").lower()
+
+    def test_subservice_custom_commission_crud_and_deduction(self, api_client, verified_technician, sample_service):
+        """
+        Verify that SubService can be created with custom commission_fee,
+        and when a booking for this subservice is completed, the technician's wallet
+        is deducted by the specific subservice's custom commission_fee.
+        """
+        # 1. Add SubService with custom price & commission fee
+        add_url = f"/api/services/{sample_service.id}/add-subservice/"
+        res_add = api_client.post(
+            add_url,
+            {
+                "name": "AC Foam Jet Supreme",
+                "price": 899.00,
+                "commission_fee": 220.00,
+                "time": "60 mins",
+                "description": "Premium foam wash",
+            },
+            format="json",
+        )
+        assert res_add.status_code == 201
+
+        # Verify SubService model instance created
+        sub_obj = SubService.objects.filter(service=sample_service, name="AC Foam Jet Supreme").first()
+        assert sub_obj is not None
+        assert sub_obj.commission_fee == Decimal("220.00")
+        assert sub_obj.price == Decimal("899.00")
+
+        # 2. Update SubService price and commission fee
+        update_url = f"/api/services/{sample_service.id}/subservice-price/"
+        res_upd = api_client.patch(
+            update_url,
+            {
+                "subservice_id": sub_obj.sub_id,
+                "price": 999.00,
+                "commission_fee": 250.00,
+            },
+            format="json",
+        )
+        assert res_upd.status_code == 200
+        sub_obj.refresh_from_db()
+        assert sub_obj.price == Decimal("999.00")
+        assert sub_obj.commission_fee == Decimal("250.00")
+
+        # 3. Create booking for this subservice and complete with Happy Code
+        sample_service.refresh_from_db()
+        booking = Booking.objects.create(
+            service=sample_service,
+            service_name=sample_service.name,
+            subcategory_id=sub_obj.sub_id,
+            subcategory_name=sub_obj.name,
+            customer_name="Ramesh Kumar",
+            customer_phone="9876543210",
+            address="Kankarbagh, Patna",
+            area="Patna Central",
+            base_price=sub_obj.price,
+            platform_fee=sub_obj.commission_fee,
+            total_amount=sub_obj.price,
+            technician=verified_technician,
+            status="In Progress",
+            service_pin="5544",
+        )
+
+        initial_balance = verified_technician.wallet_balance  # 500.00
+        complete_url = f"/api/bookings/{booking.id}/complete/"
+        res_comp = api_client.post(complete_url, {"service_pin": "5544"}, format="json")
+        assert res_comp.status_code == 200
+
+        verified_technician.refresh_from_db()
+        # Exactly 250.00 deducted (500 - 250 = 250)
+        assert verified_technician.wallet_balance == initial_balance - Decimal("250.00")
+        assert verified_technician.wallet_balance == Decimal("250.00")
+

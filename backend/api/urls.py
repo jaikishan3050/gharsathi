@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     ServiceViewSet,
+    SubServiceViewSet,
     TechnicianProfileViewSet,
     BookingViewSet,
     ComplaintViewSet,
@@ -23,6 +24,7 @@ from .views import (
 
 router = DefaultRouter()
 router.register(r'services', ServiceViewSet, basename='service')
+router.register(r'subservices', SubServiceViewSet, basename='subservice')
 router.register(r'technicians', TechnicianProfileViewSet, basename='technician')
 router.register(r'customers', CustomerProfileViewSet, basename='customer')
 router.register(r'bookings', BookingViewSet, basename='booking')
