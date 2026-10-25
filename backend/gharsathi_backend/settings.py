@@ -350,12 +350,22 @@ TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 OTP_EXPIRATION_MINUTES = int(os.environ.get('OTP_EXPIRATION_MINUTES', 5))
 
 
-# Email configuration (Console for development, SMTP for production)
+# Email configuration (Django 6 MAILERS configuration)
 MAILERS = {
     'default': {
         'BACKEND': os.environ.get(
             'EMAIL_BACKEND',
             'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
         ),
+        'HOST': os.environ.get('EMAIL_HOST', 'smtp.gmail.com'),
+        'PORT': int(os.environ.get('EMAIL_PORT', 587)),
+        'USE_TLS': os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1'),
+        'USERNAME': os.environ.get('EMAIL_HOST_USER', 'support@gharsathi.in'),
+        'PASSWORD': os.environ.get('EMAIL_HOST_PASSWORD', ''),
     },
 }
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Ghar Sathi <support@gharsathi.in>')
+EMAIL_OTP_EXPIRATION_MINUTES = int(os.environ.get('EMAIL_OTP_EXPIRATION_MINUTES', 10))
+
+# Google OAuth Settings
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()

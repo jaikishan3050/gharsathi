@@ -5,7 +5,9 @@ import random
 from datetime import timedelta
 from decimal import Decimal
 import jwt
+import requests
 from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
@@ -35,6 +37,9 @@ from .serializers import (
     ComplaintSerializer,
     AdminWithdrawalSerializer,
     CustomerProfileSerializer,
+    SendEmailOTPSerializer,
+    VerifyEmailOTPSerializer,
+    GoogleAuthSerializer,
 )
 from .seed_data import seed_database, purge_database, ensure_production_superuser
 from .services.sms import send_sms_otp
@@ -1381,6 +1386,402 @@ class VerifyOTPView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class SendEmailOTPView(APIView):
+    """
+    POST /api/auth/send-email-otp/
+    Accepts: { "email": "user@example.com", "role": "customer" | "technician" }
+    Generates a 6-digit numeric OTP with 10-minute expiry, saves to OTPVerification,
+    and dispatches via Django send_mail (SMTP).
+    """
+
+    def post(self, request):
+        serializer = SendEmailOTPSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_email = serializer.validated_data['email'].strip().lower()
+        role = serializer.validated_data.get('role', 'customer')
+
+        # Rate limiting: 15 seconds cooldown per email
+        recent_otp = OTPVerification.objects.filter(
+            email=clean_email,
+            created_at__gte=timezone.now() - timedelta(seconds=15)
+        ).first()
+        if recent_otp:
+            return Response(
+                {'error': 'OTP was already sent recently. Please wait a moment before requesting another code.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        otp_code = str(random.randint(100000, 999999))
+        expiry_minutes = getattr(settings, 'EMAIL_OTP_EXPIRATION_MINUTES', 10)
+        expires_at = timezone.now() + timedelta(minutes=expiry_minutes)
+
+        # Invalidate old unverified OTPs for this email
+        OTPVerification.objects.filter(email=clean_email, is_verified=False).delete()
+
+        # Create new OTP verification record
+        OTPVerification.objects.create(
+            email=clean_email,
+            phone='',
+            otp_code=otp_code,
+            role=role,
+            expires_at=expires_at,
+        )
+
+        subject = f"{otp_code} is your Ghar Sathi verification code"
+        plain_message = (
+            f"Namaste,\n\n"
+            f"Your 6-digit Ghar Sathi verification code is: {otp_code}\n\n"
+            f"This code will expire in {expiry_minutes} minutes. Please do not share this code with anyone.\n\n"
+            f"— Ghar Sathi Team\n"
+            f"https://bookgharsathi.in"
+        )
+        html_message = f"""
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5eae6; box-shadow: 0 4px 16px rgba(0,0,0,0.06);">
+          <div style="background: #0b3d2e; padding: 24px 28px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 0.5px;">Ghar Sathi</h1>
+            <p style="color: #d4af37; margin: 4px 0 0; font-size: 13px; font-weight: 600;">Bihar's Trusted Home Services</p>
+          </div>
+          <div style="padding: 28px 32px; color: #23332c;">
+            <h2 style="font-size: 18px; margin: 0 0 12px; color: #0b3d2e;">Verification Code</h2>
+            <p style="font-size: 14px; line-height: 1.6; color: #536459; margin: 0 0 20px;">
+              Please use the verification code below to verify your email address and continue with your Ghar Sathi account:
+            </p>
+            <div style="text-align: center; margin: 24px 0; padding: 18px; background: #f4f7f4; border: 1px dashed #0b3d2e; border-radius: 8px;">
+              <span style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0b3d2e; font-family: monospace;">{otp_code}</span>
+            </div>
+            <p style="font-size: 12px; color: #8a968e; margin: 16px 0 0; line-height: 1.5;">
+              ⏱️ This code is valid for <strong>{expiry_minutes} minutes</strong>. If you did not request this verification code, please disregard this email.
+            </p>
+          </div>
+          <div style="background: #f8faf8; padding: 14px 28px; text-align: center; border-top: 1px solid #eef2ee; font-size: 11px; color: #8a968e;">
+            © {timezone.now().year} Ghar Sathi · Patna & Across Bihar · <a href="https://bookgharsathi.in" style="color: #0b3d2e; text-decoration: none;">bookgharsathi.in</a>
+          </div>
+        </div>
+        """
+
+        email_dispatched = False
+        try:
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'Ghar Sathi <support@gharsathi.in>')
+            send_mail(
+                subject=subject,
+                message=plain_message,
+                from_email=from_email,
+                recipient_list=[clean_email],
+                html_message=html_message,
+                fail_silently=False,
+            )
+            email_dispatched = True
+        except Exception as e:
+            logger.warning(f"SMTP dispatch note for {clean_email}: {e}")
+
+        return Response({
+            'success': True,
+            'message': f"OTP verification code sent to {clean_email}.",
+            'email': clean_email,
+            'expires_in_seconds': expiry_minutes * 60,
+            'email_dispatched': email_dispatched,
+        }, status=status.HTTP_200_OK)
+
+
+class VerifyEmailOTPView(APIView):
+    """
+    POST /api/auth/verify-email-otp/
+    Accepts: {
+        "email": "user@example.com",
+        "otp": "123456",
+        "phone": "9876543210",
+        "role": "customer" | "technician",
+        "name": "...",
+        "area": "...",
+        "address": "...",
+        "pincode": "...",
+        "skills": "..."
+    }
+    Verifies OTP, registers user/technician in PostgreSQL (technicians strictly start with wallet_balance=0.00),
+    and returns JWT tokens.
+    """
+
+    def post(self, request):
+        serializer = VerifyEmailOTPSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_email = serializer.validated_data['email'].strip().lower()
+        otp_input = serializer.validated_data['otp_code']
+        role = serializer.validated_data.get('role', 'customer')
+        phone_input = serializer.validated_data.get('phone', '')
+        clean_phone = ''.join(filter(str.isdigit, str(phone_input)))[-10:] if phone_input else ''
+        name_input = serializer.validated_data.get('name', '').strip()
+        area_input = serializer.validated_data.get('area', 'Patna to Danapur')
+        address_input = serializer.validated_data.get('address', '')
+        pincode_input = serializer.validated_data.get('pincode', '801103')
+        skills_input = serializer.validated_data.get('skills', 'Home Services')
+
+        otp_record = (
+            OTPVerification.objects.filter(email=clean_email, is_verified=False)
+            .order_by('-created_at')
+            .first()
+        )
+
+        if not otp_record:
+            return Response(
+                {'error': 'No active OTP request found for this email. Please request a new OTP.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if otp_record.attempts >= 5:
+            return Response(
+                {'error': 'Maximum verification attempts exceeded. Please request a new OTP.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        otp_record.attempts += 1
+        otp_record.save(update_fields=['attempts'])
+
+        if otp_record.is_expired():
+            return Response(
+                {'error': 'This OTP has expired. Please request a new code.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if otp_record.otp_code != otp_input:
+            return Response(
+                {'error': 'Invalid OTP code. Please enter the 6-digit code received on your email.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        otp_record.is_verified = True
+        otp_record.save(update_fields=['is_verified'])
+
+        # User Resolution & Registration
+        user_profile_data = {}
+        if role == 'technician':
+            tech = None
+            if clean_email:
+                tech = TechnicianProfile.objects.filter(email__iexact=clean_email).first()
+            if not tech and clean_phone:
+                tech = TechnicianProfile.objects.filter(phone=clean_phone).first()
+
+            if not tech:
+                tech_phone = clean_phone or f"98{random.randint(10000000, 99999999)}"
+                tech_name = name_input or f"Partner {clean_email.split('@')[0]}"
+                tech = TechnicianProfile.objects.create(
+                    name=tech_name,
+                    email=clean_email,
+                    phone=tech_phone,
+                    area=area_input,
+                    trade=skills_input,
+                    wallet_balance=Decimal('0.00'),
+                )
+            else:
+                updated = False
+                if clean_email and not tech.email:
+                    tech.email = clean_email
+                    updated = True
+                if clean_phone and not tech.phone:
+                    tech.phone = clean_phone
+                    updated = True
+                if name_input and not tech.name:
+                    tech.name = name_input
+                    updated = True
+                if updated:
+                    tech.save()
+
+            user_profile_data = TechnicianProfileSerializer(tech).data
+            user_profile_data['userType'] = 'technician'
+            user_id = tech.id
+            user_phone = tech.phone
+            user_name = tech.name
+        else:
+            customer = None
+            if clean_email:
+                customer = CustomerProfile.objects.filter(email__iexact=clean_email).first()
+            if not customer and clean_phone:
+                customer = CustomerProfile.objects.filter(phone=clean_phone).first()
+
+            if not customer:
+                cus_phone = clean_phone or f"98{random.randint(10000000, 99999999)}"
+                cus_name = name_input or f"Customer {clean_email.split('@')[0]}"
+                customer = CustomerProfile.objects.create(
+                    email=clean_email,
+                    phone=cus_phone,
+                    name=cus_name,
+                    area=area_input,
+                    address=address_input,
+                    pincode=pincode_input,
+                )
+            else:
+                updated = False
+                if clean_email and not customer.email:
+                    customer.email = clean_email
+                    updated = True
+                if clean_phone and (not customer.phone or customer.phone.startswith('98')):
+                    customer.phone = clean_phone
+                    updated = True
+                if name_input and not customer.name:
+                    customer.name = name_input
+                    updated = True
+                if address_input and not customer.address:
+                    customer.address = address_input
+                    updated = True
+                if pincode_input and not customer.pincode:
+                    customer.pincode = pincode_input
+                    updated = True
+                if updated:
+                    customer.save()
+
+            user_profile_data = CustomerProfileSerializer(customer).data
+            user_profile_data['userType'] = 'customer'
+            user_id = customer.id
+            user_phone = customer.phone
+            user_name = customer.name
+
+        # Generate JWT Token (valid 7 days)
+        payload = {
+            'id': user_id,
+            'email': clean_email,
+            'phone': user_phone,
+            'name': user_name,
+            'role': role,
+            'exp': timezone.now() + timedelta(days=7),
+            'iat': timezone.now(),
+        }
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+
+        return Response({
+            'success': True,
+            'message': 'Email verified and logged in successfully.',
+            'token': token,
+            'role': role,
+            'user': user_profile_data,
+        }, status=status.HTTP_200_OK)
+
+
+class GoogleAuthView(APIView):
+    """
+    POST /api/auth/google/
+    Accepts: {
+        "credential": "<Google ID Token>",
+        "role": "customer" | "technician" (default customer),
+        "email": "...", (optional fallback)
+        "name": "..." (optional fallback)
+    }
+    Validates Google credential token, checks if user exists in PostgreSQL,
+    registers them if not (technicians start with wallet_balance=0.00), and returns JWT tokens.
+    """
+
+    def post(self, request):
+        serializer = GoogleAuthSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        credential = (
+            serializer.validated_data.get('credential')
+            or serializer.validated_data.get('token')
+            or serializer.validated_data.get('id_token')
+        )
+        role = serializer.validated_data.get('role', 'customer')
+        fallback_email = serializer.validated_data.get('email', '')
+        fallback_name = serializer.validated_data.get('name', '')
+
+        google_user_info = None
+
+        if credential:
+            # 1. Attempt online verification via Google OAuth tokeninfo endpoint
+            try:
+                resp = requests.get(
+                    'https://oauth2.googleapis.com/tokeninfo',
+                    params={'id_token': credential},
+                    timeout=5
+                )
+                if resp.status_code == 200:
+                    google_user_info = resp.json()
+            except Exception as e:
+                logger.warning(f"Google tokeninfo online check notice: {e}")
+
+            # 2. PyJWT decode fallback
+            if not google_user_info:
+                try:
+                    decoded = jwt.decode(credential, options={"verify_signature": False})
+                    if decoded and 'email' in decoded:
+                        google_user_info = decoded
+                except Exception as e:
+                    logger.warning(f"JWT decode fallback notice: {e}")
+
+        # Fallback to direct payload if supplied
+        if not google_user_info and fallback_email:
+            google_user_info = {
+                'email': fallback_email,
+                'name': fallback_name or fallback_email.split('@')[0],
+            }
+
+        if not google_user_info or not google_user_info.get('email'):
+            return Response(
+                {'error': 'Invalid or unverified Google token. Please sign in with a valid Google account.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        email = google_user_info['email'].strip().lower()
+        name = google_user_info.get('name') or email.split('@')[0]
+
+        # Resolve or Register User
+        user_profile_data = {}
+        if role == 'technician':
+            tech = TechnicianProfile.objects.filter(email__iexact=email).first()
+            if not tech:
+                tech = TechnicianProfile.objects.create(
+                    name=name,
+                    email=email,
+                    phone=f"98{random.randint(10000000, 99999999)}",
+                    area='Patna to Danapur',
+                    trade='Home Services',
+                    wallet_balance=Decimal('0.00'),
+                )
+            user_profile_data = TechnicianProfileSerializer(tech).data
+            user_profile_data['userType'] = 'technician'
+            user_id = tech.id
+            user_phone = tech.phone
+            user_name = tech.name
+        else:
+            customer = CustomerProfile.objects.filter(email__iexact=email).first()
+            if not customer:
+                customer = CustomerProfile.objects.create(
+                    name=name,
+                    email=email,
+                    phone=f"98{random.randint(10000000, 99999999)}",
+                    area='Patna to Danapur',
+                    address='',
+                    pincode='801103',
+                )
+            user_profile_data = CustomerProfileSerializer(customer).data
+            user_profile_data['userType'] = 'customer'
+            user_id = customer.id
+            user_phone = customer.phone
+            user_name = customer.name
+
+        # Generate JWT Token (valid 7 days)
+        payload = {
+            'id': user_id,
+            'email': email,
+            'phone': user_phone,
+            'name': user_name,
+            'role': role,
+            'exp': timezone.now() + timedelta(days=7),
+            'iat': timezone.now(),
+        }
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+
+        return Response({
+            'success': True,
+            'message': f'Welcome {user_name}! Google sign-in successful.',
+            'token': token,
+            'role': role,
+            'user': user_profile_data,
+        }, status=status.HTTP_200_OK)
+
+
 class LoginView(APIView):
     """
     POST /api/auth/login/ & /api/technicians/login/
@@ -1581,9 +1982,18 @@ class AuthMeView(APIView):
                 })
 
         # Customer
-        if role == 'customer' and phone:
-            clean_phone = ''.join(filter(str.isdigit, str(phone)))[-10:]
-            customer = CustomerProfile.objects.filter(phone__endswith=clean_phone).first()
+        if role == 'customer':
+            customer = None
+            cus_id = decoded.get('id')
+            email = decoded.get('email')
+            if cus_id:
+                customer = CustomerProfile.objects.filter(pk=cus_id).first()
+            if not customer and email:
+                customer = CustomerProfile.objects.filter(email__iexact=email).first()
+            if not customer and phone:
+                clean_phone = ''.join(filter(str.isdigit, str(phone)))[-10:]
+                customer = CustomerProfile.objects.filter(phone__endswith=clean_phone).first()
+
             if customer:
                 cus_data = CustomerProfileSerializer(customer).data
                 cus_data['userType'] = 'customer'

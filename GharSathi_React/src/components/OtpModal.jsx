@@ -288,6 +288,13 @@ export default function OtpModal({
                 >
                   {loading ? 'Sending OTP SMS…' : 'Send 6-Digit OTP 📲'}
                 </button>
+
+                <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '11px', color: '#64748b' }}>
+                  <span>Prefer Email or Google? </span>
+                  <a href="/login" style={{ color: 'var(--green)', fontWeight: 800, textDecoration: 'underline' }}>
+                    Open Email & Google Sign In →
+                  </a>
+                </div>
               </form>
             ) : (
               <form

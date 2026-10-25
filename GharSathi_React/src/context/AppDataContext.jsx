@@ -823,8 +823,37 @@ export function AppDataProvider({ children }) {
     return guestCustomer;
   }, [data.customers, addActivity, addToast]);
 
+  const setCustomerSession = useCallback((customer, token = null) => {
+    if (token) {
+      try {
+        localStorage.setItem(AUTH_TOKEN_KEY, token);
+      } catch {}
+    }
+    setCurrentCustomer(customer);
+    try {
+      localStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(customer));
+    } catch {}
+  }, []);
+
+  const setTechnicianSession = useCallback((technician, token = null) => {
+    if (token) {
+      try {
+        localStorage.setItem(AUTH_TOKEN_KEY, token);
+      } catch {}
+    }
+    const normalized = normalizeTechnicianFromDjango(technician) || technician;
+    setCurrentTechnician(normalized);
+    try {
+      localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
+    } catch {}
+  }, []);
+
   const logoutCustomer = useCallback(() => {
     setCurrentCustomer(null);
+    try {
+      localStorage.removeItem(CUSTOMER_AUTH_KEY);
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    } catch {}
     addToast({
       title: 'Logged Out',
       message: 'Customer session ended securely.',
@@ -2077,7 +2106,11 @@ export function AppDataProvider({ children }) {
       lastSyncTime,
       syncFromDjango,
       currentCustomer,
+      setCurrentCustomer,
       currentTechnician,
+      setCurrentTechnician,
+      setCustomerSession,
+      setTechnicianSession,
       isAdminLoggedIn,
       signupCustomer,
       loginCustomer,
@@ -2121,7 +2154,11 @@ export function AppDataProvider({ children }) {
       lastSyncTime,
       syncFromDjango,
       currentCustomer,
+      setCurrentCustomer,
       currentTechnician,
+      setCurrentTechnician,
+      setCustomerSession,
+      setTechnicianSession,
       isAdminLoggedIn,
       signupCustomer,
       loginCustomer,

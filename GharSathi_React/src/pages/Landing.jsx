@@ -38,6 +38,12 @@ export default function Landing() {
           <span className="landing-pill">
             <span className="online-dot" /> ONE PLATFORM · THREE PANELS · 100% QUALITY GUARANTEE
           </span>
+          <Link to="/login" className="button button-outline button-small" style={{ borderRadius: '8px', padding: '6px 14px', fontSize: '11px' }}>
+            Sign In
+          </Link>
+          <Link to="/signup" className="button button-gold button-small" style={{ borderRadius: '8px', padding: '6px 14px', fontSize: '11px', fontWeight: 800 }}>
+            Sign Up
+          </Link>
         </div>
       </header>
 

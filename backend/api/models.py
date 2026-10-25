@@ -313,7 +313,8 @@ class AdminWithdrawal(models.Model):
 
 class CustomerProfile(models.Model):
     customer_id = models.CharField(max_length=30, unique=True, db_index=True)
-    phone = models.CharField(max_length=15, unique=True, db_index=True)
+    phone = models.CharField(max_length=20, blank=True, default='', db_index=True)
+    email = models.EmailField(blank=True, default='', db_index=True)
     name = models.CharField(max_length=120, blank=True, default='')
     address = models.TextField(blank=True, default='')
     area = models.CharField(max_length=100, default='Patna to Danapur')
@@ -326,7 +327,8 @@ class CustomerProfile(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.customer_id} - {self.name or 'Customer'} ({self.phone})"
+        identifier = self.email or self.phone
+        return f"{self.customer_id} - {self.name or 'Customer'} ({identifier})"
 
     def save(self, *args, **kwargs):
         if not self.customer_id:
@@ -342,7 +344,8 @@ class OTPVerification(models.Model):
         ('admin', 'Admin'),
     ]
 
-    phone = models.CharField(max_length=15, db_index=True)
+    phone = models.CharField(max_length=20, blank=True, default='', db_index=True)
+    email = models.EmailField(blank=True, default='', db_index=True)
     otp_code = models.CharField(max_length=6)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -354,7 +357,8 @@ class OTPVerification(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"OTP for {self.phone} ({self.role}) - {'Verified' if self.is_verified else 'Pending'}"
+        identifier = self.email or self.phone
+        return f"OTP for {identifier} ({self.role}) - {'Verified' if self.is_verified else 'Pending'}"
 
     def is_expired(self):
         return timezone.now() > self.expires_at
