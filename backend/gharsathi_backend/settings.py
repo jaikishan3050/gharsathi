@@ -350,20 +350,33 @@ TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 OTP_EXPIRATION_MINUTES = int(os.environ.get('OTP_EXPIRATION_MINUTES', 5))
 
 
-# Email configuration (Django 6 MAILERS configuration)
-MAILERS = {
-    'default': {
-        'BACKEND': os.environ.get(
-            'EMAIL_BACKEND',
-            'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
-        ),
-        'HOST': os.environ.get('EMAIL_HOST', 'smtp.gmail.com'),
-        'PORT': int(os.environ.get('EMAIL_PORT', 587)),
-        'USE_TLS': os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1'),
-        'USERNAME': os.environ.get('EMAIL_HOST_USER', 'support@gharsathi.in'),
-        'PASSWORD': os.environ.get('EMAIL_HOST_PASSWORD', ''),
-    },
-}
+# Email configuration (Adaptive for Django 6 MAILERS and Django 5 legacy settings)
+import django
+if django.VERSION[0] >= 6:
+    MAILERS = {
+        'default': {
+            'BACKEND': os.environ.get(
+                'EMAIL_BACKEND',
+                'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+            ),
+            'HOST': os.environ.get('EMAIL_HOST', 'smtp.gmail.com'),
+            'PORT': int(os.environ.get('EMAIL_PORT', 587)),
+            'USE_TLS': os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1'),
+            'USERNAME': os.environ.get('EMAIL_HOST_USER', 'support@gharsathi.in'),
+            'PASSWORD': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+        },
+    }
+else:
+    EMAIL_BACKEND = os.environ.get(
+        'EMAIL_BACKEND',
+        'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
+    )
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1')
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'support@gharsathi.in')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Ghar Sathi <support@gharsathi.in>')
 EMAIL_OTP_EXPIRATION_MINUTES = int(os.environ.get('EMAIL_OTP_EXPIRATION_MINUTES', 10))
 
