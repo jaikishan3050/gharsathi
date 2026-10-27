@@ -36,6 +36,9 @@ export default function Signup() {
     address: '',
     pincode: '801103',
     skills: TECHNICIAN_SKILLS[0],
+    password: '',
+    email: '',
+    aadhaar: '',
   });
 
   // OTP Verification state
@@ -105,23 +108,29 @@ export default function Signup() {
       setErrorMsg('Kripya valid 10-digit Indian mobile number enter karein (starting with 6-9).');
       return;
     }
+    if (role === 'technician') {
+      if (formData.password.length < 4 || !formData.email.includes('@') || formData.aadhaar.replace(/\D/g, '').length !== 12) {
+        setErrorMsg('Technician registration ke liye password, valid email aur 12-digit Aadhaar zaroori hai.');
+        return;
+      }
+    }
 
     setLoading(true);
     try {
-      const res = await api.sendOtp(cleanPhone, role);
+      const res = await api.sendOtp(cleanPhone, role, role === 'technician' ? 'registration' : 'login');
       setStatusMsg(res?.message || `Verification OTP generated for +91 ${cleanPhone}`);
       setStep('otp');
       setCountdown(60);
       setCanResend(false);
       setOtpDigits(['', '', '', '', '', '']);
-      const otp = res?.debug_otp || res?.otp;
+      const otp = res?.debug_otp;
       if (otp) {
         setPopupOtp(otp);
         setPopupOpen(true);
       }
       addToast({
         title: 'Verification OTP Ready! 🔔',
-        message: `OTP: ${otp || 'Generated on screen'}`,
+        message: otp ? `Website OTP: ${otp}` : 'OTP website popup mein dikhaya gaya hai.',
         type: 'success',
       });
     } catch (err) {
@@ -152,15 +161,20 @@ export default function Signup() {
         phoneNumber: cleanPhone,
         otpCode,
         role,
+        purpose: role === 'technician' ? 'registration' : 'login',
         name: formData.name.trim(),
         area: formData.area,
         address: formData.address.trim(),
         skills: role === 'technician' ? formData.skills : '',
+        password: role === 'technician' ? formData.password : '',
+        email: role === 'technician' ? formData.email : '',
+        aadhaar: role === 'technician' ? formData.aadhaar : '',
       });
 
-      if (res && res.success) {
+      if (res?.success && res.token) {
         if (role === 'technician') {
           const techProfile = res?.technician || res?.user;
+          if (!techProfile) throw new Error('Technician profile was not returned by the server.');
           setTechnicianSession(techProfile, res.token);
           addToast({
             title: 'Partner Registration Successful! 🎉',
@@ -170,6 +184,7 @@ export default function Signup() {
           navigate('/technician', { replace: true });
         } else {
           const custProfile = res?.user || res?.customer;
+          if (!custProfile) throw new Error('Customer profile was not returned by the server.');
           setCustomerSession(custProfile, res.token);
           addToast({
             title: 'Welcome to Ghar Sathi! 🎉',
@@ -335,7 +350,7 @@ export default function Signup() {
                     />
                   </div>
                   <small className="field-hint" style={{ marginTop: '6px', display: 'block', color: '#166534', fontWeight: 600 }}>
-                    ⚡ Instant Verification OTP — Direct on-screen display with SMS fallback.
+                    ⚡ Verification OTP website popup mein dikhaya jayega.
                   </small>
                 </div>
 
@@ -376,6 +391,54 @@ export default function Signup() {
                       ℹ️ Note: All newly registered partner accounts strictly start with ₹0.00 wallet balance.
                     </small>
                   </div>
+                )}
+
+                {role === 'technician' && (
+                  <>
+                    <div className="field">
+                      <label htmlFor="signup-technician-password">Create Password *</label>
+                      <input
+                        id="signup-technician-password"
+                        name="password"
+                        type="password"
+                        required
+                        minLength="4"
+                        autoComplete="new-password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="signup-technician-email">Email *</label>
+                      <input
+                        id="signup-technician-email"
+                        name="email"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="field field-full">
+                      <label htmlFor="signup-technician-aadhaar">Aadhaar Number *</label>
+                      <input
+                        id="signup-technician-aadhaar"
+                        name="aadhaar"
+                        type="text"
+                        inputMode="numeric"
+                        required
+                        maxLength="14"
+                        placeholder="12-digit Aadhaar number"
+                        value={formData.aadhaar}
+                        onChange={(event) => setFormData((current) => ({ ...current, aadhaar: event.target.value.replace(/\D/g, '').slice(0, 12) }))}
+                        disabled={loading}
+                      />
+                      <small className="field-hint">Database mein sirf aakhri 4 digits save honge.</small>
+                    </div>
+                  </>
                 )}
 
                 <div className="field field-full">

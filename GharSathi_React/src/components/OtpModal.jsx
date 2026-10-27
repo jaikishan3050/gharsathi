@@ -19,6 +19,7 @@ export default function OtpModal({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
+  const [popupOtp, setPopupOtp] = useState('');
 
   // Signup fields
   const [signupData, setSignupData] = useState({
@@ -39,6 +40,7 @@ export default function OtpModal({
       setOtpDigits(['', '', '', '', '', '']);
       setErrorMsg('');
       setStatusMsg('');
+      setPopupOtp('');
       setLoading(false);
     }
   }, [isOpen, defaultMode, initialPhone]);
@@ -103,12 +105,10 @@ export default function OtpModal({
       setCountdown(60);
       setCanResend(false);
       setOtpDigits(['', '', '', '', '', '']);
+      const generatedOtp = String(res?.debug_otp || res?.otp || '');
+      setPopupOtp(generatedOtp);
 
-      setStatusMsg(
-        isResend
-          ? `Naya OTP mobile +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} par bhej diya gaya hai!`
-          : `OTP verification code mobile +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} par bhej diya gaya hai.`
-      );
+      setStatusMsg(isResend ? 'Naya OTP website popup mein dikhaya gaya hai.' : 'OTP website popup mein dikhaya gaya hai.');
 
       // Auto focus first OTP input after switching
       setTimeout(() => {
@@ -201,7 +201,7 @@ export default function OtpModal({
         <div className="modal-header">
           <div>
             <p className="eyebrow eyebrow-gold">
-              {role.toUpperCase()} AUTHENTICATION · REAL-TIME SMS OTP
+              {role.toUpperCase()} AUTHENTICATION · WEBSITE OTP
             </p>
             <h3>
               {step === 'phone'
@@ -257,7 +257,7 @@ export default function OtpModal({
                 }}
               >
                 <p className="auth-intro">
-                  Apna 10-digit mobile number enter karein. Transactional SMS ke zariye 6-digit OTP code bheja jayega.
+                  Apna 10-digit mobile number enter karein. 6-digit OTP isi website par popup mein dikh jayega.
                 </p>
 
                 <div className="field-block">
@@ -277,7 +277,7 @@ export default function OtpModal({
                       autoFocus
                     />
                   </div>
-                  <small className="field-hint">Enter your 10-digit mobile number to receive OTP</small>
+                  <small className="field-hint">10-digit mobile number enter karein; OTP website par dikhaya jayega</small>
                 </div>
 
                 <button
@@ -286,15 +286,9 @@ export default function OtpModal({
                   className="button button-gold button-wide"
                   style={{ marginTop: '20px' }}
                 >
-                  {loading ? 'Sending OTP SMS…' : 'Send 6-Digit OTP 📲'}
+                  {loading ? 'OTP bana rahe hain…' : 'Website par OTP dikhayein'}
                 </button>
 
-                <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '11px', color: '#64748b' }}>
-                  <span>Prefer Email or Google? </span>
-                  <a href="/login" style={{ color: 'var(--green)', fontWeight: 800, textDecoration: 'underline' }}>
-                    Open Email & Google Sign In →
-                  </a>
-                </div>
               </form>
             ) : (
               <form
@@ -399,10 +393,27 @@ export default function OtpModal({
             <div className="otp-verification-banner">
               <span className="otp-shield-icon">🛡️</span>
               <div className="otp-header-info">
-                <strong>OTP sent to +91 {cleanPhone.slice(0, 2)}******{cleanPhone.slice(-2)}</strong>
-                <p>Kripya apne SMS inbox mein praapt 6-digit verification code daalein.</p>
+                <strong>OTP website popup mein dikhaya gaya hai</strong>
+                <p>6-digit code enter karein ya neeche se auto-fill karein.</p>
               </div>
             </div>
+
+            {popupOtp && (
+              <div className="success-banner" role="status" style={{ textAlign: 'center', margin: '14px 0' }}>
+                <strong style={{ display: 'block', marginBottom: '6px' }}>Aapka OTP</strong>
+                <span style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '7px', fontFamily: 'monospace' }}>
+                  {popupOtp}
+                </span>
+                <button
+                  type="button"
+                  className="button button-outline"
+                  style={{ display: 'block', margin: '10px auto 0' }}
+                  onClick={() => setOtpDigits(popupOtp.split('').slice(0, 6))}
+                >
+                  OTP auto-fill karein
+                </button>
+              </div>
+            )}
 
 
             <form onSubmit={handleVerifyOtp} className="otp-form-content">
@@ -442,7 +453,7 @@ export default function OtpModal({
                       onClick={() => handleSendOtp(true)}
                       className="resend-action-link"
                     >
-                      {loading ? 'Resending…' : 'Resend SMS OTP 🔄'}
+                      {loading ? 'Regenerating…' : 'Naya OTP dikhayein 🔄'}
                     </button>
                   </div>
                 )}

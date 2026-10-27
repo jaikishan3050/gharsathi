@@ -1,6 +1,5 @@
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
-from django.contrib.auth import authenticate
 from api.seed_data import purge_database, ensure_production_superuser
 from api.models import TechnicianProfile, Booking, WalletTransaction, Complaint, Service, SubService
 
@@ -24,10 +23,6 @@ class Command(BaseCommand):
         counts = purge_database()
         ensure_production_superuser()
 
-        # Verify production credentials
-        auth_prabhat = authenticate(username='prabhat', password='Gharsathi@2026')
-        auth_email = authenticate(username='prabhat@gharsathi.in', password='Gharsathi@2026')
-
         self.stdout.write(
             self.style.SUCCESS(
                 f"Ghar Sathi Production Zero-Out Verification:\n"
@@ -37,8 +32,6 @@ class Command(BaseCommand):
                 f"  - Complaints: {counts['complaints']} (STRICT ZERO)\n"
                 f"  - Withdrawals: {counts['withdrawals']} (STRICT ZERO)\n"
                 f"  - Services: {counts['services']} active\n"
-                f"  - Subservices: {counts['subservices']} active\n"
-                f"  - Superuser 'prabhat': {'Verified OK' if auth_prabhat else 'Failed'}\n"
-                f"  - Superuser 'prabhat@gharsathi.in': {'Verified OK' if auth_email else 'Failed'}"
+                f"  - Subservices: {counts['subservices']} active"
             )
         )

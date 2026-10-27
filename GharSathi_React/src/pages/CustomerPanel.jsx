@@ -38,7 +38,7 @@ export default function CustomerPanel() {
     data,
     currentCustomer,
     signupCustomer,
-    loginCustomer,
+    setCustomerSession,
     logoutCustomer,
     createBooking,
     addComplaint,
@@ -69,23 +69,7 @@ export default function CustomerPanel() {
   const [authTab, setAuthTab] = useState('login'); // 'login' | 'signup'
   const [ratingBooking, setRatingBooking] = useState(null); // Booking object to rate
 
-  // OTP Auth States
-  const [loginPhone, setLoginPhone] = useState('');
-  const [loginOtp, setLoginOtp] = useState('');
-  const [sentLoginOtp, setSentLoginOtp] = useState('');
-  const [loginStep, setLoginStep] = useState('phone'); // 'phone' | 'otp'
   const [authError, setAuthError] = useState('');
-
-  const [signupForm, setSignupForm] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    pincode: '',
-    area: areas[0],
-  });
-  const [signupOtp, setSignupOtp] = useState('');
-  const [sentSignupOtp, setSentSignupOtp] = useState('');
-  const [signupStep, setSignupStep] = useState('details'); // 'details' | 'otp'
 
   // Razorpay Sandbox Checkout Modal States
   const [razorpayModalOpen, setRazorpayModalOpen] = useState(false);
@@ -408,17 +392,19 @@ export default function CustomerPanel() {
 
   // Real-time SMS OTP Auth Success Handler
   const handleAuthSuccess = (verified) => {
-    if (authTab === 'signup' || verified.name) {
-      signupCustomer({
-        name: verified.name || `Customer ${verified.phone.slice(-4)}`,
-        phone: verified.phone,
-        address: verified.address || '',
-        pincode: verified.pincode || '801103',
-        area: verified.area || areas[0],
-      });
-    } else {
-      loginCustomer(verified.phone);
+    const profile = verified.user || verified.customer;
+    if (!verified.token || !profile) {
+      setAuthError('Server could not verify this customer session. Please try again.');
+      return;
     }
+    setCustomerSession({
+      ...profile,
+      phone: profile.phone || verified.phone,
+      name: profile.name || verified.name,
+      address: profile.address || verified.address || '',
+      pincode: profile.pincode || verified.pincode || '',
+      area: profile.area || verified.area || areas[0],
+    }, verified.token);
     setAuthModalOpen(false);
   };
 
@@ -843,153 +829,15 @@ export default function CustomerPanel() {
               </p>
 
               <div className="inline-auth-box">
+                {authError && <div className="warning-notice">{authError}</div>}
                 <div className="auth-tab-switch">
-                  <button
-                    type="button"
-                    className={`tab-switch-btn ${authTab === 'login' ? 'active' : ''}`}
-                    onClick={() => {
-                      setAuthTab('login');
-                      setAuthError('');
-                    }}
-                  >
-                    Login with OTP
+                  <button type="button" className="tab-switch-btn active" onClick={() => { setAuthTab('login'); setAuthError(''); setAuthModalOpen(true); }}>
+                    Login with Website OTP
                   </button>
-                  <button
-                    type="button"
-                    className={`tab-switch-btn ${authTab === 'signup' ? 'active' : ''}`}
-                    onClick={() => {
-                      setAuthTab('signup');
-                      setAuthError('');
-                    }}
-                  >
+                  <button type="button" className="tab-switch-btn" onClick={() => { setAuthTab('signup'); setAuthError(''); setAuthModalOpen(true); }}>
                     New Customer Signup
                   </button>
                 </div>
-
-                {authError && <div className="warning-notice">{authError}</div>}
-
-                {authTab === 'login' ? (
-                  loginStep === 'phone' ? (
-                    <form onSubmit={handleSendLoginOtp}>
-                      <Field label="Mobile Number *" hint="Demo: 9876543210 (Ramesh Sharma)">
-                        <input
-                          required
-                          type="tel"
-                          maxLength="10"
-                          value={loginPhone}
-                          onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          placeholder="10-digit mobile number"
-                        />
-                      </Field>
-                      <button type="submit" className="button button-gold button-wide" style={{ marginTop: '14px' }}>
-                        Send OTP to Login <span>📲</span>
-                      </button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleVerifyLoginOtp}>
-                      <div className="otp-simulation-banner">
-                        <span>🔑</span>
-                        <div>
-                          <strong>Demo Verification OTP: {sentLoginOtp}</strong>
-                          <p>Phone {loginPhone} par OTP bheja gaya hai (ya demo me 1234 daalein).</p>
-                        </div>
-                      </div>
-                      <Field label="Enter 4-Digit OTP *">
-                        <input
-                          required
-                          maxLength="6"
-                          value={loginOtp}
-                          onChange={(e) => setLoginOtp(e.target.value.trim())}
-                          placeholder="Enter OTP"
-                          autoFocus
-                        />
-                      </Field>
-                      <button type="submit" className="button button-primary button-wide" style={{ marginTop: '14px' }}>
-                        Verify OTP & Access Booking <span>✓</span>
-                      </button>
-                    </form>
-                  )
-                ) : signupStep === 'details' ? (
-                  <form onSubmit={handleSendSignupOtp}>
-                    <div className="form-grid">
-                      <Field label="Full Name *">
-                        <input
-                          required
-                          value={signupForm.name}
-                          onChange={(e) => setSignupForm({ ...signupForm, name: e.target.value })}
-                          placeholder="Apna poora naam"
-                        />
-                      </Field>
-                      <Field label="Phone Number *" hint="Will be verified with OTP">
-                        <input
-                          required
-                          maxLength="10"
-                          value={signupForm.phone}
-                          onChange={(e) =>
-                            setSignupForm({ ...signupForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })
-                          }
-                          placeholder="10-digit number"
-                        />
-                      </Field>
-                      <Field label="Service Area *">
-                        <select
-                          value={signupForm.area}
-                          onChange={(e) => setSignupForm({ ...signupForm, area: e.target.value })}
-                        >
-                          {areas.map((area) => (
-                            <option key={area}>{area}</option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Pincode *" hint="6-digit postal pincode">
-                        <input
-                          required
-                          maxLength="6"
-                          value={signupForm.pincode}
-                          onChange={(e) =>
-                            setSignupForm({ ...signupForm, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })
-                          }
-                          placeholder="801103"
-                        />
-                      </Field>
-                    </div>
-                    <Field label="Full Address *">
-                      <textarea
-                        required
-                        rows="2"
-                        value={signupForm.address}
-                        onChange={(e) => setSignupForm({ ...signupForm, address: e.target.value })}
-                        placeholder="House number, colony, street..."
-                      />
-                    </Field>
-                    <button type="submit" className="button button-gold button-wide" style={{ marginTop: '14px' }}>
-                      Verify with OTP <span>📲</span>
-                    </button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleVerifySignupOtp}>
-                    <div className="otp-simulation-banner">
-                      <span>🔑</span>
-                      <div>
-                        <strong>Demo Verification OTP: {sentSignupOtp}</strong>
-                        <p>{signupForm.name} ({signupForm.phone}) ke phone par OTP bheja gaya hai.</p>
-                      </div>
-                    </div>
-                    <Field label="Enter 4-Digit OTP *">
-                      <input
-                        required
-                        maxLength="6"
-                        value={signupOtp}
-                        onChange={(e) => setSignupOtp(e.target.value.trim())}
-                        placeholder="Enter OTP"
-                        autoFocus
-                      />
-                    </Field>
-                    <button type="submit" className="button button-primary button-wide" style={{ marginTop: '14px' }}>
-                      Complete Signup & Access Booking <span>✓</span>
-                    </button>
-                  </form>
-                )}
               </div>
             </div>
           ) : (

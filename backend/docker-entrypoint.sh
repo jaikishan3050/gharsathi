@@ -20,8 +20,8 @@ python manage.py migrate --noinput
 echo "Collecting static assets for WhiteNoise..."
 python manage.py collectstatic --noinput
 
-echo "Checking seed dataset..."
-python manage.py seed_gharsathi || echo "Initial seed already present."
+echo "Configuring administrator from managed server secrets..."
+python manage.py bootstrap_admin
 
 echo "Starting Daphne ASGI server on port ${TARGET_PORT} (HTTP + WebSockets)..."
 exec daphne -b 0.0.0.0 -p "${TARGET_PORT}" gharsathi_backend.asgi:application

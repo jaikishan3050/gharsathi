@@ -1,5 +1,6 @@
 import random
 from decimal import Decimal
+from django.db.models import Q
 from django.utils import timezone
 from .models import Service, SubService, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal
 
@@ -447,37 +448,36 @@ def seed_database():
 
 
 def ensure_production_superuser():
-    """Provisions or updates production superuser prabhat@gharsathi.in / Gharsathi@2026."""
+    """Provision the configured bootstrap admin without shipping default credentials."""
+    import os
     from django.contrib.auth.models import User
-    prabhat = User.objects.filter(username='prabhat').first() or User.objects.filter(email='prabhat@gharsathi.in').first()
-    if not prabhat:
-        prabhat = User.objects.create_superuser(
-            username='prabhat',
-            email='prabhat@gharsathi.in',
-            password='Gharsathi@2026'
-        )
-    else:
-        prabhat.username = 'prabhat'
-        prabhat.email = 'prabhat@gharsathi.in'
-        prabhat.set_password('Gharsathi@2026')
-        prabhat.is_staff = True
-        prabhat.is_superuser = True
-        prabhat.is_active = True
-        prabhat.save()
+    username = os.environ.get('ADMIN_BOOTSTRAP_USERNAME', '').strip()
+    email = os.environ.get('ADMIN_BOOTSTRAP_EMAIL', '').strip().lower()
+    password = os.environ.get('ADMIN_BOOTSTRAP_PASSWORD', '')
+    if not any((username, email, password)):
+        return None
+    if not (username and email and password) or len(password) < 16:
+        raise ValueError('Set ADMIN_BOOTSTRAP_USERNAME, ADMIN_BOOTSTRAP_EMAIL, and an ADMIN_BOOTSTRAP_PASSWORD of at least 16 characters.')
 
-    admin_user = User.objects.filter(username='admin').first()
+    admin_user = User.objects.filter(username=username).first() or User.objects.filter(email__iexact=email).first()
     if not admin_user:
-        User.objects.create_superuser(
-            username='admin',
-            email='admin@gharsathi.in',
-            password='Gharsathi@2026'
-        )
-    else:
-        admin_user.set_password('Gharsathi@2026')
-        admin_user.is_staff = True
-        admin_user.is_superuser = True
-        admin_user.is_active = True
-        admin_user.save()
+        admin_user = User(username=username, email=email)
+    admin_user.username = username
+    admin_user.email = email
+    admin_user.set_password(password)
+    admin_user.is_staff = True
+    admin_user.is_superuser = True
+    admin_user.is_active = True
+    admin_user.save()
+
+    # Disable the legacy bootstrap accounts whose credentials were shipped in
+    # source code. Keep whichever one was explicitly selected above.
+    legacy_users = User.objects.filter(
+        Q(username__in=('prabhat', 'admin'))
+        | Q(email__in=('prabhat@gharsathi.in', 'admin@gharsathi.in'))
+    ).exclude(pk=admin_user.pk)
+    legacy_users.update(is_active=False, is_staff=False, is_superuser=False)
+    return admin_user
 
 
 def purge_database():

@@ -9,19 +9,24 @@ services:
     plan: starter
     rootDir: backend
     autoDeploy: true
+    healthCheckPath: /api/services/
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
       python manage.py collectstatic --noinput
-      python manage.py migrate --noinput
-      python manage.py flush --no-input || true
-      python manage.py purge_demo_data || true
+    preDeployCommand: python manage.py migrate --noinput
     startCommand: daphne -b 0.0.0.0 -p $PORT gharsathi_backend.asgi:application
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: DEBUG
         value: "False"
+      - key: SECURE_SSL_REDIRECT
+        value: "True"
+      - key: SESSION_COOKIE_SECURE
+        value: "True"
+      - key: CSRF_COOKIE_SECURE
+        value: "True"
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS
@@ -40,13 +45,17 @@ services:
       - key: CSRF_TRUSTED_ORIGINS
         value: "https://gharsathi-in.web.app,https://gharsathi-in.firebaseapp.com,https://gharsathi.in,https://www.gharsathi.in,https://bookgharsathi.in,https://www.bookgharsathi.in,https://*.onrender.com"
       - key: RAZORPAY_KEY_ID
-        value: "rzp_live_Tr00Y2gS1bC4Rv"
+        sync: false
       - key: RAZORPAY_KEY_SECRET
-        value: "ETgvqsAaKu3tQi8KkypuWGZd"
-      - key: FAST2SMS_API_KEY
-        value: "JfHmAA8J0vTcFOOUzHAyxA6fJza5XzSfHkzbTiipoL2YQpajGIsDOIpWqIKkpLALH5n8R8Ia6MGxxxAQ"
+        sync: false
+      - key: ADMIN_BOOTSTRAP_USERNAME
+        sync: false
+      - key: ADMIN_BOOTSTRAP_EMAIL
+        sync: false
+      - key: ADMIN_BOOTSTRAP_PASSWORD
+        sync: false
       - key: SMS_PROVIDER
-        value: "fast2sms"
+        value: "website_popup"
 
   # ============================================================================
   # 2. Redis In-Memory Datastore for Django Channels & WebSockets

@@ -1,127 +1,112 @@
 import logging
+
 import requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+FAST2SMS_URL = 'https://www.fast2sms.com/dev/bulkV2'
 
 
-def send_sms_otp(phone_number, otp_code, app_name="Ghar Sathi"):
-    """
-    Sends transactional 6-digit OTP SMS to a given 10-digit Indian mobile number.
-    Supports Fast2SMS OTP Route, Twilio fallback, and local sandbox simulation.
-    """
-    # Clean phone number (extract 10 digits)
+def _failure(provider, message, status_code=None):
+    result = {'success': False, 'provider': provider, 'error': message}
+    if status_code is not None:
+        result['status_code'] = status_code
+    return result
+
+
+def _fast2sms_request(api_key, payload):
+    response = requests.post(
+        FAST2SMS_URL,
+        json=payload,
+        headers={
+            'authorization': api_key,
+            'accept': 'application/json',
+            'content-type': 'application/json',
+        },
+        timeout=15,
+    )
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    return response, data
+
+
+def send_sms_otp(phone_number, otp_code, app_name='Ghar Sathi'):
+    """Send an OTP using the configured gateway and report delivery failures honestly."""
     clean_phone = ''.join(filter(str.isdigit, str(phone_number)))[-10:]
     if len(clean_phone) != 10:
-        return {
-            'success': False,
-            'error': f"Invalid 10-digit Indian mobile number: {phone_number}",
-            'provider': 'validation',
-        }
+        return _failure('validation', 'A valid 10-digit Indian mobile number is required.')
 
-    provider = getattr(settings, 'SMS_PROVIDER', 'fast2sms').lower()
+    provider = getattr(settings, 'SMS_PROVIDER', 'fast2sms').strip().lower()
     fast2sms_key = getattr(settings, 'FAST2SMS_API_KEY', '').strip()
     twilio_sid = getattr(settings, 'TWILIO_ACCOUNT_SID', '').strip()
     twilio_token = getattr(settings, 'TWILIO_AUTH_TOKEN', '').strip()
     twilio_from = getattr(settings, 'TWILIO_PHONE_NUMBER', '').strip()
 
-    # 1. FAST2SMS GATEWAY INTEGRATION
-    if fast2sms_key and fast2sms_key not in ('sandbox', 'demo', 'YOUR_FAST2SMS_API_KEY'):
+    if provider == 'fast2sms':
+        if not fast2sms_key:
+            return _failure('fast2sms', 'Fast2SMS API key is not configured on the server.')
+
         try:
-            url = "https://www.fast2sms.com/dev/bulkV2"
-            headers = {
-                "authorization": fast2sms_key,
-                "Content-Type": "application/json",
-            }
-            # Attempt 1: Standard OTP route
-            payload = {
-                "variables_values": str(otp_code),
-                "route": "otp",
-                "numbers": clean_phone,
-            }
-            response = requests.post(url, json=payload, headers=headers, timeout=8)
-            res_data = response.json()
+            response, data = _fast2sms_request(fast2sms_key, {
+                'variables_values': str(otp_code),
+                'route': 'otp',
+                'numbers': clean_phone,
+            })
 
-            if response.status_code == 200 and res_data.get('return') is True:
-                logger.info(f"Fast2SMS OTP successfully sent to {clean_phone}: {res_data.get('message')}")
-                return {
-                    'success': True,
-                    'provider': 'fast2sms',
-                    'message': 'OTP sent via Fast2SMS gateway successfully.',
-                    'gateway_response': res_data,
-                }
+            if response.ok and data.get('return') is True:
+                logger.info('Fast2SMS accepted OTP delivery (status=%s).', data.get('status_code'))
+                return {'success': True, 'provider': 'fast2sms', 'message': 'OTP sent by SMS.'}
 
-            # Attempt 2: If OTP route requests website verification (code 996), try Quick route 'q'
-            if res_data.get('status_code') == 996:
-                payload_q = {
-                    "route": "q",
-                    "message": f"Your Ghar Sathi OTP is {otp_code}. Valid for 5 minutes.",
-                    "language": "english",
-                    "flash": 0,
-                    "numbers": clean_phone,
-                }
-                resp_q = requests.post(url, json=payload_q, headers=headers, timeout=8)
-                res_q_data = resp_q.json()
-                if resp_q.status_code == 200 and res_q_data.get('return') is True:
-                    logger.info(f"Fast2SMS Quick SMS successfully sent to {clean_phone}")
-                    return {
-                        'success': True,
-                        'provider': 'fast2sms',
-                        'message': 'OTP sent via Fast2SMS Quick route successfully.',
-                        'gateway_response': res_q_data,
-                    }
+            # Fast2SMS may require website KYC for its OTP route. Quick SMS is a
+            # separate, potentially paid route; only report success when accepted.
+            if data.get('status_code') == 996 and getattr(settings, 'FAST2SMS_ALLOW_QUICK_FALLBACK', False):
+                quick_response, quick_data = _fast2sms_request(fast2sms_key, {
+                    'route': 'q',
+                    'message': f'Your {app_name} verification code is {otp_code}. Valid for 5 minutes.',
+                    'language': 'english',
+                    'flash': 0,
+                    'numbers': clean_phone,
+                })
+                if quick_response.ok and quick_data.get('return') is True:
+                    logger.info('Fast2SMS Quick SMS accepted OTP delivery.')
+                    return {'success': True, 'provider': 'fast2sms', 'message': 'OTP sent by SMS.'}
+                data = quick_data or data
+                response = quick_response
 
-            err_msg = res_data.get('message', 'Fast2SMS returned error status')
-            logger.warning(f"Fast2SMS notice for {clean_phone}: {err_msg}")
-            return {
-                'success': True,
-                'provider': 'fast2sms',
-                'message': f"Fast2SMS: {err_msg}.",
-            }
-        except requests.RequestException as e:
-            logger.error(f"Fast2SMS network error connecting for {clean_phone}: {e}")
-            return {
-                'success': True,
-                'provider': 'fast2sms',
-                'message': 'Fast2SMS request processed.',
-            }
+            error = data.get('message') or 'Fast2SMS did not accept the SMS request.'
+            logger.warning('Fast2SMS rejected OTP request (HTTP %s, code %s): %s', response.status_code, data.get('status_code'), error)
+            return _failure('fast2sms', error, data.get('status_code') or response.status_code)
+        except requests.RequestException as exc:
+            logger.warning('Fast2SMS request failed: %s', exc.__class__.__name__)
+            return _failure('fast2sms', 'Could not connect to Fast2SMS. Please try again.')
 
-    # 2. TWILIO GATEWAY INTEGRATION
-    if provider == 'twilio' and twilio_sid and twilio_token and twilio_from:
+    if provider == 'twilio':
+        if not (twilio_sid and twilio_token and twilio_from):
+            return _failure('twilio', 'Twilio credentials are not fully configured on the server.')
         try:
-            url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json"
-            body_text = f"Your {app_name} verification code is: {otp_code}. Valid for 5 minutes. Please do not share this code with anyone."
-            data = {
-                "To": f"+91{clean_phone}",
-                "From": twilio_from,
-                "Body": body_text,
-            }
-            response = requests.post(url, data=data, auth=(twilio_sid, twilio_token), timeout=8)
+            url = f'https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json'
+            response = requests.post(
+                url,
+                data={
+                    'To': f'+91{clean_phone}',
+                    'From': twilio_from,
+                    'Body': f'Your {app_name} verification code is: {otp_code}. Valid for 5 minutes. Please do not share this code.',
+                },
+                auth=(twilio_sid, twilio_token),
+                timeout=15,
+            )
             if response.status_code in (200, 201):
-                logger.info(f"Twilio SMS sent to +91{clean_phone}")
-                return {
-                    'success': True,
-                    'provider': 'twilio',
-                    'message': 'OTP sent via Twilio successfully.',
-                }
-            else:
-                logger.warning(f"Twilio error: {response.text}")
-        except Exception as e:
-            logger.error(f"Twilio exception: {e}")
+                return {'success': True, 'provider': 'twilio', 'message': 'OTP sent by SMS.'}
+            logger.warning('Twilio rejected OTP delivery (HTTP %s).', response.status_code)
+            return _failure('twilio', 'Twilio did not accept the SMS request.', response.status_code)
+        except requests.RequestException as exc:
+            logger.warning('Twilio request failed: %s', exc.__class__.__name__)
+            return _failure('twilio', 'Could not connect to Twilio. Please try again.')
 
-    # 3. LOCAL / SANDBOX SIMULATION (Zero External Dependency)
-    logger.info(
-        f"\n======================================================\n"
-        f"📱 [GHAR SATHI SMS OTP GATEWAY - SANDBOX]\n"
-        f"Recipient : +91 {clean_phone}\n"
-        f"OTP Code  : {otp_code}\n"
-        f"Message   : Your Ghar Sathi verification code is {otp_code}.\n"
-        f"Validity  : 5 Minutes (Expires soon)\n"
-        f"======================================================\n"
-    )
+    if getattr(settings, 'DEBUG', False):
+        logger.info('Development OTP for +91%s: %s', clean_phone, otp_code)
+        return {'success': True, 'provider': 'development', 'message': 'Development OTP generated.'}
 
-    return {
-        'success': True,
-        'provider': 'fast2sms',
-        'message': f"OTP delivered to +91 {clean_phone}.",
-    }
+    return _failure(provider or 'unconfigured', 'No working SMS provider is configured.')

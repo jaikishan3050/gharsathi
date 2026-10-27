@@ -31,7 +31,6 @@ export default function TechnicianPanel() {
   const {
     data,
     currentTechnician,
-    registerTechnician,
     loginTechnician,
     logoutTechnician,
     setTechnicianSession,
@@ -55,34 +54,14 @@ export default function TechnicianPanel() {
   // Direct On-Screen Popup OTP states
   const [popupOtp, setPopupOtp] = useState('');
   const [popupOpen, setPopupOpen] = useState(false);
-  const [popupTarget, setPopupTarget] = useState('login'); // 'login' | 'register' | 'forgot'
+  const [popupTarget, setPopupTarget] = useState('register'); // 'register' | 'forgot'
 
-  // Auth screen states: 'login' (OTP login) | 'register' | 'password' | 'forgot'
-  const [authMode, setAuthMode] = useState('login');
+  // Technicians sign in with their registered mobile number and password.
+  const [authMode, setAuthMode] = useState('password');
   const [authError, setAuthError] = useState('');
-
-  // Mobile OTP Login States
-  const [loginPhone, setLoginPhone] = useState('');
-  const [loginOtp, setLoginOtp] = useState('');
-  const [loginOtpStep, setLoginOtpStep] = useState(false);
-  const [loginCountdown, setLoginCountdown] = useState(60);
-  const [loginLoading, setLoginLoading] = useState(false);
 
   // Password Login Form
   const [loginForm, setLoginForm] = useState({ phone: '', password: '' });
-
-  // Countdown timer for Technician Mobile OTP Login
-  useEffect(() => {
-    let timer = null;
-    if (loginOtpStep && loginCountdown > 0) {
-      timer = setInterval(() => {
-        setLoginCountdown((prev) => (prev <= 1 ? 0 : prev - 1));
-      }, 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [loginOtpStep, loginCountdown]);
 
   // Forgot Password States
   const [forgotPhone, setForgotPhone] = useState('');
@@ -181,87 +160,6 @@ export default function TechnicianPanel() {
     }
   }, [myJobs, currentTechnician, assignedRingingJob]);
 
-  // Handle Send Mobile OTP for Technician Login
-  const handleSendLoginOtp = async (e, isResend = false) => {
-    if (e) e.preventDefault();
-    const cleanPhone = loginPhone.replace(/\D/g, '').slice(-10);
-    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
-      const errMsg = 'Kripya valid 10-digit Indian mobile number daalein (e.g. 9876500001).';
-      setAuthError(errMsg);
-      addToast({ title: 'Invalid Mobile Number', message: errMsg, type: 'error' });
-      return;
-    }
-
-    setLoginLoading(true);
-    setAuthError('');
-    try {
-      const res = await api.sendOtp(cleanPhone, 'technician');
-      setLoginLoading(false);
-      setLoginOtpStep(true);
-      setLoginCountdown(60);
-      const otp = res?.debug_otp || res?.otp;
-      if (otp) {
-        setPopupOtp(otp);
-        setPopupTarget('login');
-        setPopupOpen(true);
-      }
-      addToast({
-        title: 'Verification OTP Ready! 🔔',
-        message: `OTP: ${otp || 'Generated on screen'}`,
-        type: 'success',
-      });
-    } catch (err) {
-      setLoginLoading(false);
-      const errMsg = err?.data?.error || err?.message || 'OTP send karne mein samasya aayi.';
-      setAuthError(errMsg);
-      addToast({ title: 'OTP Error', message: errMsg, type: 'error' });
-    }
-  };
-
-  // Handle Verify Mobile OTP for Technician Login
-  const handleVerifyLoginOtp = async (e) => {
-    if (e) e.preventDefault();
-    setAuthError('');
-    const cleanPhone = loginPhone.replace(/\D/g, '').slice(-10);
-    const cleanOtp = loginOtp.replace(/\D/g, '').trim();
-
-    if (!cleanOtp || cleanOtp.length !== 6) {
-      const errMsg = 'Kripya poora 6-digit OTP code enter karein.';
-      setAuthError(errMsg);
-      addToast({ title: 'Invalid OTP', message: errMsg, type: 'error' });
-      return;
-    }
-
-    setLoginLoading(true);
-    try {
-      const res = await api.verifyOtp({
-        phoneNumber: cleanPhone,
-        otpCode: cleanOtp,
-        role: 'technician',
-      });
-      setLoginLoading(false);
-
-      const techProfile = res?.technician || res?.user;
-      if (techProfile) {
-        setTechnicianSession(techProfile, res.token);
-        setLoginOtpStep(false);
-        setNotice(`Namaste ${techProfile.name}! Workspace active.`);
-        addToast({
-          title: `Namaste, ${techProfile.name}! 🧰`,
-          message: 'Technician partner logged in successfully.',
-          type: 'success',
-        });
-      } else {
-        setAuthError('Login verify nahi ho saka. Kripya punah prayas karein.');
-      }
-    } catch (err) {
-      setLoginLoading(false);
-      const errMsg = err?.data?.error || err?.message || 'Galat OTP code daala gaya hai.';
-      setAuthError(errMsg);
-      addToast({ title: 'Login Failed', message: errMsg, type: 'error' });
-    }
-  };
-
   // Handle Password Login
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -301,17 +199,18 @@ export default function TechnicianPanel() {
       setForgotLoading(false);
       setForgotStep(2);
       setForgotCountdown(60);
-      const otp = res?.debug_otp || res?.otp;
+      const otp = res?.debug_otp;
+      setPopupOtp(otp || '');
       if (otp) {
         setPopupOtp(otp);
         setPopupTarget('forgot');
         setPopupOpen(true);
       }
-      const successMsg = res?.message || `OTP code +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} par bhej diya gaya hai.`;
+      const successMsg = res?.message || 'Password reset OTP website popup mein dikhaya gaya hai.';
       setNotice(successMsg);
       addToast({
         title: 'Reset OTP Ready! 🔔',
-        message: `OTP: ${otp || 'Generated on screen'}`,
+        message: otp ? `Website OTP: ${otp}` : 'OTP website popup mein dikhaya gaya hai.',
         type: 'success',
       });
     } catch (err) {
@@ -348,7 +247,7 @@ export default function TechnicianPanel() {
       setNotice(successMsg);
       addToast({ title: 'Password Reset! 🔑', message: successMsg, type: 'success' });
       setLoginForm({ phone: cleanPhone, password: newPassword });
-      setAuthMode('login');
+      setAuthMode('password');
       setForgotStep(1);
       setForgotOtp('');
       setNewPassword('');
@@ -360,7 +259,7 @@ export default function TechnicianPanel() {
     }
   };
 
-  // Handle Send Real SMS OTP for Registration
+  // Generate a registration OTP for the on-screen website popup.
   const handleSendRegOtp = async (e, isResend = false) => {
     if (e) e.preventDefault();
     const cleanPhone = regForm.phone.replace(/\D/g, '').slice(-10);
@@ -393,11 +292,12 @@ export default function TechnicianPanel() {
     setRegLoading(true);
     setAuthError('');
     try {
-      const res = await api.sendOtp(cleanPhone, 'technician');
+      const res = await api.sendOtp(cleanPhone, 'technician', 'registration');
       setRegLoading(false);
       setRegOtpStep(true);
       setRegCountdown(60);
-      const otp = res?.debug_otp || res?.otp;
+      const otp = res?.debug_otp;
+      setPopupOtp(otp || '');
       if (otp) {
         setPopupOtp(otp);
         setPopupTarget('register');
@@ -405,7 +305,7 @@ export default function TechnicianPanel() {
       }
       addToast({
         title: 'Verification OTP Ready! 🔔',
-        message: `OTP: ${otp || 'Generated on screen'}`,
+        message: otp ? `Website OTP: ${otp}` : 'OTP website popup mein dikhaya gaya hai.',
         type: 'success',
       });
       if (isResend) {
@@ -428,19 +328,24 @@ export default function TechnicianPanel() {
         phoneNumber: cleanPhone,
         otpCode: regOtp,
         role: 'technician',
+        purpose: 'registration',
         name: regForm.name,
         skills: Array.isArray(regForm.skills) ? regForm.skills.join(', ') : regForm.skills,
         area: regForm.area,
         address: regForm.address,
+        password: regForm.password,
+        email: regForm.email,
+        aadhaar: regForm.aadhaar,
+        liveLocation: regForm.liveLocation,
+        liveImage: regForm.liveImage,
       });
 
       setRegLoading(false);
       const techProfile = res?.technician || res?.user;
-      if (techProfile) {
-        setTechnicianSession(techProfile, res.token);
-      } else {
-        registerTechnician(regForm);
+      if (!res?.success || !res?.token || !techProfile) {
+        throw new Error(res?.error || 'Technician registration could not be verified by the server.');
       }
+      setTechnicianSession(techProfile, res.token);
       setRegOtpStep(false);
       setNotice(
         `Technician registration complete! Welcome ${regForm.name}. Mobile number verified.`
@@ -627,17 +532,7 @@ export default function TechnicianPanel() {
             Ghar Sathi partner banein. Fixed ₹149 platform fee, direct customer navigation, aur daily earning manage karein.
           </p>
 
-          <div className="auth-tab-switch" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <button
-              type="button"
-              className={`tab-switch-btn ${authMode === 'login' ? 'active' : ''}`}
-              onClick={() => {
-                setAuthMode('login');
-                setAuthError('');
-              }}
-            >
-              Login with Mobile OTP 📲
-            </button>
+          <div className="auth-tab-switch" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
             <button
               type="button"
               className={`tab-switch-btn ${authMode === 'register' ? 'active' : ''}`}
@@ -656,176 +551,13 @@ export default function TechnicianPanel() {
                 setAuthError('');
               }}
             >
-              Password Login 🔑
+              Mobile + Password Login 🔑
             </button>
           </div>
 
           {authError && <div className="warning-notice">{authError}</div>}
 
-          {/* 1. LOGIN WITH MOBILE NUMBER & ON-SCREEN POPUP OTP */}
-          {authMode === 'login' && (
-            <div className="technician-auth-form">
-              {!loginOtpStep ? (
-                <form onSubmit={handleSendLoginOtp}>
-                  <Field label="Mobile Number *" hint="10-digit registered Indian mobile number">
-                    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #dce4dc', borderRadius: '10px', background: '#fbfcfb', overflow: 'hidden' }}>
-                      <span style={{ padding: '12px 14px', background: '#eef4f0', color: '#16523e', fontWeight: 800, fontSize: '12px', borderRight: '1px solid #dce4dc' }}>
-                        🇮🇳 +91
-                      </span>
-                      <input
-                        required
-                        type="tel"
-                        maxLength="10"
-                        value={loginPhone}
-                        onChange={(e) => setLoginPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        placeholder="e.g. 9876500001"
-                        autoFocus
-                        style={{ border: 'none', background: 'transparent', flex: 1, padding: '12px 14px', outline: 'none' }}
-                      />
-                    </div>
-                  </Field>
-
-                  <button
-                    type="submit"
-                    className="button button-gold button-wide"
-                    style={{ marginTop: '16px' }}
-                    disabled={loginLoading || loginPhone.replace(/\D/g, '').length !== 10}
-                  >
-                    {loginLoading ? 'Generating OTP…' : 'Send OTP to Screen 📲'}
-                  </button>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-                    <button
-                      type="button"
-                      style={{ background: 'none', border: 'none', color: '#0d5c43', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
-                      onClick={() => {
-                        setAuthMode('password');
-                        setLoginForm({ ...loginForm, phone: loginPhone });
-                        setAuthError('');
-                      }}
-                    >
-                      Login with Password instead 🔑
-                    </button>
-                    <button
-                      type="button"
-                      style={{ background: 'none', border: 'none', color: '#0d5c43', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
-                      onClick={() => {
-                        setAuthMode('register');
-                        setAuthError('');
-                      }}
-                    >
-                      New Partner? Register 📝
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyLoginOtp}>
-                  {/* On-screen OTP notification banner */}
-                  <div
-                    style={{
-                      background: '#fefce8',
-                      border: '2px dashed #d4af37',
-                      borderRadius: '14px',
-                      padding: '14px 16px',
-                      marginBottom: '16px',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#854d0e', fontWeight: 800 }}>
-                      ⚡ Your Verification OTP is:
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '30px',
-                        fontWeight: 900,
-                        letterSpacing: '8px',
-                        color: '#0b3d2e',
-                        fontFamily: 'monospace, sans-serif',
-                        margin: '6px 0',
-                      }}
-                    >
-                      {popupOtp || '482910'}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setLoginOtp(popupOtp)}
-                      style={{
-                        background: '#0b3d2e',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '6px 14px',
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ⚡ Click to Auto-Fill OTP
-                    </button>
-                  </div>
-
-                  <Field label="Enter 6-Digit OTP *" hint={`Sent to +91 ${loginPhone}`}>
-                    <input
-                      required
-                      type="tel"
-                      maxLength="6"
-                      value={loginOtp}
-                      onChange={(e) => setLoginOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="Enter 6-digit OTP"
-                      autoFocus
-                      style={{ fontSize: '22px', letterSpacing: '6px', textAlign: 'center', fontWeight: 'bold' }}
-                    />
-                  </Field>
-
-                  {/* Resend Countdown Bar */}
-                  <div className="otp-resend-countdown-bar" style={{ marginTop: '12px', marginBottom: '14px' }}>
-                    {loginCountdown > 0 ? (
-                      <div className="countdown-pill active">
-                        <span className="timer-icon">⏳</span>
-                        <span>Resend in <strong>00:{loginCountdown < 10 ? `0${loginCountdown}` : loginCountdown}</strong></span>
-                      </div>
-                    ) : (
-                      <div className="countdown-pill expired">
-                        <span>Code not received?</span>
-                        <button
-                          type="button"
-                          disabled={loginLoading}
-                          onClick={(e) => handleSendLoginOtp(e, true)}
-                          className="resend-action-link"
-                        >
-                          {loginLoading ? 'Resending…' : 'Regenerate OTP 🔄'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                    <button
-                      type="button"
-                      className="button button-outline"
-                      onClick={() => {
-                        setLoginOtpStep(false);
-                        setAuthError('');
-                      }}
-                      disabled={loginLoading}
-                    >
-                      ← Change Number
-                    </button>
-                    <button
-                      type="submit"
-                      className="button button-primary"
-                      style={{ flex: 1 }}
-                      disabled={loginLoading || loginOtp.length !== 6}
-                    >
-                      {loginLoading ? 'Verifying…' : 'Verify & Login 🚀'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          )}
-
-          {/* 2. LOGIN WITH MOBILE NUMBER & PASSWORD */}
+          {/* LOGIN WITH REGISTERED MOBILE NUMBER & PASSWORD */}
           {authMode === 'password' && (
             <form onSubmit={handleLogin} className="technician-auth-form">
               <Field label="Mobile Number *">
@@ -851,26 +583,7 @@ export default function TechnicianPanel() {
                 />
               </Field>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                <button
-                  type="button"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#0d5c43',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                  }}
-                  onClick={() => {
-                    setAuthMode('login');
-                    setLoginPhone(loginForm.phone);
-                    setAuthError('');
-                  }}
-                >
-                  ← Login with OTP instead
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '6px' }}>
                 <button
                   type="button"
                   style={{
@@ -904,7 +617,7 @@ export default function TechnicianPanel() {
             <div className="technician-auth-form">
               <div style={{ marginBottom: '14px', textAlign: 'center' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: '#1b4332' }}>
-                  Reset Password via SMS OTP
+                  Reset Password via Website OTP
                 </h3>
                 <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
                   Apne registered mobile number par OTP prapt karein aur naya password banayein.
@@ -931,7 +644,7 @@ export default function TechnicianPanel() {
                     style={{ marginTop: '16px' }}
                     disabled={forgotLoading || forgotPhone.replace(/\D/g, '').length < 10}
                   >
-                    {forgotLoading ? 'Sending SMS OTP…' : 'Send Reset OTP 📲'}
+                    {forgotLoading ? 'OTP bana rahe hain…' : 'Website par Reset OTP dikhayein'}
                   </button>
 
                   <div style={{ textAlign: 'center', marginTop: '16px' }}>
@@ -939,7 +652,7 @@ export default function TechnicianPanel() {
                       type="button"
                       className="button button-outline button-small"
                       onClick={() => {
-                        setAuthMode('login');
+                        setAuthMode('password');
                         setAuthError('');
                       }}
                     >
@@ -975,7 +688,7 @@ export default function TechnicianPanel() {
                     }}
                   >
                     <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#854d0e', fontWeight: 800 }}>
-                      ⚡ Reset Verification OTP:
+                      ⚡ Website verification code:
                     </div>
                     <div
                       style={{
@@ -987,11 +700,12 @@ export default function TechnicianPanel() {
                         margin: '6px 0',
                       }}
                     >
-                      {popupOtp || '482910'}
+                      {popupOtp || 'Check your phone'}
                     </div>
                     <button
                       type="button"
                       onClick={() => setForgotOtp(popupOtp)}
+                      disabled={!popupOtp}
                       style={{
                         background: '#0b3d2e',
                         color: '#ffffff',
@@ -1007,7 +721,7 @@ export default function TechnicianPanel() {
                     </button>
                   </div>
 
-                  <Field label="Enter 6-Digit SMS OTP *" hint="Check your mobile SMS">
+                  <Field label="Enter 6-Digit OTP *" hint="Website popup mein code dekhein">
                     <input
                       required
                       type="tel"
@@ -1237,8 +951,8 @@ export default function TechnicianPanel() {
                   <div className="otp-verification-banner">
                     <span className="otp-shield-icon">🛡️</span>
                     <div className="otp-header-info">
-                      <strong>SMS OTP sent to +91 {regForm.phone.slice(0, 2)}******{regForm.phone.slice(-2)}</strong>
-                      <p>Kripya apne mobile SMS inbox ya on-screen popup mein praapt 6-digit verification code enter karein.</p>
+                      <strong>Website OTP +91 {regForm.phone.slice(0, 2)}******{regForm.phone.slice(-2)} ke liye taiyar hai</strong>
+                      <p>Popup mein dikhaya gaya 6-digit verification code enter karein.</p>
                     </div>
                   </div>
 
@@ -1254,7 +968,7 @@ export default function TechnicianPanel() {
                     }}
                   >
                     <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#854d0e', fontWeight: 800 }}>
-                      ⚡ Partner Verification OTP:
+                      ⚡ Website verification code:
                     </div>
                     <div
                       style={{
@@ -1266,11 +980,12 @@ export default function TechnicianPanel() {
                         margin: '6px 0',
                       }}
                     >
-                      {popupOtp || '482910'}
+                      {popupOtp || 'Check your phone'}
                     </div>
                     <button
                       type="button"
                       onClick={() => setRegOtp(popupOtp)}
+                      disabled={!popupOtp}
                       style={{
                         background: '#0b3d2e',
                         color: '#ffffff',
@@ -1287,7 +1002,7 @@ export default function TechnicianPanel() {
                   </div>
 
 
-                  <Field label="Enter 6-Digit SMS OTP *">
+                  <Field label="Enter 6-Digit OTP *">
                     <input
                       required
                       maxLength="6"
@@ -1310,14 +1025,14 @@ export default function TechnicianPanel() {
                       </div>
                     ) : (
                       <div className="countdown-pill expired">
-                        <span>Didn't receive SMS?</span>
+                        <span>OTP nahi dikha?</span>
                         <button
                           type="button"
                           disabled={regLoading}
                           onClick={(e) => handleSendRegOtp(e, true)}
                           className="resend-action-link"
                         >
-                          {regLoading ? 'Resending…' : 'Resend SMS OTP 🔄'}
+                          {regLoading ? 'Regenerating…' : 'Naya OTP dikhayein 🔄'}
                         </button>
                       </div>
                     )}
@@ -1352,18 +1067,15 @@ export default function TechnicianPanel() {
           <OtpPopupModal
             isOpen={popupOpen}
             otp={popupOtp}
-            phone={popupTarget === 'login' ? loginPhone : popupTarget === 'register' ? regForm.phone : forgotPhone}
+            phone={popupTarget === 'register' ? regForm.phone : forgotPhone}
             title={
-              popupTarget === 'login'
-                ? 'Technician Login OTP'
-                : popupTarget === 'register'
+              popupTarget === 'register'
                 ? 'Partner Registration OTP'
                 : 'Reset Password OTP'
             }
             onClose={() => setPopupOpen(false)}
             onAutoFill={(code) => {
-              if (popupTarget === 'login') setLoginOtp(code);
-              else if (popupTarget === 'register') setRegOtp(code);
+              if (popupTarget === 'register') setRegOtp(code);
               else if (popupTarget === 'forgot') setForgotOtp(code);
             }}
           />

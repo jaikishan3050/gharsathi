@@ -14,8 +14,4 @@ python manage.py collectstatic --noinput
 echo "==> Running database migrations..."
 python manage.py migrate --noinput
 
-echo "==> Flushing database and purging demo data to ensure clean zero-out..."
-python manage.py flush --no-input || true
-python manage.py purge_demo_data || true
-
 echo "==> Ghar Sathi build finished successfully!"

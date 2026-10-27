@@ -148,7 +148,20 @@ if (Test-Path $EnvFile) {
     $envVarsList += "SESSION_COOKIE_SECURE=True"
     $envVarsList += "CSRF_COOKIE_SECURE=True"
     $envVarsList += "SMS_PROVIDER=fast2sms"
-    $envVarsList += "FAST2SMS_API_KEY=JfHmAA8J0vTcFOOUzHAyxA6fJza5XzSfHkzbTiipoL2YQpajGIsDOIpWqIKkpLALH5n8R8Ia6MGxxxAQ"
+}
+
+# Never ship credentials embedded in this script. Supply secrets through the
+# environment file or the deployment environment instead.
+$requiredSecrets = @('SECRET_KEY', 'FAST2SMS_API_KEY', 'RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'ADMIN_BOOTSTRAP_USERNAME', 'ADMIN_BOOTSTRAP_EMAIL', 'ADMIN_BOOTSTRAP_PASSWORD')
+foreach ($secretName in $requiredSecrets) {
+    $hasSecret = @($envVarsList | Where-Object { $_ -match "^$secretName=.+$" }).Count -gt 0
+    if (-not $hasSecret -and -not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($secretName))) {
+        $envVarsList += "$secretName=$([Environment]::GetEnvironmentVariable($secretName))"
+        $hasSecret = $true
+    }
+    if (-not $hasSecret) {
+        throw "Required secret $secretName is missing. Add it to $EnvFile or the process environment before deploying."
+    }
 }
 
 # Delimit variables with ^|^ to safely handle commas inside ALLOWED_HOSTS/CORS_ORIGINS

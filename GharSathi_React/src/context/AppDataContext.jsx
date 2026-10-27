@@ -14,301 +14,41 @@ import {
 import jobWebSocket from '../services/websocket.js';
 
 const AppDataContext = createContext(null);
-const STORAGE_KEY = 'gharsathi_react_v2_data';
+const STORAGE_KEY = 'gharsathi_react_v3_data';
 const CUSTOMER_AUTH_KEY = 'gharsathi_customer_session';
 const TECH_AUTH_KEY = 'gharsathi_tech_session';
 const ADMIN_AUTH_KEY = 'gharsathi_admin_session';
-const AUTH_TOKEN_KEY = 'gharsathi_auth_token';
+const AUTH_TOKEN_KEY = 'gharsathi_auth_token_tab';
 
 export const initialDemoData = {
-  bookings: [
-    {
-      id: 'GS-8821001',
-      customerName: 'Ramesh Sharma',
-      phone: '9876543210',
-      pincode: '801103',
-      area: 'Maner',
-      address: 'House No 14, Near Primary School, Maner',
-      serviceId: 'ac',
-      serviceName: 'AC Service & Repair',
-      subcategoryId: 'ac-split-service',
-      subcategoryName: 'Split AC Foam Jet Service',
-      price: 499,
-      date: '2026-10-17',
-      time: '10 AM - 12 PM',
-      payment: 'Cash on Service',
-      status: 'Completed',
-      servicePin: '4829',
-      technicianId: 'TECH-101',
-      technicianName: 'Manoj Kumar',
-      technicianPhone: '9876500001',
-      location: { lat: 25.6482, lng: 84.8778 },
-      createdAt: '2026-10-17T09:30:00.000Z',
-      completedAt: '2026-10-17T11:45:00.000Z',
-      commission: FIXED_PLATFORM_COMMISSION, // 149
-      rating: 5,
-      review: 'Bahut badhiya kaam kiya! Time par aaye aur AC ekdum mast thanda kar diya.',
-      reviewTags: ['On-time arrival', 'Professional behavior', 'Clean & tidy'],
-      ratedAt: '2026-10-17T14:30:00.000Z',
-    },
-    {
-      id: 'GS-8821002',
-      customerName: 'Anita Verma',
-      phone: '9811223344',
-      pincode: '801503',
-      area: 'Patna to Danapur',
-      address: 'Flat 4B, Shanti Enclave, Saguna More, Danapur',
-      serviceId: 'washing',
-      serviceName: 'Washing Machine Repair',
-      subcategoryId: 'wm-top-load',
-      subcategoryName: 'Top Load Fully Automatic Service',
-      price: 599,
-      date: new Date().toISOString().slice(0, 10),
-      time: '12 PM - 2 PM',
-      payment: 'UPI / Online on Completion',
-      status: 'Accepted',
-      servicePin: '7391',
-      technicianId: 'TECH-101',
-      technicianName: 'Manoj Kumar',
-      technicianPhone: '9876500001',
-      location: { lat: 25.6212, lng: 85.0441 },
-      createdAt: new Date().toISOString(),
-      commission: 0,
-      notes: 'Spin tub se aawaaz aa rahi hai',
-    },
-    {
-      id: 'GS-8821003',
-      customerName: 'Sanjay Gupta',
-      phone: '9798001122',
-      pincode: '801103',
-      area: 'Bihta',
-      address: 'Main Market Road, Near SBI ATM, Bihta',
-      serviceId: 'ro',
-      serviceName: 'RO Service & Water Purifier',
-      subcategoryId: 'ro-routine',
-      subcategoryName: 'Routine Filter Service & TDS Check',
-      price: 399,
-      date: new Date().toISOString().slice(0, 10),
-      time: '2 PM - 4 PM',
-      payment: 'Cash on Service',
-      status: 'Pending',
-      servicePin: '5164',
-      technicianId: '',
-      technicianName: '',
-      technicianPhone: '',
-      location: { lat: 25.5661, lng: 84.8643 },
-      createdAt: new Date().toISOString(),
-      commission: 0,
-      notes: 'Water taste thoda change ho gaya hai',
-    },
-    {
-      id: 'GS-8821004',
-      customerName: 'Priya Kumari',
-      phone: '9934112233',
-      pincode: '801503',
-      area: 'Khagaul',
-      address: 'Near Railway Station, Khagaul, Patna',
-      serviceId: 'electrician',
-      serviceName: 'Electrician & Electrical Services',
-      subcategoryId: 'elec-fan',
-      subcategoryName: 'Ceiling Fan Repair & Installation',
-      price: 249,
-      date: new Date().toISOString().slice(0, 10),
-      time: '4 PM - 6 PM',
-      payment: 'Cash on Service',
-      status: 'Completed',
-      servicePin: '6248',
-      technicianId: 'TECH-101',
-      technicianName: 'Manoj Kumar',
-      technicianPhone: '9876500001',
-      location: { lat: 25.5812, lng: 85.0441 },
-      createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      completedAt: new Date(Date.now() - 86400000 * 2 + 7200000).toISOString(),
-      commission: FIXED_PLATFORM_COMMISSION,
-      rating: 4,
-      review: 'Quick wiring fix and fan capacitor change. Good service.',
-      reviewTags: ['Expert & fast work', 'Polite behavior'],
-      ratedAt: new Date(Date.now() - 86400000 * 2 + 10000000).toISOString(),
-    },
-  ],
-  technicians: [
-    {
-      id: 'TECH-101',
-      name: 'Manoj Kumar',
-      phone: '9876500001',
-      password: 'password123',
-      email: 'manoj.kumar@gharsathi.com',
-      aadhaar: '5482 9104 2231',
-      area: 'Patna to Danapur',
-      address: 'Station Road, Danapur Cantt, Patna - 801503',
-      skills: 'AC Service & Repair, Fridge & Refrigerator, Electrician',
-      status: 'Verified',
-      wallet: 600,
-      walletBalance: 600,
-      completedJobs: 2,
-      rating: 4.8,
-      ratingCount: 2,
-      isOnline: true,
-      liveLocation: { lat: 25.6207, lng: 85.0444, address: 'Danapur Cantt, Patna' },
-      liveImage: '',
-      walletTransactions: [
-        {
-          id: 'WTX-101',
-          type: 'credit',
-          amount: 500,
-          description: 'Initial Partner Deposit',
-          timestamp: '2026-10-15T10:00:00.000Z',
-        },
-        {
-          id: 'WTX-102',
-          type: 'credit',
-          amount: 350,
-          description: 'Service Earnings: GS-8821001 (AC Service)',
-          bookingId: 'GS-8821001',
-          timestamp: '2026-10-17T11:45:00.000Z',
-        },
-        {
-          id: 'WTX-103',
-          type: 'debit',
-          amount: 149,
-          description: 'Fixed Platform Fee: GS-8821001',
-          bookingId: 'GS-8821001',
-          timestamp: '2026-10-17T11:45:00.000Z',
-        },
-        {
-          id: 'WTX-104',
-          type: 'credit',
-          amount: 200,
-          description: 'UPI Wallet Top-up (Recharge)',
-          timestamp: '2026-10-17T16:00:00.000Z',
-        },
-        {
-          id: 'WTX-105',
-          type: 'debit',
-          amount: 149,
-          description: 'Fixed Platform Fee: GS-8821004',
-          bookingId: 'GS-8821004',
-          timestamp: '2026-10-17T18:00:00.000Z',
-        },
-      ],
-    },
-    {
-      id: 'TECH-102',
-      name: 'Rajesh Singh',
-      phone: '9876500002',
-      password: 'password123',
-      email: 'rajesh.singh@gharsathi.com',
-      aadhaar: '7821 4452 9012',
-      area: 'Bihta',
-      address: 'Near Bus Stand, Bihta, Patna - 801103',
-      skills: 'Washing Machine Repair, RO Water Purifier, Plumbing',
-      status: 'Verified',
-      wallet: 250,
-      walletBalance: 250,
-      completedJobs: 0,
-      rating: 4.9,
-      ratingCount: 3,
-      isOnline: true,
-      liveLocation: { lat: 25.5658, lng: 84.8631, address: 'Bihta Chowk, Patna' },
-      liveImage: '',
-      walletTransactions: [
-        {
-          id: 'WTX-201',
-          type: 'credit',
-          amount: 250,
-          description: 'Welcome Bonus Credit',
-          timestamp: '2026-10-16T12:00:00.000Z',
-        },
-      ],
-    },
-  ],
-  customers: [
-    {
-      id: 'CUS-101',
-      name: 'Ramesh Sharma',
-      phone: '9876543210',
-      pincode: '801103',
-      area: 'Maner',
-      address: 'House No 14, Near Primary School, Maner',
-      bookings: 1,
-      status: 'Active',
-      registeredAt: '2026-10-15T10:00:00.000Z',
-    },
-    {
-      id: 'CUS-102',
-      name: 'Anita Verma',
-      phone: '9811223344',
-      pincode: '801503',
-      area: 'Patna to Danapur',
-      address: 'Flat 4B, Shanti Enclave, Saguna More, Danapur',
-      bookings: 1,
-      status: 'Active',
-      registeredAt: '2026-10-16T11:20:00.000Z',
-    },
-    {
-      id: 'CUS-103',
-      name: 'Sanjay Gupta',
-      phone: '9798001122',
-      pincode: '801103',
-      area: 'Bihta',
-      address: 'Main Market Road, Near SBI ATM, Bihta',
-      bookings: 1,
-      status: 'Active',
-      registeredAt: '2026-10-18T08:00:00.000Z',
-    },
-    {
-      id: 'CUS-104',
-      name: 'Priya Kumari',
-      phone: '9934112233',
-      pincode: '801503',
-      area: 'Khagaul',
-      address: 'Near Railway Station, Khagaul, Patna',
-      bookings: 1,
-      status: 'Active',
-      registeredAt: '2026-10-17T09:00:00.000Z',
-    },
-  ],
+  bookings: [],
+  technicians: [],
+  customers: [],
   services: initialServices,
   complaints: [],
-  withdrawals: [
-    {
-      id: 'WDR-8821001',
-      amount: 149,
-      bankDetails: 'ghar.sathi@okhdfcbank',
-      status: 'Approved',
-      adminNotes: 'Platform commission payout for Order GS-8821001',
-      createdAt: '2026-10-18T10:00:00.000Z',
-      processedAt: '2026-10-18T12:00:00.000Z',
-    },
-  ],
-  activity: [
-    { id: 'act-1', message: 'Demo system initialized with fixed Rs 149 platform commission', at: new Date().toLocaleString() },
-  ],
-  notifications: [
-    {
-      id: 'notif-1',
-      role: 'customer',
-      userId: '9811223344',
-      bookingId: 'GS-8821002',
-      title: 'Technician Assigned',
-      message: 'Manoj Kumar (9876500001) has been assigned for your Washing Machine Repair.',
-      step: 'Assigned',
-      read: false,
-      timestamp: new Date().toISOString(),
-    },
-  ],
+  withdrawals: [],
+  activity: [],
+  notifications: [],
+  transactions: [],
   profile: { name: '', phone: '', email: '', address: '', pincode: '' },
 };
 
 const readStored = () => {
   try {
+    // Discard the previous release's bundled demo fixtures from browser storage.
+    localStorage.removeItem('gharsathi_react_v2_data');
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (!parsed.services || parsed.services.length === 0) parsed.services = initialServices;
-      if (!parsed.notifications) parsed.notifications = initialDemoData.notifications;
-      if (!parsed.customers || parsed.customers.length === 0) parsed.customers = initialDemoData.customers;
-      if (!Array.isArray(parsed.withdrawals)) parsed.withdrawals = initialDemoData.withdrawals;
+      if (!Array.isArray(parsed.notifications)) parsed.notifications = [];
+      if (!Array.isArray(parsed.customers)) parsed.customers = [];
+      if (!Array.isArray(parsed.withdrawals)) parsed.withdrawals = [];
+      if (!Array.isArray(parsed.bookings)) parsed.bookings = [];
+      if (!Array.isArray(parsed.technicians)) parsed.technicians = [];
+      if (!Array.isArray(parsed.complaints)) parsed.complaints = [];
+      if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
+      if (!Array.isArray(parsed.activity)) parsed.activity = [];
 
       // Ensure all bookings have a 4-digit Happy Code servicePin
       if (Array.isArray(parsed.bookings)) {
@@ -358,30 +98,11 @@ export function AppDataProvider({ children }) {
 
   // Authentication states
   const [currentCustomer, setCurrentCustomer] = useState(() => {
-    try {
-      const saved = localStorage.getItem(CUSTOMER_AUTH_KEY);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
+    return null;
   });
 
-  const [currentTechnician, setCurrentTechnician] = useState(() => {
-    try {
-      const saved = localStorage.getItem(TECH_AUTH_KEY);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    try {
-      return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [currentTechnician, setCurrentTechnician] = useState(null);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   // Reusable Toast Notification Queue
   const [toasts, setToasts] = useState([]);
@@ -423,10 +144,11 @@ export function AppDataProvider({ children }) {
           return false;
         }
 
-        const [servicesRes, techsRes, bookingsRes, complaintsRes, withdrawalsRes] = await Promise.all([
+        const [servicesRes, techsRes, bookingsRes, customersRes, complaintsRes, withdrawalsRes] = await Promise.all([
           api.getServices().catch(() => null),
           api.getTechnicians().catch(() => null),
           api.getBookings().catch(() => null),
+          api.getCustomers().catch(() => null),
           api.getComplaints().catch(() => null),
           api.getAdminWithdrawals().catch(() => null),
         ]);
@@ -463,13 +185,34 @@ export function AppDataProvider({ children }) {
           }
 
           let updatedTechnicians = current.technicians;
-          if (Array.isArray(techsRes) && techsRes.length > 0) {
+          if (Array.isArray(techsRes)) {
             updatedTechnicians = techsRes.map(normalizeTechnicianFromDjango);
           }
 
           let updatedBookings = current.bookings;
-          if (Array.isArray(bookingsRes) && bookingsRes.length > 0) {
+          if (Array.isArray(bookingsRes)) {
             updatedBookings = bookingsRes.map(normalizeBookingFromDjango);
+          }
+
+          let updatedCustomers = current.customers;
+          if (Array.isArray(customersRes)) {
+            const bookingsByPhone = new Map();
+            (Array.isArray(bookingsRes) ? bookingsRes : []).forEach((booking) => {
+              const phone = String(booking.customer_phone || '').replace(/\D/g, '').slice(-10);
+              if (phone) bookingsByPhone.set(phone, (bookingsByPhone.get(phone) || 0) + 1);
+            });
+            updatedCustomers = customersRes.map((customer) => ({
+              id: customer.customer_id || customer.id,
+              name: customer.name || 'Customer',
+              phone: customer.phone || '',
+              email: customer.email || '',
+              address: customer.address || '',
+              area: customer.area || '',
+              pincode: customer.pincode || '',
+              bookings: bookingsByPhone.get(String(customer.phone || '').replace(/\D/g, '').slice(-10)) || 0,
+              status: customer.status || 'Active',
+              registeredAt: customer.created_at || '',
+            }));
           }
 
           let updatedComplaints = current.complaints;
@@ -478,7 +221,7 @@ export function AppDataProvider({ children }) {
           }
 
           let updatedWithdrawals = current.withdrawals || [];
-          if (Array.isArray(withdrawalsRes) && withdrawalsRes.length > 0) {
+          if (Array.isArray(withdrawalsRes)) {
             updatedWithdrawals = withdrawalsRes.map(normalizeWithdrawalFromDjango);
           }
 
@@ -487,6 +230,7 @@ export function AppDataProvider({ children }) {
             services: updatedServices,
             technicians: updatedTechnicians,
             bookings: updatedBookings,
+            customers: updatedCustomers,
             complaints: updatedComplaints,
             withdrawals: updatedWithdrawals,
           };
@@ -612,19 +356,6 @@ export function AppDataProvider({ children }) {
           console.warn('Sync failed:', err);
         }
       }
-      if (e.key === CUSTOMER_AUTH_KEY) {
-        try {
-          setCurrentCustomer(e.newValue ? JSON.parse(e.newValue) : null);
-        } catch {}
-      }
-      if (e.key === TECH_AUTH_KEY) {
-        try {
-          setCurrentTechnician(e.newValue ? JSON.parse(e.newValue) : null);
-        } catch {}
-      }
-      if (e.key === ADMIN_AUTH_KEY) {
-        setIsAdminLoggedIn(e.newValue === 'true');
-      }
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -643,54 +374,73 @@ export function AppDataProvider({ children }) {
   // Persist customer auth
   useEffect(() => {
     try {
-      if (currentCustomer) localStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(currentCustomer));
-      else localStorage.removeItem(CUSTOMER_AUTH_KEY);
+      if (currentCustomer) sessionStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(currentCustomer));
+      else sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
     } catch {}
   }, [currentCustomer]);
 
   // Persist technician auth
   useEffect(() => {
     try {
-      if (currentTechnician) localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(currentTechnician));
-      else localStorage.removeItem(TECH_AUTH_KEY);
+      if (currentTechnician) sessionStorage.setItem(TECH_AUTH_KEY, JSON.stringify(currentTechnician));
+      else sessionStorage.removeItem(TECH_AUTH_KEY);
     } catch {}
   }, [currentTechnician]);
 
   // Persist admin auth
   useEffect(() => {
     try {
-      if (isAdminLoggedIn) localStorage.setItem(ADMIN_AUTH_KEY, 'true');
-      else localStorage.removeItem(ADMIN_AUTH_KEY);
+      if (isAdminLoggedIn) sessionStorage.setItem(ADMIN_AUTH_KEY, 'true');
+      else sessionStorage.removeItem(ADMIN_AUTH_KEY);
     } catch {}
   }, [isAdminLoggedIn]);
 
   // Session Persistence on Mount: Verify auth token against /api/auth/me/ to prevent unwanted redirects
   useEffect(() => {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
-    if (!token) return;
+    const token = sessionStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) {
+      sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+      sessionStorage.removeItem(TECH_AUTH_KEY);
+      sessionStorage.removeItem(ADMIN_AUTH_KEY);
+      return;
+    }
 
     let isMounted = true;
     api
       .getMe(token)
       .then((res) => {
-        if (!isMounted || !res || !res.success) return;
+        if (!isMounted) return;
+        if (!res || !res.success) throw new Error('Session verification failed.');
         if (res.role === 'technician' && res.technician) {
           const normalized = normalizeTechnicianFromDjango(res.technician);
           setCurrentTechnician(normalized);
-          localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
+          sessionStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
+          sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+          sessionStorage.removeItem(ADMIN_AUTH_KEY);
         } else if (res.role === 'customer' && res.user) {
           setCurrentCustomer(res.user);
-          localStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(res.user));
+          sessionStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(res.user));
+          sessionStorage.removeItem(TECH_AUTH_KEY);
+          sessionStorage.removeItem(ADMIN_AUTH_KEY);
         } else if (res.role === 'admin') {
           setIsAdminLoggedIn(true);
-          localStorage.setItem(ADMIN_AUTH_KEY, 'true');
+          sessionStorage.setItem(ADMIN_AUTH_KEY, 'true');
+          sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+          sessionStorage.removeItem(TECH_AUTH_KEY);
+        } else {
+          throw new Error('Unsupported session role.');
         }
       })
       .catch((err) => {
         console.warn('Session verification notice (/api/auth/me/):', err?.message);
-        if (err?.status === 401 || err?.message?.includes('expired') || err?.message?.includes('Invalid')) {
-          localStorage.removeItem(AUTH_TOKEN_KEY);
-        }
+        if (!isMounted) return;
+        sessionStorage.removeItem(AUTH_TOKEN_KEY);
+        sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+        sessionStorage.removeItem(TECH_AUTH_KEY);
+        sessionStorage.removeItem(ADMIN_AUTH_KEY);
+        setCurrentCustomer(null);
+        setCurrentTechnician(null);
+        setIsAdminLoggedIn(false);
       });
 
     return () => {
@@ -785,74 +535,40 @@ export function AppDataProvider({ children }) {
     return customerRecord;
   }, [data.customers, addActivity, addToast]);
 
-  const loginCustomer = useCallback((phone) => {
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    const found = data.customers.find((c) => c.phone.replace(/\D/g, '').slice(-10) === cleanPhone);
-    if (found) {
-      setCurrentCustomer(found);
-      addToast({
-        title: 'Welcome Back! 👋',
-        message: `Logged in as ${found.name}`,
-        type: 'success',
-      });
-      return found;
-    }
-    // Auto-create guest customer profile if not registered
-    const guestCustomer = {
-      id: `CUS-${Date.now().toString().slice(-6)}`,
-      name: `Customer ${cleanPhone.slice(-4)}`,
-      phone: cleanPhone,
-      address: '',
-      pincode: '',
-      area: 'Maner',
-      bookings: 0,
-      status: 'Active',
-      registeredAt: new Date().toISOString(),
-    };
-    setData((current) => ({
-      ...current,
-      customers: [guestCustomer, ...current.customers],
-      activity: [addActivity(`Customer ${cleanPhone} logged in`), ...current.activity].slice(0, 50),
-    }));
-    setCurrentCustomer(guestCustomer);
-    addToast({
-      title: 'Logged in Successfully! 🚀',
-      message: `Account activated for ${cleanPhone}`,
-      type: 'success',
-    });
-    return guestCustomer;
-  }, [data.customers, addActivity, addToast]);
-
   const setCustomerSession = useCallback((customer, token = null) => {
     if (token) {
       try {
-        localStorage.setItem(AUTH_TOKEN_KEY, token);
+        sessionStorage.setItem(AUTH_TOKEN_KEY, token);
       } catch {}
     }
     setCurrentCustomer(customer);
     try {
-      localStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(customer));
+      sessionStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(customer));
+      sessionStorage.removeItem(TECH_AUTH_KEY);
+      sessionStorage.removeItem(ADMIN_AUTH_KEY);
     } catch {}
   }, []);
 
   const setTechnicianSession = useCallback((technician, token = null) => {
     if (token) {
       try {
-        localStorage.setItem(AUTH_TOKEN_KEY, token);
+        sessionStorage.setItem(AUTH_TOKEN_KEY, token);
       } catch {}
     }
     const normalized = normalizeTechnicianFromDjango(technician) || technician;
     setCurrentTechnician(normalized);
     try {
-      localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
+      sessionStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
+      sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+      sessionStorage.removeItem(ADMIN_AUTH_KEY);
     } catch {}
   }, []);
 
   const logoutCustomer = useCallback(() => {
     setCurrentCustomer(null);
     try {
-      localStorage.removeItem(CUSTOMER_AUTH_KEY);
-      localStorage.removeItem(AUTH_TOKEN_KEY);
+      sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+      sessionStorage.removeItem(AUTH_TOKEN_KEY);
     } catch {}
     addToast({
       title: 'Logged Out',
@@ -908,13 +624,9 @@ export function AppDataProvider({ children }) {
     // 1. Attempt official Django authentication via API
     try {
       const res = await api.login({ phone: cleanPhone, password, role: 'technician' });
-      if (res && res.success && res.technician) {
+      if (res?.success && res.role === 'technician' && res.token && res.technician) {
         const normalized = normalizeTechnicianFromDjango(res.technician);
-        if (res.token) {
-          localStorage.setItem(AUTH_TOKEN_KEY, res.token);
-        }
-        localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
-        setCurrentTechnician(normalized);
+        setTechnicianSession(normalized, res.token);
         addToast({
           title: `Namaste, ${normalized.name}! 🧰`,
           message: 'Technician partner portal active.',
@@ -925,43 +637,19 @@ export function AppDataProvider({ children }) {
     } catch (err) {
       console.warn('Backend login attempt notice:', err);
       // If server specifically returned an invalid password / credential error, display it
-      const errorMsg = err?.error || err?.message;
-      if (errorMsg && (errorMsg.includes('password') || errorMsg.includes('Galat') || errorMsg.includes('Invalid'))) {
-        addToast({
-          title: 'Login Failed',
-          message: errorMsg,
-          type: 'error',
-        });
-        return { success: false, error: errorMsg };
-      }
+      const errorMsg = err?.data?.error || err?.message || 'Could not verify credentials with the server.';
+      addToast({ title: 'Login Failed', message: errorMsg, type: 'error' });
+      return { success: false, error: errorMsg };
     }
-
-    // 2. Local fallback if offline or demo fallback
-    const tech = data.technicians.find(
-      (t) => t.phone.replace(/\D/g, '').slice(-10) === cleanPhone && (!t.password || t.password === password)
-    );
-    if (tech) {
-      setCurrentTechnician(tech);
-      localStorage.setItem(TECH_AUTH_KEY, JSON.stringify(tech));
-      addToast({
-        title: `Namaste, ${tech.name}! 🧰`,
-        message: 'Technician partner portal active.',
-        type: 'success',
-      });
-      return { success: true, technician: tech };
-    }
-    addToast({
-      title: 'Login Failed',
-      message: 'Invalid mobile number or password.',
-      type: 'error',
-    });
-    return { success: false, error: 'Mobile number ya Password galat hai.' };
-  }, [data.technicians, addToast]);
+    const errorMsg = 'Invalid mobile number or password.';
+    addToast({ title: 'Login Failed', message: errorMsg, type: 'error' });
+    return { success: false, error: errorMsg };
+  }, [addToast, setTechnicianSession]);
 
   const logoutTechnician = useCallback(() => {
     setCurrentTechnician(null);
-    localStorage.removeItem(TECH_AUTH_KEY);
-    localStorage.removeItem(AUTH_TOKEN_KEY);
+    sessionStorage.removeItem(TECH_AUTH_KEY);
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
     addToast({
       title: 'Logged Out',
       message: 'Technician session closed.',
@@ -970,32 +658,30 @@ export function AppDataProvider({ children }) {
   }, [addToast]);
 
   // Admin Authentication
-  const loginAdmin = useCallback((email, password) => {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const cleanPass = (password || '').trim();
-    const isProductionAdmin =
-      (cleanEmail === 'prabhat@gharsathi.in' || cleanEmail === 'prabhat' || cleanEmail === 'admin' || cleanEmail === 'admin@gharsathi.in' || cleanEmail === 'admin@gharsathi.com') &&
-      (cleanPass === 'Gharsathi@2026' || cleanPass === 'GharSathi@2026' || cleanPass === 'admin123');
-
-    if (isProductionAdmin) {
+  const loginAdmin = useCallback(async (email, password) => {
+    try {
+      const res = await api.login({ username: (email || '').trim(), password, role: 'admin' });
+      if (!res?.success || res.role !== 'admin' || !res.token) {
+        return { success: false, error: res?.error || 'Admin credentials could not be verified.' };
+      }
+      sessionStorage.setItem(AUTH_TOKEN_KEY, res.token);
+      sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+      sessionStorage.removeItem(TECH_AUTH_KEY);
       setIsAdminLoggedIn(true);
-      addToast({
-        title: 'Super Admin Access Granted 🛡️',
-        message: 'Platform management dashboard online.',
-        type: 'success',
-      });
+      await syncFromDjango(false);
+      addToast({ title: 'Admin sign-in successful', message: 'Admin access verified by the server.', type: 'success' });
       return { success: true };
+    } catch (err) {
+      const error = err?.data?.error || err?.message || 'Could not connect to the authentication server.';
+      addToast({ title: 'Admin Login Failed', message: error, type: 'error' });
+      return { success: false, error };
     }
-    addToast({
-      title: 'Admin Login Failed',
-      message: 'Invalid email or password. Use prabhat@gharsathi.in',
-      type: 'error',
-    });
-    return { success: false, error: 'Invalid admin credentials. Please enter the correct email and password.' };
-  }, [addToast]);
+  }, [addToast, syncFromDjango]);
 
   const logoutAdmin = useCallback(() => {
     setIsAdminLoggedIn(false);
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
     addToast({
       title: 'Admin Session Ended',
       message: 'Logged out from Admin Dashboard.',
@@ -1053,33 +739,29 @@ export function AppDataProvider({ children }) {
 
     // If Django backend is live, asynchronously persist to database
     if (backendStatus === 'live') {
-      const payload = {
-        booking_code: booking.id,
-        service: service.pk || 1,
-        service_name: service.name,
-        subcategory_name: subcategoryName,
-        subcategory_id: input.subcategoryId || '',
-        customer_name: booking.customerName,
-        customer_phone: cleanPhone,
-        address: booking.address,
-        area: booking.area,
-        pincode: booking.pincode,
-        scheduled_date: booking.date || null,
-        scheduled_time: booking.time || '10 AM - 12 PM',
-        base_price: price,
-        total_amount: price,
-        payment_method: booking.payment,
-        payment_status: booking.paymentStatus,
-        razorpay_order_id: booking.razorpayOrderId,
-        razorpay_payment_id: booking.razorpayPaymentId,
-        razorpay_signature: booking.razorpaySignature,
-        notes: booking.notes,
-        service_pin: booking.servicePin,
-        latitude: booking.latitude,
-        longitude: booking.longitude,
-      };
-      api.createBooking(payload, service.pk || 1).catch((err) => {
+      api.createBooking(booking, service.pk || 1).catch((err) => {
         console.warn('Live API createBooking sync warning:', err);
+        const authRejected = err?.status === 401 || err?.status === 403;
+        if (authRejected) {
+          sessionStorage.removeItem(AUTH_TOKEN_KEY);
+          sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+          setCurrentCustomer(null);
+        }
+        setData((current) => ({
+          ...current,
+          bookings: current.bookings.filter((item) => item.id !== booking.id),
+          customers: current.customers.filter((item) => item.phone !== cleanPhone),
+          notifications: current.notifications.filter((item) => item.bookingId !== booking.id),
+          activity: current.activity.filter((item) => !item.message?.includes(booking.id)),
+        }));
+        addToast({
+          title: authRejected ? 'Customer login expired' : 'Booking could not be saved',
+          message: authRejected
+            ? 'Customer data was cleared from the database. Sign in again with mobile OTP, then retry the booking.'
+            : err?.data?.detail || err?.data?.error || err?.message || 'Database ne booking save nahi ki. Please retry.',
+          type: 'error',
+          duration: 7000,
+        });
       });
     }
 
@@ -1630,10 +1312,12 @@ export function AppDataProvider({ children }) {
     setData((current) => ({
       ...current,
       bookings: [],
+      customers: [],
       complaints: [],
       technicians: [],
       transactions: [],
       withdrawals: [],
+      notifications: [],
       activity: [addActivity('Clean production wipe: All demo and test data purged.'), ...current.activity].slice(0, 50),
     }));
 
@@ -1851,8 +1535,8 @@ export function AppDataProvider({ children }) {
 
       const expectedPin = String(booking.servicePin || '4829').trim();
 
-      // Verify Happy Code (exact match or demo fallback '1234')
-      if (cleanPin !== expectedPin && cleanPin !== '1234') {
+      // Verify the exact Happy Code; no shared demo PIN is accepted.
+      if (!expectedPin || cleanPin !== expectedPin) {
         addToast({
           title: 'Invalid Happy Code! ❌',
           message: 'Security PIN galat hai. Customer se booking screen par 4-digit Happy Code poochein.',
@@ -2069,19 +1753,20 @@ export function AppDataProvider({ children }) {
     [backendStatus, currentTechnician, addActivity, addToast]
   );
 
-  // Reset Demo Data (Re-seeds default services, sample technicians, and dummy bookings)
+  // Clear local cached data and re-sync from the database; never restore demo fixtures.
   const resetDemoData = useCallback(async () => {
     if (backendStatus === 'live') {
       try {
-        await api.resetDemoData();
+        await api.purgeProductionData();
       } catch (err) {
-        console.warn('Backend resetDemoData warning:', err);
+        console.warn('Backend purgeProductionData warning:', err);
       }
     }
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(CUSTOMER_AUTH_KEY);
-    localStorage.removeItem(TECH_AUTH_KEY);
-    localStorage.removeItem(ADMIN_AUTH_KEY);
+    localStorage.removeItem('gharsathi_react_v2_data');
+    sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+    sessionStorage.removeItem(TECH_AUTH_KEY);
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
     setData(initialDemoData);
     setCurrentCustomer(null);
     setCurrentTechnician(null);
@@ -2089,11 +1774,13 @@ export function AppDataProvider({ children }) {
 
     if (backendStatus === 'live') {
       syncFromDjango(false);
+    } else {
+      setData(initialDemoData);
     }
 
     addToast({
-      title: 'Demo Data Reset 🔄',
-      message: 'All default services, sample technicians, and dummy bookings restored.',
+      title: 'Demo Data Cleared ✓',
+      message: 'Browser cache cleared. Production database records will load on sync.',
       type: 'success',
     });
   }, [backendStatus, syncFromDjango, addToast]);
@@ -2113,7 +1800,6 @@ export function AppDataProvider({ children }) {
       setTechnicianSession,
       isAdminLoggedIn,
       signupCustomer,
-      loginCustomer,
       logoutCustomer,
       registerTechnician,
       loginTechnician,
@@ -2161,7 +1847,6 @@ export function AppDataProvider({ children }) {
       setTechnicianSession,
       isAdminLoggedIn,
       signupCustomer,
-      loginCustomer,
       logoutCustomer,
       registerTechnician,
       loginTechnician,

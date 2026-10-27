@@ -77,7 +77,6 @@ export function TopBar({ title, role, children }) {
         <BackendStatusBadge />
         <span className="topbar-section">{title}</span>
         <span className="role-chip">{role}</span>
-        {role === 'Admin' && <ResetDemoButton compact />}
         {children}
       </div>
     </header>
@@ -883,36 +882,6 @@ export function SkeletonList({ count = 3 }) {
 }
 
 /**
- * Discreet Demo Data Reset Button
- */
-export function ResetDemoButton({ compact = false }) {
-  const { resetDemoData } = useGharSathi();
-  const [confirming, setConfirming] = useState(false);
-
-  const handleReset = () => {
-    if (!confirming) {
-      setConfirming(true);
-      setTimeout(() => setConfirming(false), 4000);
-      return;
-    }
-    resetDemoData();
-    setConfirming(false);
-  };
-
-  return (
-    <button
-      type="button"
-      className={`reset-demo-btn ${confirming ? 'confirming' : ''} ${compact ? 'compact' : ''}`}
-      onClick={handleReset}
-      title="Clears and re-seeds default services, sample technicians, and dummy bookings"
-    >
-      <span className="reset-btn-icon">🔄</span>
-      <span>{confirming ? 'Confirm Reset?' : 'Reset Demo Data'}</span>
-    </button>
-  );
-}
-
-/**
  * 4-Digit Happy Code PIN Verification Modal for Technician
  */
 export function PinVerificationModal({ booking, onClose, onVerify }) {
@@ -1107,7 +1076,6 @@ export function WalletRechargeModal({ technician, onClose, onRecharge }) {
       if (!orderRes || !orderRes.order_id) {
         throw new Error('Payment server par order create nahi ho saka. Kripya punah prayas karein.');
       }
-
       setStatusMessage('Razorpay payment gateway khul raha hai…');
 
       // Step 2: Open official Razorpay Checkout popup

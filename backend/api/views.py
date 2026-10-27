@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import logging
 import random
+import secrets
 from datetime import timedelta
 from decimal import Decimal
 import jwt
@@ -15,6 +16,8 @@ from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 
 from .models import (
     Service,
@@ -38,7 +41,12 @@ from .serializers import (
     CustomerProfileSerializer,
 )
 from .seed_data import seed_database, purge_database, ensure_production_superuser
-from .services.sms import send_sms_otp
+from .authentication import (
+    IsGharSathiAdmin,
+    IsGharSathiAuthenticated,
+    IsGharSathiCustomer,
+    IsGharSathiTechnician,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +111,11 @@ def broadcast_booking_event(booking, event_type='NEW_JOB'):
 class ServiceViewSet(viewsets.ModelViewSet):
     queryset = Service.objects.all()
     serializer_class = ServiceSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [AllowAny()]
+        return [IsGharSathiAdmin()]
 
     def get_object(self):
         pk = self.kwargs.get('pk')
@@ -254,6 +267,11 @@ class SubServiceViewSet(viewsets.ModelViewSet):
     queryset = SubService.objects.all()
     serializer_class = SubServiceSerializer
 
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [AllowAny()]
+        return [IsGharSathiAdmin()]
+
     def get_queryset(self):
         qs = super().get_queryset()
         service_id = self.request.query_params.get('service_id') or self.request.query_params.get('service')
@@ -266,6 +284,8 @@ class SubServiceViewSet(viewsets.ModelViewSet):
 class TechnicianProfileViewSet(viewsets.ModelViewSet):
     queryset = TechnicianProfile.objects.all()
     serializer_class = TechnicianProfileSerializer
+
+    permission_classes = [IsGharSathiAdmin]
 
     def get_object(self):
         pk = self.kwargs.get('pk')
@@ -450,6 +470,16 @@ class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all().select_related('service', 'technician')
     serializer_class = BookingSerializer
 
+    def get_permissions(self):
+        action = getattr(self, 'action', None)
+        if action in ('accept', 'start', 'complete'):
+            return [IsGharSathiTechnician()]
+        if action in ('rate', 'create'):
+            return [IsGharSathiCustomer()]
+        if action in ('update', 'partial_update', 'destroy'):
+            return [IsGharSathiAdmin()]
+        return [IsGharSathiAuthenticated()]
+
     def get_object(self):
         pk = self.kwargs.get('pk')
         if str(pk).isdigit():
@@ -462,6 +492,12 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        role = getattr(self.request.user, 'role', None)
+        if role == 'customer':
+            phone = ''.join(filter(str.isdigit, str(self.request.user.phone)))[-10:]
+            qs = qs.filter(customer_phone__endswith=phone)
+        elif role == 'technician':
+            qs = qs.filter(Q(technician_id=self.request.user.profile.pk) | Q(technician__isnull=True, status='Pending'))
         phone = self.request.query_params.get('phone')
         technician_id = self.request.query_params.get('technician_id')
         partner_id = self.request.query_params.get('partner_id')
@@ -486,9 +522,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
+        profile = self.request.user.profile
         # When a customer places a booking, it remains unassigned (technician=None, status='Pending')
         # and is automatically broadcasted in the queryset to all active and online technicians matching the service category.
         booking = serializer.save(
+            customer_name=profile.name,
+            customer_phone=profile.phone,
             technician=None,
             technician_name='',
             technician_phone='',
@@ -500,8 +539,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
         """Assigns technician to booking ONLY IF KYC is Verified and wallet >= 150."""
-        tech_id = request.data.get('technician_id')
-        partner_id = request.data.get('partner_id')
+        technician_profile = request.user.profile
 
         with transaction.atomic():
             booking_obj = self.get_object()
@@ -513,20 +551,10 @@ class BookingViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Find technician
-            tech_query = TechnicianProfile.objects.select_for_update()
-            if tech_id:
-                if str(tech_id).isdigit():
-                    technician = tech_query.get(pk=tech_id)
-                else:
-                    technician = tech_query.get(partner_id=tech_id)
-            elif partner_id:
-                technician = tech_query.get(partner_id=partner_id)
-            else:
-                return Response(
-                    {'error': 'technician_id or partner_id is required.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # The authenticated technician identity comes from the JWT, never client input.
+            technician = TechnicianProfile.objects.select_for_update().get(pk=technician_profile.pk)
+            if booking.technician_id not in (None, technician.pk):
+                return Response({'error': 'This job is assigned to another technician.'}, status=status.HTTP_403_FORBIDDEN)
 
             # STRICT GUARDRAIL 1: KYC Verification
             if technician.kyc_status != 'Verified':
@@ -568,6 +596,8 @@ class BookingViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             booking_obj = self.get_object()
             booking = Booking.objects.select_for_update().get(pk=booking_obj.pk)
+            if booking.technician_id != request.user.profile.pk:
+                return Response({'error': 'This job is not assigned to your technician account.'}, status=status.HTTP_403_FORBIDDEN)
             if booking.status != 'Accepted':
                 return Response(
                     {'error': f"Only 'Accepted' bookings can be moved to 'In Progress'. Current status: {booking.status}."},
@@ -593,12 +623,15 @@ class BookingViewSet(viewsets.ModelViewSet):
             booking_obj = self.get_object()
             booking = Booking.objects.select_for_update().get(pk=booking_obj.pk)
 
+            if booking.technician_id != request.user.profile.pk:
+                return Response({'error': 'This job is not assigned to your technician account.'}, status=status.HTTP_403_FORBIDDEN)
+
             if booking.status == 'Completed':
                 return Response({'error': 'Booking is already completed.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # 4-Digit Happy Code Verification
-            expected_pin = str(booking.service_pin or '4829').strip()
-            if submitted_pin != expected_pin and submitted_pin != '1234':
+            expected_pin = str(booking.service_pin or '').strip()
+            if not expected_pin or submitted_pin != expected_pin:
                 return Response(
                     {
                         'error': 'Invalid Happy Code! Customer ki screen par display ho raha 4-digit code confirm karein.'
@@ -707,6 +740,15 @@ class ComplaintViewSet(viewsets.ModelViewSet):
     queryset = Complaint.objects.all().select_related('booking')
     serializer_class = ComplaintSerializer
 
+    def get_permissions(self):
+        if self.action == 'resolve':
+            return [IsGharSathiAdmin()]
+        if self.action == 'create':
+            return [IsGharSathiCustomer()]
+        if self.action in ('update', 'partial_update', 'destroy'):
+            return [IsGharSathiAdmin()]
+        return [IsGharSathiAuthenticated()]
+
     def get_object(self):
         pk = self.kwargs.get('pk')
         if str(pk).isdigit():
@@ -719,6 +761,12 @@ class ComplaintViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        role = getattr(self.request.user, 'role', None)
+        if role == 'customer':
+            phone = ''.join(filter(str.isdigit, str(self.request.user.phone)))[-10:]
+            qs = qs.filter(customer_phone__endswith=phone)
+        elif role == 'technician':
+            return qs.none()
         phone = self.request.query_params.get('phone')
         status_filter = self.request.query_params.get('status')
         if phone:
@@ -727,6 +775,14 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
         return qs
+
+    def perform_create(self, serializer):
+        profile = self.request.user.profile
+        booking = serializer.validated_data.get('booking')
+        if booking and booking.customer_phone[-10:] != profile.phone[-10:]:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('You can only file a complaint for your own booking.')
+        serializer.save(customer_name=profile.name, customer_phone=profile.phone)
 
     @action(detail=True, methods=['post', 'patch'])
     def resolve(self, request, pk=None):
@@ -753,6 +809,7 @@ class ComplaintViewSet(viewsets.ModelViewSet):
 class AdminWithdrawalViewSet(viewsets.ModelViewSet):
     queryset = AdminWithdrawal.objects.all()
     serializer_class = AdminWithdrawalSerializer
+    permission_classes = [IsGharSathiAdmin]
 
     def get_object(self):
         pk = self.kwargs.get('pk')
@@ -868,6 +925,7 @@ class AdminWithdrawalViewSet(viewsets.ModelViewSet):
 
 
 class AdminAnalyticsView(APIView):
+    permission_classes = [IsGharSathiAdmin]
     """Calculates GBV, platform earnings, technician payouts, and status health ratios."""
 
     def get(self, request):
@@ -950,6 +1008,7 @@ class AdminAnalyticsView(APIView):
 
 class ResetDemoView(APIView):
     """Resets database and re-seeds with fresh demo dataset."""
+    permission_classes = [IsGharSathiAdmin]
 
     def post(self, request):
         counts = seed_database()
@@ -961,66 +1020,29 @@ class ResetDemoView(APIView):
 
 
 class SetupSuperuserView(APIView):
-    """Creates or updates the production superuser for Django Admin."""
-
-    def get(self, request):
-        return self._process(request)
+    """Deprecated endpoint; admin bootstrap credentials must be configured out of band."""
+    permission_classes = [IsGharSathiAdmin]
 
     def post(self, request):
-        return self._process(request)
-
-    def _process(self, request):
-        from django.contrib.auth import authenticate
-
-        data = request.data if request.method == 'POST' and request.data else request.query_params
-        username = data.get('username') or 'prabhat'
-        password = data.get('password') or 'Gharsathi@2026'
-        email = data.get('email') or 'prabhat@gharsathi.in'
-
-        ensure_production_superuser()
-
-        auth_username = authenticate(username=username, password=password)
-        auth_email = authenticate(username=email, password=password)
-
-        return Response({
-            'success': True,
-            'message': f"Production superuser '{username}' ({email}) configured successfully.",
-            'auth_verified_username': auth_username is not None,
-            'auth_verified_email': auth_email is not None,
-            'credentials': {
-                'username': username,
-                'email': email,
-                'login_url': '/admin/',
-            }
-        })
+        return Response(
+            {'error': 'Admin bootstrap is managed through ADMIN_BOOTSTRAP_* server environment variables.'},
+            status=status.HTTP_410_GONE,
+        )
 
 
 class PurgeProductionDataView(APIView):
     """
     Completely flushes and wipes all mock/seeded test data (dummy technicians,
-    test bookings, mock complaints, mock transactions) and provisions
-    the production superuser (prabhat@gharsathi.in / Gharsathi@2026).
+    test bookings, mock complaints, and mock transactions.
     """
-
-    def get(self, request):
-        return self.post(request)
+    permission_classes = [IsGharSathiAdmin]
 
     def post(self, request):
         counts = purge_database()
-        from django.contrib.auth import authenticate
-        auth_prabhat = authenticate(username='prabhat', password='Gharsathi@2026')
-        auth_email = authenticate(username='prabhat@gharsathi.in', password='Gharsathi@2026')
-
         return Response({
             'success': True,
             'message': 'Ghar Sathi production database completely purged and wiped of all mock/test records.',
             'remaining_records': counts,
-            'production_superuser': {
-                'username': 'prabhat',
-                'email': 'prabhat@gharsathi.in',
-                'auth_verified_username': auth_prabhat is not None,
-                'auth_verified_email': auth_email is not None,
-            }
         })
 
 
@@ -1029,7 +1051,6 @@ class RazorpayCreateOrderView(APIView):
     Creates a Razorpay Order for online customer booking checkout.
     Converts amount in INR to Paise. Uses Razorpay SDK or demo order fallback.
     """
-
     def post(self, request):
         amount = request.data.get('amount')
         booking_id = request.data.get('booking_id', '')
@@ -1184,6 +1205,7 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
     """
     queryset = CustomerProfile.objects.all()
     serializer_class = CustomerProfileSerializer
+    permission_classes = [IsGharSathiAdmin]
 
     def get_object(self):
         pk = self.kwargs.get('pk')
@@ -1201,12 +1223,16 @@ class SendOTPView(APIView):
     POST /api/auth/send-otp/
     Accepts: { "phone_number": "9876543210", "role": "customer" }
     Generates secure 6-digit numeric OTP, saves to DB with 5-minute expiry,
-    triggers SMS Gateway (Fast2SMS / Twilio / Sandbox), and returns response.
+    creates a website-visible OTP and returns it for the on-screen verification popup.
     """
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_send'
 
     def post(self, request):
         phone_input = request.data.get('phone_number') or request.data.get('phone')
-        role = request.data.get('role', 'customer')
+        technician_registration = request.path.endswith('/technicians/send-otp/')
+        role = 'technician' if technician_registration else request.data.get('role', 'customer')
 
         if not phone_input:
             return Response({'error': 'Phone number is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1218,8 +1244,33 @@ class SendOTPView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if role not in ('customer', 'technician'):
+            return Response({'error': 'Unsupported authentication role.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if role == 'technician' and not technician_registration:
+            return Response(
+                {'error': 'Technician sign-in uses the registered mobile number and password.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tech = None
+        if technician_registration:
+            tech = TechnicianProfile.objects.filter(phone__endswith=clean_phone).first()
+            if tech:
+                return Response(
+                    {'error': 'This technician is already registered. Sign in with mobile number and password.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+        recent_requests = OTPVerification.objects.filter(
+            phone=clean_phone,
+            created_at__gte=timezone.now() - timedelta(hours=1),
+        ).count()
+        if recent_requests >= 10:
+            return Response({'error': 'Too many OTP requests. Please try again later.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
         # Generate secure 6-digit random numeric OTP
-        otp_code = str(random.randint(100000, 999999))
+        otp_code = str(secrets.randbelow(900000) + 100000)
         expiry_minutes = getattr(settings, 'OTP_EXPIRATION_MINUTES', 5)
         expires_at = timezone.now() + timedelta(minutes=expiry_minutes)
 
@@ -1227,41 +1278,22 @@ class SendOTPView(APIView):
         OTPVerification.objects.filter(phone=clean_phone, is_verified=False).delete()
 
         # Create new OTP verification record
-        OTPVerification.objects.create(
+        otp_record = OTPVerification.objects.create(
             phone=clean_phone,
             otp_code=otp_code,
             role=role,
             expires_at=expires_at,
         )
 
-        # If technician exists, also update TechnicianProfile otp_code
-        tech = TechnicianProfile.objects.filter(
-            Q(phone=clean_phone) | Q(phone=f'+91{clean_phone}') | Q(phone__endswith=clean_phone)
-        ).first()
-        if tech:
-            tech.otp_code = otp_code
-            tech.otp_expires_at = expires_at
-            tech.otp_attempts = 0
-            tech.save(update_fields=['otp_code', 'otp_expires_at', 'otp_attempts', 'updated_at'])
-
-        # Optional external SMS gateway dispatch (non-blocking)
-        provider = 'direct_on_screen'
-        try:
-            sms_result = send_sms_otp(clean_phone, otp_code)
-            if sms_result and sms_result.get('provider'):
-                provider = sms_result['provider']
-        except Exception as e:
-            logger.warning(f"SMS dispatch fallback: {e}")
-
         resp_data = {
             'status': 'success',
             'success': True,
-            'message': f"OTP generated successfully for +91 {clean_phone}.",
+            'message': 'OTP website par popup mein dikhaya gaya hai.',
             'phone': clean_phone,
             'debug_otp': otp_code,
             'otp': otp_code,
             'expires_in_seconds': expiry_minutes * 60,
-            'provider': provider,
+            'provider': 'website_popup',
         }
 
         return Response(resp_data, status=status.HTTP_200_OK)
@@ -1274,16 +1306,47 @@ class VerifyOTPView(APIView):
     Validates OTP, checks expiration, handles customer/technician authentication,
     and returns a JWT token.
     """
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_verify'
 
     def post(self, request):
         phone_input = request.data.get('phone_number') or request.data.get('phone')
         otp_input = str(request.data.get('otp_code') or '').strip()
         role = request.data.get('role', 'customer')
+        technician_registration = request.path.endswith('/technicians/verify-otp/')
 
         if not phone_input or not otp_input:
             return Response({'error': 'Phone number and OTP code are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if role not in ('customer', 'technician'):
+            return Response({'error': 'Unsupported authentication role.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if (role == 'technician') != technician_registration:
+            return Response(
+                {'error': 'Technicians must register with OTP and sign in with their mobile number and password.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         clean_phone = ''.join(filter(str.isdigit, str(phone_input)))[-10:]
+
+        if technician_registration:
+            registration_name = str(request.data.get('name') or '').strip()
+            registration_password = str(request.data.get('password') or '')
+            registration_email = str(request.data.get('email') or '').strip()
+            aadhaar_digits = ''.join(filter(str.isdigit, str(request.data.get('aadhaar') or '')))
+            if not registration_name or len(registration_password) < 4 or '@' not in registration_email:
+                return Response(
+                    {'error': 'Name, valid email, and a password of at least 4 characters are required.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if len(aadhaar_digits) != 12:
+                return Response({'error': 'A valid 12-digit Aadhaar number is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            if TechnicianProfile.objects.filter(phone__endswith=clean_phone).exists():
+                return Response(
+                    {'error': 'This technician is already registered. Sign in with mobile number and password.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
         # Find latest active OTP record for this phone
         otp_record = (
@@ -1297,6 +1360,9 @@ class VerifyOTPView(APIView):
                 {'error': 'No active OTP request found for this phone number. Please request a new OTP.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        if otp_record.role != role:
+            return Response({'error': 'This OTP was requested for a different account type.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if otp_record.attempts >= 5:
             return Response(
@@ -1319,29 +1385,25 @@ class VerifyOTPView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        otp_record.is_verified = True
-        otp_record.save(update_fields=['is_verified'])
-
         # User Authentication & Profile Resolution
         user_profile_data = {}
         if role == 'technician':
-            tech = TechnicianProfile.objects.filter(
-                Q(phone=clean_phone) | Q(phone=f'+91{clean_phone}') | Q(phone__endswith=clean_phone)
-            ).first()
-            if not tech:
-                tech = TechnicianProfile.objects.create(
-                    name=request.data.get('name', f"Partner {clean_phone[-4:]}"),
-                    phone=clean_phone,
-                    area=request.data.get('area', 'Patna to Danapur'),
-                    trade=request.data.get('skills', 'Home Services'),
-                    address=request.data.get('address', ''),
-                    wallet_balance=Decimal('0.00'),
-                )
-            else:
-                tech.otp_code = ""
-                tech.otp_expires_at = None
-                tech.otp_attempts = 0
-                tech.save(update_fields=['otp_code', 'otp_expires_at', 'otp_attempts', 'updated_at'])
+            tech = TechnicianProfile.objects.create(
+                name=registration_name,
+                phone=clean_phone,
+                email=registration_email,
+                area=request.data.get('area') or 'Patna to Danapur',
+                trade=request.data.get('skills') or 'Home Services',
+                address=request.data.get('address') or '',
+                aadhaar_masked=f'XXXX XXXX {aadhaar_digits[-4:]}',
+                live_location=request.data.get('live_location') or {},
+                live_image=request.data.get('live_image') or '',
+                wallet_balance=Decimal('0.00'),
+                otp_code='',
+                otp_expires_at=None,
+                otp_attempts=0,
+            )
+            tech.set_password(registration_password)
 
             user_profile_data = TechnicianProfileSerializer(tech).data
             user_profile_data['userType'] = 'technician'
@@ -1376,19 +1438,18 @@ class VerifyOTPView(APIView):
             user_profile_data = CustomerProfileSerializer(customer).data
             user_profile_data['userType'] = 'customer'
 
+        otp_record.is_verified = True
+        otp_record.save(update_fields=['is_verified'])
+
         # Generate standard JWT Token (valid 7 days)
-        token = ''
-        try:
-            payload = {
-                'phone': clean_phone,
-                'role': role,
-                'exp': timezone.now() + timedelta(days=7),
-                'iat': timezone.now(),
-            }
-            token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
-        except Exception as e:
-            logger.warning(f"JWT generation notice: {e}")
-            token = f"gharsathi_jwt_{clean_phone}_{int(timezone.now().timestamp())}"
+        payload = {
+            'id': tech.id if role == 'technician' else customer.id,
+            'phone': clean_phone,
+            'role': role,
+            'exp': timezone.now() + timedelta(days=7),
+            'iat': timezone.now(),
+        }
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
 
         return Response({
             'status': 'success',
@@ -1409,6 +1470,7 @@ class LoginView(APIView):
     Validates passwords using Django password hashing (check_password / authenticate)
     and returns valid tokens/JWT and profile data.
     """
+    permission_classes = [AllowAny]
 
     def post(self, request):
         phone_input = request.data.get('phone') or request.data.get('username') or request.data.get('phone_number')
@@ -1461,6 +1523,14 @@ class LoginView(APIView):
                     }
                 })
 
+        if role == 'customer':
+            return Response(
+                {'error': 'Customer sign-in requires a verified mobile OTP.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if role != 'technician':
+            return Response({'error': 'Unsupported authentication role.'}, status=status.HTTP_400_BAD_REQUEST)
+
         # 2. Technician login
         tech = None
         if len(clean_phone) == 10:
@@ -1499,27 +1569,6 @@ class LoginView(APIView):
                 'user': tech_data,
             })
 
-        # 3. Customer profile fallback
-        if len(clean_phone) == 10:
-            customer = CustomerProfile.objects.filter(phone__endswith=clean_phone).first()
-            if customer:
-                payload = {
-                    'id': customer.id,
-                    'phone': customer.phone,
-                    'role': 'customer',
-                    'exp': timezone.now() + timedelta(days=7),
-                    'iat': timezone.now(),
-                }
-                token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
-                cus_data = CustomerProfileSerializer(customer).data
-                cus_data['userType'] = 'customer'
-                return Response({
-                    'success': True,
-                    'token': token,
-                    'role': 'customer',
-                    'user': cus_data,
-                })
-
         return Response(
             {'error': 'Is mobile number ya username se koi account nahi mila.'},
             status=status.HTTP_404_NOT_FOUND
@@ -1532,6 +1581,7 @@ class AuthMeView(APIView):
     Accepts Authorization: Bearer <token> or ?token=...
     Decodes token, retrieves profile from DB, and returns user data for session persistence.
     """
+    permission_classes = [AllowAny]
 
     def get(self, request):
         auth_header = request.headers.get('Authorization', '')
@@ -1546,26 +1596,21 @@ class AuthMeView(APIView):
         if not token:
             return Response({'error': 'Authentication token is required.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        decoded = None
         try:
             decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
         except jwt.ExpiredSignatureError:
             return Response({'error': 'Session expired. Please log in again.'}, status=status.HTTP_401_UNAUTHORIZED)
-        except Exception:
-            if token.startswith('gharsathi_jwt_'):
-                parts = token.split('_')
-                if len(parts) >= 3:
-                    clean_phone = parts[2]
-                    decoded = {'phone': clean_phone, 'role': 'technician'}
-            if not decoded:
-                return Response({'error': 'Invalid authentication token.'}, status=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError:
+            return Response({'error': 'Invalid authentication token.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         role = decoded.get('role', 'technician')
+        if role not in ('admin', 'customer', 'technician'):
+            return Response({'error': 'Unsupported authentication role.'}, status=status.HTTP_401_UNAUTHORIZED)
         phone = decoded.get('phone')
         tech_id = decoded.get('id')
 
         # Technician
-        if role == 'technician' or tech_id or phone:
+        if role == 'technician':
             tech = None
             if tech_id:
                 tech = TechnicianProfile.objects.filter(pk=tech_id).first()
@@ -1587,7 +1632,7 @@ class AuthMeView(APIView):
         if role == 'admin':
             from django.contrib.auth.models import User
             user_id = decoded.get('user_id')
-            user = User.objects.filter(pk=user_id).first() if user_id else None
+            user = User.objects.filter(pk=user_id, is_active=True, is_staff=True).first() if user_id else None
             if user:
                 return Response({
                     'success': True,
@@ -1645,11 +1690,14 @@ def normalize_phone_number(phone_input):
 
 
 class TechnicianForgotPasswordView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_send'
     """
     POST /api/technicians/forgot-password/
     Accepts: { "phone": "9876500001" }
     Normalizes phone number, generates 6-digit OTP, saves to TechnicianProfile with 5-minute expiry,
-    and dispatches OTP via Fast2SMS SMS gateway.
+    and returns OTP for the website popup.
     """
 
     def post(self, request):
@@ -1677,8 +1725,8 @@ class TechnicianForgotPasswordView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Generate 6-digit numeric OTP
-        otp_code = str(random.randint(100000, 999999))
+        # Generate a cryptographically secure 6-digit numeric OTP
+        otp_code = str(secrets.randbelow(900000) + 100000)
         expiry_minutes = getattr(settings, 'OTP_EXPIRATION_MINUTES', 5)
         expires_at = timezone.now() + timedelta(minutes=expiry_minutes)
 
@@ -1697,26 +1745,24 @@ class TechnicianForgotPasswordView(APIView):
             expires_at=expires_at,
         )
 
-        logger.info(f"Technician forgot password OTP generated for {clean_phone}")
-
-        # Send via transactional SMS
-        sms_result = send_sms_otp(clean_phone, otp_code)
-
         resp_data = {
             'status': 'success',
             'success': True,
-            'message': f"OTP naye password ke liye +91 {clean_phone[:2]}******{clean_phone[-2:]} par bhej diya gaya hai.",
+            'message': 'Password reset OTP website popup mein dikhaya gaya hai.',
             'phone': clean_phone,
+            'expires_in_seconds': expiry_minutes * 60,
+            'provider': 'website_popup',
             'debug_otp': otp_code,
             'otp': otp_code,
-            'expires_in_seconds': expiry_minutes * 60,
-            'provider': sms_result.get('provider', 'fast2sms') if sms_result else 'direct',
         }
 
         return Response(resp_data, status=status.HTTP_200_OK)
 
 
 class TechnicianResetPasswordView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_verify'
     """
     POST /api/technicians/reset-password-otp/
     Accepts: { "phone": "9876500001", "otp_code": "123456", "new_password": "..." }

@@ -35,9 +35,14 @@ for candidate_env in [BASE_DIR / '.env', BASE_DIR.parent / '.env']:
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-^&bkrv1a5!147_dvy+_jg5aa5l)9+ll%xp#z43bd7ue8)4izyl')
-
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
+SECRET_KEY = os.environ.get('SECRET_KEY', '').strip()
+if not SECRET_KEY and DEBUG:
+    import secrets as secret_generator
+    SECRET_KEY = secret_generator.token_urlsafe(50)
+if not SECRET_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured('SECRET_KEY must be configured for non-debug deployments.')
 
 allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
 if allowed_hosts_env:
@@ -132,7 +137,7 @@ for o in [
     if o not in CORS_ALLOWED_ORIGINS:
         CORS_ALLOWED_ORIGINS.append(o)
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 # Regex origins for dynamic Cloud Run, Firebase Hosting, and web.app staging URLs
@@ -185,11 +190,23 @@ for c in [
         CSRF_TRUSTED_ORIGINS.append(c)
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.authentication.GharSathiJWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'api.authentication.IsGharSathiAuthenticated',
+    ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S.%fZ',
+    'DEFAULT_THROTTLE_RATES': {
+        # Per-IP caps should allow households and shared networks to sign in
+        # without rapidly locking everyone out; the endpoint also limits each phone.
+        'otp_send': '20/hour',
+        'otp_verify': '60/hour',
+    },
 }
 
 ROOT_URLCONF = 'gharsathi_backend.urls'
@@ -340,14 +357,13 @@ RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8Kkyp
 
 # SMS OTP Gateway Settings (Fast2SMS / MSG91 / Twilio)
 SMS_PROVIDER = os.environ.get('SMS_PROVIDER', 'fast2sms')
-FAST2SMS_API_KEY = os.environ.get(
-    'FAST2SMS_API_KEY',
-    'JfHmAA8J0vTcFOOUzHAyxA6fJza5XzSfHkzbTiipoL2YQpajGIsDOIpWqIKkpLALH5n8R8Ia6MGxxxAQ'
-).strip()
+FAST2SMS_API_KEY = os.environ.get('FAST2SMS_API_KEY', '').strip()
+FAST2SMS_ALLOW_QUICK_FALLBACK = os.environ.get('FAST2SMS_ALLOW_QUICK_FALLBACK', 'False').lower() in ('true', '1', 'yes')
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
 TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 OTP_EXPIRATION_MINUTES = int(os.environ.get('OTP_EXPIRATION_MINUTES', 5))
+OTP_EXPOSE_DEBUG_CODE = os.environ.get('OTP_EXPOSE_DEBUG_CODE', str(DEBUG)).lower() in ('true', '1', 'yes')
 
 
 # Email configuration (Adaptive for Django 6 MAILERS and Django 5 legacy settings)

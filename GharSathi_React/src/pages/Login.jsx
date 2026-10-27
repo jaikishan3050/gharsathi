@@ -17,6 +17,7 @@ export default function Login() {
   // Auth flow states
   const [step, setStep] = useState('input'); // 'input' | 'otp'
   const [phone, setPhone] = useState(location.state?.phone || '');
+  const [password, setPassword] = useState('');
   const [popupOtp, setPopupOtp] = useState('');
   const [popupOpen, setPopupOpen] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
@@ -61,7 +62,7 @@ export default function Login() {
     };
   }, [step, countdown]);
 
-  // Step 1: Send Mobile OTP with direct on-screen popup & SMS fallback
+  // Step 1: Generate the OTP and show it in the website popup.
   const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
     setErrorMsg('');
@@ -81,20 +82,40 @@ export default function Login() {
       setCountdown(60);
       setCanResend(false);
       setOtpDigits(['', '', '', '', '', '']);
-      const otp = res?.debug_otp || res?.otp;
+      const otp = res?.debug_otp;
       if (otp) {
         setPopupOtp(otp);
         setPopupOpen(true);
       }
       addToast({
         title: 'Verification OTP Ready! 🔔',
-        message: `OTP: ${otp || 'Generated on screen'}`,
+        message: otp ? `Website OTP: ${otp}` : 'OTP website popup mein dikhaya gaya hai.',
         type: 'success',
       });
     } catch (err) {
       console.error('OTP send failed:', err);
       const msg = err?.data?.error || err?.message || 'Failed to send OTP. Please try again.';
       setErrorMsg(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTechnicianPasswordLogin = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setLoading(true);
+    try {
+      const res = await api.login({ phone, password, role: 'technician' });
+      const profile = res?.technician || res?.user;
+      if (!res?.success || res.role !== 'technician' || !res.token || !profile) {
+        throw new Error(res?.error || 'Invalid mobile number or password.');
+      }
+      setTechnicianSession(profile, res.token);
+      addToast({ title: `Welcome, ${profile.name || 'Partner'}! 🧰`, message: 'Technician signed in with mobile and password.', type: 'success' });
+      navigate('/technician', { replace: true });
+    } catch (err) {
+      setErrorMsg(err?.data?.error || err?.message || 'Invalid mobile number or password.');
     } finally {
       setLoading(false);
     }
@@ -120,26 +141,16 @@ export default function Login() {
         role,
       });
 
-      if (res && res.success) {
-        if (role === 'technician') {
-          const techProfile = res?.technician || res?.user;
-          setTechnicianSession(techProfile, res.token);
-          addToast({
-            title: `Welcome, ${techProfile?.name || 'Partner'}! 🧰`,
-            message: 'Technician partner portal signed in successfully.',
-            type: 'success',
-          });
-          navigate('/technician', { replace: true });
-        } else {
-          const custProfile = res?.user || res?.customer;
-          setCustomerSession(custProfile, res.token);
-          addToast({
-            title: `Welcome, ${custProfile?.name || 'Customer'}! 🏡`,
-            message: 'Signed in successfully. Ready to book services!',
-            type: 'success',
-          });
-          navigate('/customer', { replace: true });
-        }
+      if (res?.success && res.token) {
+        const custProfile = res?.user || res?.customer;
+        if (!custProfile) throw new Error('Customer profile was not returned by the server.');
+        setCustomerSession(custProfile, res.token);
+        addToast({
+          title: `Welcome, ${custProfile?.name || 'Customer'}! 🏡`,
+          message: 'Signed in successfully. Ready to book services!',
+          type: 'success',
+        });
+        navigate('/customer', { replace: true });
       } else {
         setErrorMsg(res?.error || 'Verification failed. Please try again.');
       }
@@ -241,7 +252,7 @@ export default function Login() {
               <h2>{role === 'technician' ? 'Technician Partner Login' : 'Sign in to Ghar Sathi'}</h2>
               <p className="auth-sub">
                 {role === 'technician'
-                  ? 'Access your technician jobs, live routing & wallet earnings with instant On-Screen OTP.'
+                  ? 'Technician account ke liye registered mobile number aur password enter karein.'
                   : 'Enter your 10-digit mobile number to access verified home services & track live bookings.'}
               </p>
             </div>
@@ -262,7 +273,7 @@ export default function Login() {
 
             {step === 'input' ? (
               <div className="auth-step-input">
-                <form onSubmit={handleSendOtp} className="auth-form-email">
+                <form onSubmit={role === 'technician' ? handleTechnicianPasswordLogin : handleSendOtp} className="auth-form-email">
                   <div className="field">
                     <label htmlFor="login-phone">Mobile Number (10 Digits)</label>
                     <div className="phone-input-wrap">
@@ -280,22 +291,39 @@ export default function Login() {
                         autoComplete="tel"
                       />
                     </div>
-                    <small className="field-hint" style={{ marginTop: '6px', display: 'block', color: '#166534', fontWeight: 600 }}>
-                      ⚡ Instant Verification OTP — Direct on-screen display with SMS fallback.
-                    </small>
+                    {role === 'customer' && (
+                      <small className="field-hint" style={{ marginTop: '6px', display: 'block', color: '#166534', fontWeight: 600 }}>
+                        OTP website par popup mein dikhaya jayega.
+                      </small>
+                    )}
                   </div>
+
+                  {role === 'technician' && (
+                    <div className="field">
+                      <label htmlFor="technician-login-password">Password</label>
+                      <input
+                        id="technician-login-password"
+                        type="password"
+                        required
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
 
                   <button
                     type="submit"
-                    disabled={loading || phone.replace(/\D/g, '').length !== 10}
+                    disabled={loading || phone.replace(/\D/g, '').length !== 10 || (role === 'technician' && !password)}
                     className="button button-primary button-wide auth-submit-btn"
                   >
                     {loading ? (
                       <>
-                        <span className="spinner-icon">🔄</span> Generating OTP…
+                        <span className="spinner-icon">🔄</span> {role === 'technician' ? 'Signing in…' : 'Generating OTP…'}
                       </>
                     ) : (
-                      'Get Verification OTP 📲'
+                      role === 'technician' ? 'Login with Mobile + Password 🔑' : 'Get Verification OTP 📲'
                     )}
                   </button>
                 </form>
@@ -305,7 +333,7 @@ export default function Login() {
               <div className="auth-step-otp">
                 <div className="otp-sent-banner">
                   <span>
-                    📲 Verification OTP generated for <strong>+91 {phone.replace(/\D/g, '').slice(-10)}</strong>
+                    📲 Website popup mein dikhaya OTP enter karein.
                   </span>
                   <button
                     type="button"
@@ -438,7 +466,7 @@ export default function Login() {
             <div className="auth-bottom-nav">
               <p>
                 New to Ghar Sathi?{' '}
-                <Link to="/signup" state={{ role, phone }} className="auth-link-bold">
+                <Link to={role === 'technician' ? '/technician' : '/signup'} state={{ role, phone }} className="auth-link-bold">
                   Create an account
                 </Link>
               </p>
@@ -450,7 +478,7 @@ export default function Login() {
             isOpen={popupOpen}
             otp={popupOtp}
             phone={phone}
-            title={role === 'technician' ? 'Technician Partner Login OTP' : 'Customer Verification OTP'}
+            title="Customer Verification OTP"
             onClose={() => setPopupOpen(false)}
             onAutoFill={(code) => {
               const digits = code.split('').slice(0, 6);

@@ -11,7 +11,6 @@ import {
   TopBarProfile,
   InvoiceModal,
   ReviewsModal,
-  ResetDemoButton,
   SkeletonCard,
   SkeletonList,
 } from '../components/Common.jsx';
@@ -47,7 +46,6 @@ export default function AdminPanel() {
     deleteSubservice,
     purgeProductionData,
     updateComplaint,
-    resetDemoData,
     requestAdminWithdrawal,
     updateAdminWithdrawalStatus,
   } = useGharSathi();
@@ -97,6 +95,7 @@ export default function AdminPanel() {
   // Admin Login Form
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [adminAuthError, setAdminAuthError] = useState('');
 
   // Add Technician Modal/Form
@@ -228,14 +227,19 @@ export default function AdminPanel() {
   }, [data.services, adminServiceCategory, adminServiceSearch]);
 
   // Admin Login Submission
-  const handleAdminLogin = (e) => {
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
     setAdminAuthError('');
-    const res = loginAdmin(adminEmail, adminPassword);
-    if (!res.success) {
-      setAdminAuthError(res.error);
-    } else {
-      setNotice('Admin authentication verified. Welcome to Ghar Sathi Platform Center.');
+    setAdminLoginLoading(true);
+    try {
+      const res = await loginAdmin(adminEmail, adminPassword);
+      if (!res.success) {
+        setAdminAuthError(res.error);
+      } else {
+        setNotice('Admin authentication verified. Welcome to Ghar Sathi Platform Center.');
+      }
+    } finally {
+      setAdminLoginLoading(false);
     }
   };
 
@@ -416,20 +420,9 @@ export default function AdminPanel() {
     setNotice(`Payout request ${wId} rejected.`);
   };
 
-  const clearDemo = () => {
-    const okay = window.confirm(
-      'Demo browser data reset karein? Bookings, technician records aur customer profiles delete ho jayengi.'
-    );
-    if (okay) {
-      resetDemoData();
-      setNotice('Demo data reset ho gaya.');
-    }
-  };
-
   // Top Actions
   const topActions = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-      <ResetDemoButton compact />
       <TopBarProfile
         user={{ name: 'Platform Admin', email: 'admin@gharsathi.com' }}
         role="Admin"
@@ -457,7 +450,7 @@ export default function AdminPanel() {
           {adminAuthError && <div className="warning-notice">{adminAuthError}</div>}
 
           <form onSubmit={handleAdminLogin} className="admin-login-form">
-            <Field label="Admin Email ID *" hint="Production: prabhat@gharsathi.in">
+            <Field label="Admin Email ID *">
               <input
                 required
                 type="text"
@@ -468,7 +461,7 @@ export default function AdminPanel() {
               />
             </Field>
 
-            <Field label="Password *" hint="Production: Gharsathi@2026">
+            <Field label="Password *">
               <input
                 required
                 type="password"
@@ -478,14 +471,9 @@ export default function AdminPanel() {
               />
             </Field>
 
-            <button type="submit" className="button button-gold button-wide" style={{ marginTop: '16px' }}>
-              Sign In to Admin Dashboard <span>→</span>
+            <button type="submit" className="button button-gold button-wide" style={{ marginTop: '16px' }} disabled={adminLoginLoading}>
+              {adminLoginLoading ? 'Verifying…' : 'Sign In to Admin Dashboard →'}
             </button>
-
-            <div className="demo-credentials-box">
-              <small>Production Super Admin Access:</small>
-              <p>Email: <strong>prabhat@gharsathi.in</strong> · Password: <strong>Gharsathi@2026</strong></p>
-            </div>
           </form>
 
           <a href="/" className="back-link">
@@ -2119,22 +2107,11 @@ export default function AdminPanel() {
             )}
           </div>
 
-          <div className="danger-zone">
-            <div>
-              <strong>Reset Local Demo Data</strong>
-              <p>Delete demo bookings, profiles, customer accounts and complaints.</p>
-            </div>
-            <button className="button button-danger" onClick={clearDemo}>
-              Reset Demo Data
-            </button>
-          </div>
-
           <div className="danger-zone" style={{ marginTop: '16px', border: '1.5px solid #ef4444', background: '#fff5f5' }}>
             <div>
               <strong style={{ color: '#b91c1c' }}>Purge All Mock Data (Production Clean Mode)</strong>
               <p style={{ color: '#7f1d1d' }}>
-                Completely wipes all mock bookings, dummy technicians, test complaints, and simulated transactions from the live PostgreSQL database.
-                Retains official service catalogue and provisions primary superuser (prabhat@gharsathi.in).
+                Deletes customer and technician profiles, bookings, complaints, wallet records, OTPs, and withdrawals from the connected database. The service catalogue remains.
               </p>
             </div>
             <button
@@ -2276,7 +2253,7 @@ export default function AdminPanel() {
               This will completely wipe all test bookings, mock complaints, dummy technicians, and simulated wallet entries from the live database.
             </p>
             <p style={{ fontSize: '12px', background: '#fef2f2', padding: '10px 14px', borderRadius: '8px', color: '#991b1b', border: '1px solid #fecaca' }}>
-              ⚠️ The primary superuser <strong>prabhat@gharsathi.in</strong> (Gharsathi@2026) and official services catalog will remain intact.
+              ⚠️ Existing administrator accounts and the official services catalog will remain intact.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
               <button type="button" className="button button-outline" disabled={isPurging} onClick={() => setPurgeConfirmModal(false)}>

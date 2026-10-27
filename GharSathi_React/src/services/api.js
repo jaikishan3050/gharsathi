@@ -29,12 +29,22 @@ export async function apiRequest(endpoint, options = {}, timeoutMs = 4500) {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
+    || /^\/technicians\/(forgot-password|reset-password-otp)\//.test(`${path}/`)
+    || /^\/technicians\/(send-otp|verify-otp)\//.test(`${path}/`)
+    || /^\/(services|subservices)(\/|$)/.test(path);
+  let storedToken = '';
+  try {
+    storedToken = sessionStorage.getItem('gharsathi_auth_token_tab') || '';
+  } catch {}
 
   try {
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(storedToken && !publicAuthRequest ? { Authorization: `Bearer ${storedToken}` } : {}),
         ...(options.headers || {}),
       },
       signal: controller.signal,
@@ -68,7 +78,7 @@ export async function apiRequest(endpoint, options = {}, timeoutMs = 4500) {
 // Quick health check to test if Django server is reachable
 export async function checkBackendHealth() {
   try {
-    const data = await apiRequest('/admin/analytics/', { method: 'GET' }, 2000);
+    const data = await apiRequest('/services/', { method: 'GET' }, 2000);
     return { online: true, source: 'django', data };
   } catch {
     return { online: false, source: 'local' };
@@ -323,6 +333,11 @@ export const api = {
     return await apiRequest(`/technicians/${q ? `?${q}` : ''}`);
   },
 
+  getCustomers: async (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return await apiRequest(`/customers/${q ? `?${q}` : ''}`);
+  },
+
   registerTechnician: async (techData) => {
     const payload = {
       name: techData.name,
@@ -366,24 +381,32 @@ export const api = {
   },
 
   createBooking: async (bookingData, servicePk = 1) => {
+    const phone = bookingData.phone || bookingData.customer_phone || '';
+    const price = bookingData.price ?? bookingData.base_price ?? bookingData.total_amount ?? 0;
     const payload = {
-      service: servicePk,
-      service_name: bookingData.serviceName,
-      subcategory_name: bookingData.subcategoryName || '',
-      subcategory_id: bookingData.subcategoryId || '',
-      customer_name: bookingData.customerName,
-      customer_phone: bookingData.phone.replace(/\D/g, '').slice(-10),
+      booking_code: bookingData.id || bookingData.booking_code || '',
+      service: servicePk || bookingData.service || 1,
+      service_name: bookingData.serviceName || bookingData.service_name || '',
+      subcategory_name: bookingData.subcategoryName || bookingData.subcategory_name || '',
+      subcategory_id: bookingData.subcategoryId || bookingData.subcategory_id || '',
+      customer_name: bookingData.customerName || bookingData.customer_name || '',
+      customer_phone: phone.replace(/\D/g, '').slice(-10),
       address: bookingData.address,
       area: bookingData.area,
       pincode: bookingData.pincode || '',
-      scheduled_date: bookingData.date || null,
-      scheduled_time: bookingData.time || '10 AM - 12 PM',
-      base_price: bookingData.price,
-      total_amount: bookingData.price,
-      payment_method: bookingData.payment || 'Cash on Service',
+      scheduled_date: bookingData.date || bookingData.scheduled_date || null,
+      scheduled_time: bookingData.time || bookingData.scheduled_time || '10 AM - 12 PM',
+      base_price: price,
+      total_amount: bookingData.total_amount ?? price,
+      payment_method: bookingData.payment || bookingData.payment_method || 'Cash on Service',
+      payment_status: bookingData.paymentStatus || bookingData.payment_status || 'Pending',
+      razorpay_order_id: bookingData.razorpayOrderId || bookingData.razorpay_order_id || '',
+      razorpay_payment_id: bookingData.razorpayPaymentId || bookingData.razorpay_payment_id || '',
+      razorpay_signature: bookingData.razorpaySignature || bookingData.razorpay_signature || '',
+      service_pin: bookingData.servicePin || bookingData.service_pin || '',
       notes: bookingData.notes || '',
-      latitude: bookingData.location?.lat || null,
-      longitude: bookingData.location?.lng || null,
+      latitude: bookingData.latitude ?? bookingData.location?.lat ?? null,
+      longitude: bookingData.longitude ?? bookingData.location?.lng ?? null,
     };
 
     return await apiRequest('/bookings/', {
@@ -485,7 +508,6 @@ export const api = {
         }),
       });
     } catch (err) {
-      // Local fallback for offline/browser-only mode
       console.warn('Backend payment create-order fallback:', err);
       return {
         order_id: `order_demo_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
@@ -525,27 +547,54 @@ export const api = {
   },
 
   // Mobile OTP Authentication (Direct On-Screen with SMS Fallback)
-  sendOtp: async (phoneNumber, role = 'customer') => {
+  sendOtp: async (phoneNumber, role = 'customer', purpose = 'login') => {
     const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
-    return await apiRequest('/auth/send-otp/', {
+    const endpoint = role === 'technician' && purpose === 'registration'
+      ? '/technicians/send-otp/'
+      : '/auth/send-otp/';
+    return await apiRequest(endpoint, {
       method: 'POST',
       body: JSON.stringify({ phone_number: cleanPhone, role }),
     });
   },
 
-  verifyOtp: async ({ phoneNumber, otpCode, role = 'customer', name = '', area = '', address = '', pincode = '', skills = '' }) => {
+  verifyOtp: async ({
+    phoneNumber,
+    otpCode,
+    role = 'customer',
+    purpose = 'login',
+    name = '',
+    area = '',
+    address = '',
+    pincode = '',
+    skills = '',
+    password = '',
+    email = '',
+    aadhaar = '',
+    liveLocation = null,
+    liveImage = '',
+  }) => {
     const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
-    return await apiRequest('/auth/verify-otp/', {
+    const endpoint = role === 'technician' && purpose === 'registration'
+      ? '/technicians/verify-otp/'
+      : '/auth/verify-otp/';
+    return await apiRequest(endpoint, {
       method: 'POST',
       body: JSON.stringify({
         phone_number: cleanPhone,
         otp_code: String(otpCode).trim(),
         role,
+        purpose,
         name,
         area,
         address,
         pincode,
         skills,
+        password,
+        email,
+        aadhaar,
+        live_location: liveLocation,
+        live_image: liveImage,
       }),
     });
   },
@@ -567,7 +616,7 @@ export const api = {
     return await apiRequest('/auth/login/', {
       method: 'POST',
       body: JSON.stringify({ phone: phone || username, password, role, username }),
-    });
+    }, 20000);
   },
 
   getMe: async (token) => {
