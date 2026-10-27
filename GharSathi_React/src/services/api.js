@@ -524,40 +524,7 @@ export const api = {
     }
   },
 
-  // Authentication & Email OTP & Google Auth Verification
-  sendEmailOtp: async (email, role = 'customer') => {
-    return await apiRequest('/auth/send-email-otp/', {
-      method: 'POST',
-      body: JSON.stringify({ email: String(email || '').trim().toLowerCase(), role }),
-    });
-  },
-
-  verifyEmailOtp: async ({ email, otpCode, otp, phone = '', role = 'customer', name = '', area = '', address = '', pincode = '', skills = '' }) => {
-    const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
-    return await apiRequest('/auth/verify-email-otp/', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: String(email || '').trim().toLowerCase(),
-        otp_code: String(otpCode || otp || '').trim(),
-        phone: cleanPhone,
-        role,
-        name,
-        area,
-        address,
-        pincode,
-        skills,
-      }),
-    });
-  },
-
-  googleAuth: async ({ credential, role = 'customer', email = '', name = '', picture = '' }) => {
-    return await apiRequest('/auth/google/', {
-      method: 'POST',
-      body: JSON.stringify({ credential, role, email, name, picture }),
-    });
-  },
-
-  // Legacy SMS OTP Verification (kept for fallback compatibility)
+  // Mobile OTP Authentication (Direct On-Screen with SMS Fallback)
   sendOtp: async (phoneNumber, role = 'customer') => {
     const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
     return await apiRequest('/auth/send-otp/', {

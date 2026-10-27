@@ -4640,60 +4640,6 @@
   text-align: center;
 }
 
-.auth-or-divider::before,
-.auth-or-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #e2ece5;
-}
-
-.auth-or-divider span {
-  padding: 0 14px;
-  color: #8c9e94;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-}
-
-/* 1-Click Google Sign In Button */
-.google-signin-btn {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: #ffffff;
-  color: #3c4043;
-  border: 1.5px solid #dadce0;
-  border-radius: 12px;
-  padding: 13px 18px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(60, 64, 67, 0.08);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.google-signin-btn:hover:not(:disabled) {
-  background: #f8faf9;
-  border-color: #c1c7ce;
-  box-shadow: 0 4px 12px rgba(60, 64, 67, 0.14);
-  transform: translateY(-1px);
-}
-
-.google-signin-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.google-signin-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.google-icon {
-  flex-shrink: 0;
-}
-
 /* OTP Step */
 .otp-sent-banner {
   display: flex;

@@ -141,38 +141,3 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['customer_id', 'created_at', 'updated_at']
 
 
-class SendEmailOTPSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    role = serializers.ChoiceField(choices=['customer', 'technician', 'admin'], default='customer')
-
-
-class VerifyEmailOTPSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    otp = serializers.CharField(max_length=10, required=False)
-    otp_code = serializers.CharField(max_length=10, required=False)
-    phone = serializers.CharField(max_length=20, required=False, allow_blank=True, default='')
-    role = serializers.ChoiceField(choices=['customer', 'technician', 'admin'], default='customer')
-    name = serializers.CharField(max_length=120, required=False, allow_blank=True, default='')
-    area = serializers.CharField(max_length=100, required=False, allow_blank=True, default='Patna to Danapur')
-    address = serializers.CharField(required=False, allow_blank=True, default='')
-    pincode = serializers.CharField(max_length=10, required=False, allow_blank=True, default='801103')
-    skills = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
-
-    def validate(self, attrs):
-        otp = attrs.get('otp') or attrs.get('otp_code')
-        if not otp:
-            raise serializers.ValidationError({'otp': 'OTP code is required.'})
-        attrs['otp_code'] = str(otp).strip()
-        return attrs
-
-
-class GoogleAuthSerializer(serializers.Serializer):
-    credential = serializers.CharField(required=False, allow_blank=True)
-    token = serializers.CharField(required=False, allow_blank=True)
-    id_token = serializers.CharField(required=False, allow_blank=True)
-    role = serializers.ChoiceField(choices=['customer', 'technician', 'admin'], default='customer')
-    email = serializers.EmailField(required=False, allow_blank=True)
-    name = serializers.CharField(max_length=120, required=False, allow_blank=True)
-    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
-
-
