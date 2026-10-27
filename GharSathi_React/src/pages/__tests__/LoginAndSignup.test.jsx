@@ -16,9 +16,6 @@ vi.mock('../../services/api.js', async (importOriginal) => {
       ...actual.default,
       sendOtp: vi.fn(),
       verifyOtp: vi.fn(),
-      sendEmailOtp: vi.fn(),
-      verifyEmailOtp: vi.fn(),
-      googleAuth: vi.fn(),
       forgotPasswordTechnician: vi.fn(),
       resetPasswordTechnician: vi.fn(),
       getMe: vi.fn().mockResolvedValue({ success: false }),
@@ -34,25 +31,27 @@ function renderWithProviders(ui) {
   );
 }
 
-describe('Login Page (Email OTP & Google Sign-In)', () => {
+describe('Login Page (Direct Mobile OTP Login)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders Email input field at top and Sign in with Google directly below', () => {
+  it('renders Mobile Number input field and NO residual Email or Google Sign-In interface', () => {
     renderWithProviders(<Login />);
 
-    // 1. Email input field and submit button
-    const emailInput = screen.getByLabelText(/Email Address/i);
-    expect(emailInput).toBeInTheDocument();
-    expect(emailInput).toHaveAttribute('type', 'email');
+    // 1. Mobile Number input field and Get OTP button are present
+    const phoneInput = screen.getByLabelText(/Mobile Number/i);
+    expect(phoneInput).toBeInTheDocument();
+    expect(phoneInput).toHaveAttribute('type', 'tel');
 
-    const continueBtn = screen.getByRole('button', { name: /Continue with Email/i });
-    expect(continueBtn).toBeInTheDocument();
+    const getOtpBtn = screen.getByRole('button', { name: /Get Verification OTP/i });
+    expect(getOtpBtn).toBeInTheDocument();
 
-    // 2. Directly below: Prominent 1-click "Sign in with Google" button
-    const googleBtn = screen.getByRole('button', { name: /Sign in with Google/i });
-    expect(googleBtn).toBeInTheDocument();
+    // 2. Email and Google Sign-In elements are completely removed
+    expect(screen.queryByLabelText(/Email Address/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Continue with Email/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Sign in with Google/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/OR/i)).not.toBeInTheDocument();
 
     // 3. Link to Signup page
     expect(screen.getByText(/Create an account/i)).toBeInTheDocument();
@@ -71,30 +70,33 @@ describe('Login Page (Email OTP & Google Sign-In)', () => {
 
     expect(techTab).toHaveAttribute('aria-selected', 'true');
     expect(customerTab).toHaveAttribute('aria-selected', 'false');
-    expect(screen.getByText(/Access your technician jobs/i)).toBeInTheDocument();
+    expect(screen.getByText(/Technician Partner Login/i)).toBeInTheDocument();
   });
 
-  it('submits email and transitions to 6-digit OTP verification screen', async () => {
-    api.sendEmailOtp.mockResolvedValueOnce({
+  it('submits customer mobile number and transitions to 6-digit OTP verification screen', async () => {
+    api.sendOtp.mockResolvedValueOnce({
+      status: 'success',
       success: true,
-      message: 'OTP sent to user@example.com',
+      debug_otp: '123456',
+      otp: '123456',
+      message: 'Verification OTP generated for +91 9876500001',
     });
 
     renderWithProviders(<Login />);
 
-    const emailInput = screen.getByLabelText(/Email Address/i);
-    fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
+    const phoneInput = screen.getByLabelText(/Mobile Number/i);
+    fireEvent.change(phoneInput, { target: { value: '9876500001' } });
 
-    const continueBtn = screen.getByRole('button', { name: /Continue with Email/i });
-    fireEvent.click(continueBtn);
+    const getOtpBtn = screen.getByRole('button', { name: /Get Verification OTP/i });
+    fireEvent.click(getOtpBtn);
 
     await waitFor(() => {
-      expect(api.sendEmailOtp).toHaveBeenCalledWith('user@example.com', 'customer');
+      expect(api.sendOtp).toHaveBeenCalledWith('9876500001', 'customer');
     });
 
     // Verify OTP input screen appears
     expect(await screen.findByText(/Enter 6-Digit Verification Code/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/user@example.com/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/9876500001/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: /Verify & Continue/i })).toBeInTheDocument();
   });
 
@@ -119,7 +121,7 @@ describe('Login Page (Email OTP & Google Sign-In)', () => {
 
     fireEvent.change(phoneInput, { target: { value: '9876500001' } });
 
-    const sendOtpBtn = screen.getByRole('button', { name: /Send OTP to Screen/i });
+    const sendOtpBtn = screen.getByRole('button', { name: /Get Verification OTP/i });
     fireEvent.click(sendOtpBtn);
 
     await waitFor(() => {
@@ -141,19 +143,21 @@ describe('Login Page (Email OTP & Google Sign-In)', () => {
   });
 });
 
-describe('Signup Page (Email, Phone & Email OTP)', () => {
+describe('Signup Page (Direct Mobile OTP Registration)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders required signup fields (Email, Phone, Name, Area)', () => {
+  it('renders required signup fields (Phone, Name, Area) and NO residual Email field', () => {
     renderWithProviders(<Signup />);
 
     expect(screen.getByLabelText(/Full Name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Email Address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Mobile Number/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Service Area/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Send Verification Code to Email/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Get Verification OTP/i })).toBeInTheDocument();
+
+    // Verify email field is not present
+    expect(screen.queryByLabelText(/Email Address/i)).not.toBeInTheDocument();
   });
 
   it('shows ₹0.00 wallet balance note when Technician Partner is selected', () => {
@@ -167,26 +171,28 @@ describe('Signup Page (Email, Phone & Email OTP)', () => {
     expect(screen.getByLabelText(/Primary Skill/i)).toBeInTheDocument();
   });
 
-  it('sends OTP on signup and transitions to verification step', async () => {
-    api.sendEmailOtp.mockResolvedValueOnce({
+  it('sends mobile OTP on customer signup and transitions to verification step', async () => {
+    api.sendOtp.mockResolvedValueOnce({
+      status: 'success',
       success: true,
-      message: 'OTP sent to partner@gharsathi.in',
+      debug_otp: '778899',
+      otp: '778899',
+      message: 'OTP generated for +91 9876543210',
     });
 
     renderWithProviders(<Signup />);
 
     fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: 'Sunil Sharma' } });
-    fireEvent.change(screen.getByLabelText(/Email Address/i), { target: { value: 'partner@gharsathi.in' } });
     fireEvent.change(screen.getByLabelText(/Mobile Number/i), { target: { value: '9876543210' } });
 
-    const submitBtn = screen.getByRole('button', { name: /Send Verification Code to Email/i });
+    const submitBtn = screen.getByRole('button', { name: /Get Verification OTP/i });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(api.sendEmailOtp).toHaveBeenCalledWith('partner@gharsathi.in', 'customer');
+      expect(api.sendOtp).toHaveBeenCalledWith('9876543210', 'customer');
     });
 
-    expect(await screen.findByText(/Email Verification Code/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Enter 6-Digit Verification Code/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Verify & Create Account/i })).toBeInTheDocument();
   });
 
@@ -208,7 +214,7 @@ describe('Signup Page (Email, Phone & Email OTP)', () => {
     fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: 'Rajesh Plumber' } });
     fireEvent.change(screen.getByLabelText(/Mobile Number/i), { target: { value: '9876543210' } });
 
-    const submitBtn = screen.getByRole('button', { name: /Get Verification OTP to Screen/i });
+    const submitBtn = screen.getByRole('button', { name: /Get Verification OTP/i });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {

@@ -16,7 +16,6 @@ export default function Login() {
 
   // Auth flow states
   const [step, setStep] = useState('input'); // 'input' | 'otp'
-  const [email, setEmail] = useState(location.state?.email || '');
   const [phone, setPhone] = useState(location.state?.phone || '');
   const [popupOtp, setPopupOtp] = useState('');
   const [popupOpen, setPopupOpen] = useState(false);
@@ -24,22 +23,16 @@ export default function Login() {
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
 
   const inputRefs = useRef([]);
-  const emailInputRef = useRef(null);
   const phoneInputRef = useRef(null);
 
   // Focus input on load
   useEffect(() => {
-    if (step === 'email' || step === 'input') {
-      if (role === 'technician' && phoneInputRef.current) {
-        phoneInputRef.current.focus();
-      } else if (emailInputRef.current) {
-        emailInputRef.current.focus();
-      }
+    if (step === 'input' && phoneInputRef.current) {
+      phoneInputRef.current.focus();
     } else if (step === 'otp' && inputRefs.current[0]) {
       inputRefs.current[0].focus();
     }
@@ -68,8 +61,8 @@ export default function Login() {
     };
   }, [step, countdown]);
 
-  // Send Technician Mobile OTP with on-screen debug popup
-  const handleSendTechnicianOtp = async (e) => {
+  // Step 1: Send Mobile OTP with direct on-screen popup & SMS fallback
+  const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
     setErrorMsg('');
     setStatusMsg('');
@@ -82,8 +75,8 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const res = await api.sendOtp(cleanPhone, 'technician');
-      setStatusMsg(res?.message || `Verification OTP sent to +91 ${cleanPhone}`);
+      const res = await api.sendOtp(cleanPhone, role);
+      setStatusMsg(res?.message || `Verification OTP generated for +91 ${cleanPhone}`);
       setStep('otp');
       setCountdown(60);
       setCanResend(false);
@@ -99,42 +92,8 @@ export default function Login() {
         type: 'success',
       });
     } catch (err) {
-      console.error('Technician OTP send failed:', err);
+      console.error('OTP send failed:', err);
       const msg = err?.data?.error || err?.message || 'Failed to send OTP. Please try again.';
-      setErrorMsg(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Step 1: Send Email OTP (Customer)
-  const handleSendEmailOtp = async (e) => {
-    if (e) e.preventDefault();
-    setErrorMsg('');
-    setStatusMsg('');
-
-    const cleanEmail = (email || '').trim().toLowerCase();
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setErrorMsg('Kripya valid email address enter karein (e.g. name@example.com).');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await api.sendEmailOtp(cleanEmail, role);
-      setStatusMsg(res?.message || `6-digit verification code sent to ${cleanEmail}`);
-      setStep('otp');
-      setCountdown(60);
-      setCanResend(false);
-      setOtpDigits(['', '', '', '', '', '']);
-      addToast({
-        title: 'Verification Code Sent! ✉️',
-        message: `OTP sent to ${cleanEmail}. Please check your inbox or spam.`,
-        type: 'info',
-      });
-    } catch (err) {
-      console.error('Email OTP send failed:', err);
-      const msg = err?.data?.email?.[0] || err?.data?.error || err?.message || 'Failed to send verification code. Please try again.';
       setErrorMsg(msg);
     } finally {
       setLoading(false);
@@ -154,16 +113,16 @@ export default function Login() {
 
     setLoading(true);
     try {
-      if (role === 'technician') {
-        const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-        const res = await api.verifyOtp({
-          phoneNumber: cleanPhone,
-          otpCode,
-          role: 'technician',
-        });
+      const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
+      const res = await api.verifyOtp({
+        phoneNumber: cleanPhone,
+        otpCode,
+        role,
+      });
 
-        const techProfile = res?.technician || res?.user;
-        if (res && res.success && techProfile) {
+      if (res && res.success) {
+        if (role === 'technician') {
+          const techProfile = res?.technician || res?.user;
           setTechnicianSession(techProfile, res.token);
           addToast({
             title: `Welcome, ${techProfile?.name || 'Partner'}! 🧰`,
@@ -172,27 +131,17 @@ export default function Login() {
           });
           navigate('/technician', { replace: true });
         } else {
-          setErrorMsg(res?.error || 'Verification failed. Please try again.');
-        }
-      } else {
-        const cleanEmail = email.trim().toLowerCase();
-        const res = await api.verifyEmailOtp({
-          email: cleanEmail,
-          otpCode,
-          role,
-        });
-
-        if (res && res.success) {
-          setCustomerSession(res.user, res.token);
+          const custProfile = res?.user || res?.customer;
+          setCustomerSession(custProfile, res.token);
           addToast({
-            title: `Welcome, ${res.user?.name || 'Customer'}! 🏡`,
+            title: `Welcome, ${custProfile?.name || 'Customer'}! 🏡`,
             message: 'Signed in successfully. Ready to book services!',
             type: 'success',
           });
           navigate('/customer', { replace: true });
-        } else {
-          setErrorMsg(res?.error || 'Verification failed. Please try again.');
         }
+      } else {
+        setErrorMsg(res?.error || 'Verification failed. Please try again.');
       }
     } catch (err) {
       console.error('OTP verify failed:', err);
@@ -200,99 +149,6 @@ export default function Login() {
       setErrorMsg(msg);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // 1-Click "Sign in with Google" Handler
-  const handleGoogleSignIn = async () => {
-    setErrorMsg('');
-    setGoogleLoading(true);
-
-    try {
-      // Check if official Google Identity Services client is available in window
-      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
-        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1048680197479-gharsathi.apps.googleusercontent.com';
-        
-        // Initialize Google One Tap / Button client
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (response) => {
-            if (response && response.credential) {
-              await processGoogleCredential(response.credential);
-            }
-          },
-          auto_select: false,
-        });
-
-        // Prompt Google account chooser
-        window.google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            fallbackGooglePrompt();
-          }
-        });
-        return;
-      }
-
-      // If GIS library is not loaded (or testing offline), provide prompt fallback
-      fallbackGooglePrompt();
-    } catch (err) {
-      console.warn('Google sign-in client notice:', err);
-      fallbackGooglePrompt();
-    }
-  };
-
-  const fallbackGooglePrompt = async () => {
-    // Prompt the user for their Google account email for quick sign-in
-    const promptEmail = window.prompt(
-      'Sign in with Google:\nPlease enter your Google Account email address:',
-      email || 'user@gmail.com'
-    );
-
-    if (!promptEmail) {
-      setGoogleLoading(false);
-      return;
-    }
-
-    const cleanEmail = promptEmail.trim().toLowerCase();
-    await processGoogleCredential(`mock-google-token-${Date.now()}`, cleanEmail);
-  };
-
-  const processGoogleCredential = async (credential, fallbackEmail = '') => {
-    try {
-      const res = await api.googleAuth({
-        credential,
-        role,
-        email: fallbackEmail || email,
-        name: fallbackEmail ? fallbackEmail.split('@')[0] : '',
-      });
-
-      if (res && res.success) {
-        if (role === 'technician') {
-          setTechnicianSession(res.user, res.token);
-          addToast({
-            title: `Namaste, ${res.user?.name || 'Partner'}! 🧰`,
-            message: 'Signed in with Google.',
-            type: 'success',
-          });
-          navigate('/technician', { replace: true });
-        } else {
-          setCustomerSession(res.user, res.token);
-          addToast({
-            title: `Welcome, ${res.user?.name || 'Customer'}! 🏡`,
-            message: 'Signed in with Google.',
-            type: 'success',
-          });
-          navigate('/customer', { replace: true });
-        }
-      } else {
-        setErrorMsg(res?.error || 'Google sign-in was unable to complete.');
-      }
-    } catch (err) {
-      console.error('Google auth error:', err);
-      const msg = err?.data?.error || err?.message || 'Google sign in failed. Please use Email OTP.';
-      setErrorMsg(msg);
-    } finally {
-      setGoogleLoading(false);
     }
   };
 
@@ -386,7 +242,7 @@ export default function Login() {
               <p className="auth-sub">
                 {role === 'technician'
                   ? 'Access your technician jobs, live routing & wallet earnings with instant On-Screen OTP.'
-                  : 'Book home services with verified experts & track live updates.'}
+                  : 'Enter your 10-digit mobile number to access verified home services & track live bookings.'}
               </p>
             </div>
 
@@ -399,130 +255,58 @@ export default function Login() {
             )}
             {statusMsg && (
               <div className="auth-alert info-alert" role="status">
-                <span className="alert-icon">{role === 'technician' ? '📲' : '✉️'}</span>
+                <span className="alert-icon">📲</span>
                 <span>{statusMsg}</span>
               </div>
             )}
 
             {step === 'input' ? (
               <div className="auth-step-input">
-                {role === 'technician' ? (
-                  /* Technician Partner Mobile OTP Login */
-                  <form onSubmit={handleSendTechnicianOtp} className="auth-form-email">
-                    <div className="field">
-                      <label htmlFor="login-phone">Mobile Number (10 Digits)</label>
-                      <div className="phone-input-wrap">
-                        <span className="phone-prefix">+91</span>
-                        <input
-                          id="login-phone"
-                          ref={phoneInputRef}
-                          type="tel"
-                          required
-                          placeholder="9876543210"
-                          maxLength="10"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          disabled={loading || googleLoading}
-                          autoComplete="tel"
-                        />
-                      </div>
-                      <small className="field-hint" style={{ marginTop: '6px', display: 'block', color: '#166534', fontWeight: 600 }}>
-                        ⚡ Instant On-Screen OTP — No SMS delay or carrier issues.
-                      </small>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading || googleLoading || phone.replace(/\D/g, '').length !== 10}
-                      className="button button-primary button-wide auth-submit-btn"
-                    >
-                      {loading ? (
-                        <>
-                          <span className="spinner-icon">🔄</span> Generating OTP…
-                        </>
-                      ) : (
-                        'Send OTP to Screen 📲'
-                      )}
-                    </button>
-                  </form>
-                ) : (
-                  /* Customer Email OTP Login */
-                  <form onSubmit={handleSendEmailOtp} className="auth-form-email">
-                    <div className="field">
-                      <label htmlFor="login-email">Email Address</label>
+                <form onSubmit={handleSendOtp} className="auth-form-email">
+                  <div className="field">
+                    <label htmlFor="login-phone">Mobile Number (10 Digits)</label>
+                    <div className="phone-input-wrap">
+                      <span className="phone-prefix">+91</span>
                       <input
-                        id="login-email"
-                        ref={emailInputRef}
-                        type="email"
+                        id="login-phone"
+                        ref={phoneInputRef}
+                        type="tel"
                         required
-                        placeholder="e.g. yourname@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={loading || googleLoading}
-                        autoComplete="email"
+                        placeholder="9876543210"
+                        maxLength="10"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        disabled={loading}
+                        autoComplete="tel"
                       />
                     </div>
+                    <small className="field-hint" style={{ marginTop: '6px', display: 'block', color: '#166534', fontWeight: 600 }}>
+                      ⚡ Instant Verification OTP — Direct on-screen display with SMS fallback.
+                    </small>
+                  </div>
 
-                    <button
-                      type="submit"
-                      disabled={loading || googleLoading || !email.trim()}
-                      className="button button-primary button-wide auth-submit-btn"
-                    >
-                      {loading ? (
-                        <>
-                          <span className="spinner-icon">🔄</span> Sending verification code…
-                        </>
-                      ) : (
-                        'Continue with Email →'
-                      )}
-                    </button>
-                  </form>
-                )}
-
-                {/* 2. Divider */}
-                <div className="auth-or-divider">
-                  <span>OR</span>
-                </div>
-
-                {/* 3. Directly below: Prominent 1-click "Sign in with Google" button */}
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading || googleLoading}
-                  className="google-signin-btn"
-                  aria-label="Sign in with Google"
-                >
-                  <svg width="20" height="20" viewBox="0 0 48 48" className="google-icon" aria-hidden="true">
-                    <path
-                      fill="#EA4335"
-                      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-                    />
-                    <path
-                      fill="#4285F4"
-                      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.55 10.78l7.98-6.19z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-                    />
-                    <path fill="none" d="M0 0h48v48H0z" />
-                  </svg>
-                  <span>{googleLoading ? 'Signing in with Google…' : 'Sign in with Google'}</span>
-                </button>
+                  <button
+                    type="submit"
+                    disabled={loading || phone.replace(/\D/g, '').length !== 10}
+                    className="button button-primary button-wide auth-submit-btn"
+                  >
+                    {loading ? (
+                      <>
+                        <span className="spinner-icon">🔄</span> Generating OTP…
+                      </>
+                    ) : (
+                      'Get Verification OTP 📲'
+                    )}
+                  </button>
+                </form>
               </div>
             ) : (
-              /* Step 2: 6-Digit OTP Verification */
+              /* Step 2: 6-Digit Mobile OTP Verification */
               <div className="auth-step-otp">
                 <div className="otp-sent-banner">
-                  {role === 'technician' ? (
-                    <span>📲 Verification OTP generated for <strong>+91 {phone.replace(/\D/g, '').slice(-10)}</strong></span>
-                  ) : (
-                    <span>✉️ Code sent to <strong>{email}</strong></span>
-                  )}
+                  <span>
+                    📲 Verification OTP generated for <strong>+91 {phone.replace(/\D/g, '').slice(-10)}</strong>
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
@@ -532,12 +316,12 @@ export default function Login() {
                     }}
                     className="change-email-btn"
                   >
-                    Change
+                    Change Number
                   </button>
                 </div>
 
-                {/* On-screen Popup/Banner notification for Technician OTP */}
-                {role === 'technician' && popupOtp && (
+                {/* On-screen Popup/Banner notification for OTP */}
+                {popupOtp && (
                   <div
                     className="otp-screen-callout"
                     role="alert"
@@ -551,7 +335,7 @@ export default function Login() {
                     }}
                   >
                     <div style={{ fontSize: '11px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-                      ⚡ Your On-Screen Login OTP:
+                      ⚡ Your On-Screen Verification OTP:
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '6px' }}>
                       <span style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '6px', color: '#0b3d2e', fontFamily: 'monospace' }}>
@@ -578,7 +362,7 @@ export default function Login() {
                         ⚡ Auto-Fill
                       </button>
                     </div>
-                    <small style={{ fontSize: '11px', color: '#78350f' }}>No SMS wait needed — instant verified access.</small>
+                    <small style={{ fontSize: '11px', color: '#78350f' }}>Direct on-screen access — no SMS wait required.</small>
                   </div>
                 )}
 
@@ -613,17 +397,11 @@ export default function Login() {
                       </div>
                     ) : (
                       <div className="countdown-pill expired">
-                        <span>{role === 'technician' ? 'Need a new OTP?' : "Didn't receive email?"}</span>
+                        <span>Need a new OTP?</span>
                         <button
                           type="button"
                           disabled={loading || !canResend}
-                          onClick={() => {
-                            if (role === 'technician') {
-                              handleSendTechnicianOtp();
-                            } else {
-                              handleSendEmailOtp();
-                            }
-                          }}
+                          onClick={() => handleSendOtp()}
                           className="resend-action-link"
                         >
                           {loading ? 'Generating…' : 'Get New OTP 🔄'}
@@ -660,7 +438,7 @@ export default function Login() {
             <div className="auth-bottom-nav">
               <p>
                 New to Ghar Sathi?{' '}
-                <Link to="/signup" state={{ role, email, phone }} className="auth-link-bold">
+                <Link to="/signup" state={{ role, phone }} className="auth-link-bold">
                   Create an account
                 </Link>
               </p>
@@ -671,8 +449,8 @@ export default function Login() {
           <OtpPopupModal
             isOpen={popupOpen}
             otp={popupOtp}
-            phone={role === 'technician' ? phone : ''}
-            title={role === 'technician' ? 'Technician Login OTP' : 'Verification OTP'}
+            phone={phone}
+            title={role === 'technician' ? 'Technician Partner Login OTP' : 'Customer Verification OTP'}
             onClose={() => setPopupOpen(false)}
             onAutoFill={(code) => {
               const digits = code.split('').slice(0, 6);
