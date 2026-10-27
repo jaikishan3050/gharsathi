@@ -14,6 +14,7 @@ vi.mock('../../services/api.js', async (importOriginal) => {
     checkBackendHealth: vi.fn().mockResolvedValue({ online: false }),
     default: {
       ...actual.default,
+      login: vi.fn(),
       sendOtp: vi.fn(),
       verifyOtp: vi.fn(),
       forgotPasswordTechnician: vi.fn(),
@@ -23,7 +24,15 @@ vi.mock('../../services/api.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../services/websocket.js', () => ({
+  default: {
+    connect: vi.fn(),
+    subscribe: vi.fn(() => () => {}),
+  },
+}));
+
 function renderWithProviders(ui) {
+  window.history.replaceState({}, '', '/');
   return render(
     <BrowserRouter>
       <AppDataProvider>{ui}</AppDataProvider>
@@ -39,7 +48,7 @@ describe('Login Page (Direct Mobile OTP Login)', () => {
   it('renders Mobile Number input field and NO residual Email or Google Sign-In interface', () => {
     renderWithProviders(<Login />);
 
-    // 1. Mobile Number input field and Get OTP button are present
+    // 1. Mobile Number input field and customer OTP button are present
     const phoneInput = screen.getByLabelText(/Mobile Number/i);
     expect(phoneInput).toBeInTheDocument();
     expect(phoneInput).toHaveAttribute('type', 'tel');
@@ -100,13 +109,12 @@ describe('Login Page (Direct Mobile OTP Login)', () => {
     expect(screen.getByRole('button', { name: /Verify & Continue/i })).toBeInTheDocument();
   });
 
-  it('handles technician partner mobile OTP login with on-screen debug OTP popup', async () => {
-    api.sendOtp.mockResolvedValueOnce({
-      status: 'success',
+  it('uses registered mobile number and password for technician login', async () => {
+    api.login.mockResolvedValueOnce({
       success: true,
-      debug_otp: '482910',
-      otp: '482910',
-      message: 'OTP generated successfully for +91 9876500001.',
+      role: 'technician',
+      token: 'test-token',
+      technician: { name: 'Test Partner', phone: '9876500001' },
     });
 
     renderWithProviders(<Login />);
@@ -120,26 +128,14 @@ describe('Login Page (Direct Mobile OTP Login)', () => {
     expect(phoneInput).toBeInTheDocument();
 
     fireEvent.change(phoneInput, { target: { value: '9876500001' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'partner-password' } });
 
-    const sendOtpBtn = screen.getByRole('button', { name: /Get Verification OTP/i });
-    fireEvent.click(sendOtpBtn);
+    fireEvent.click(screen.getByRole('button', { name: /Login with Mobile \+ Password/i }));
 
     await waitFor(() => {
-      expect(api.sendOtp).toHaveBeenCalledWith('9876500001', 'technician');
+      expect(api.login).toHaveBeenCalledWith({ phone: '9876500001', password: 'partner-password', role: 'technician' });
     });
-
-    // Check that OTP code 482910 is displayed on screen (both banner and modal)
-    const otpElements = await screen.findAllByText('482910');
-    expect(otpElements.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/On-Screen/i).length).toBeGreaterThanOrEqual(1);
-
-    // Verify auto-fill action button is available
-    const autoFillBtn = screen.getByRole('button', { name: /Auto-Fill & Proceed/i });
-    expect(autoFillBtn).toBeInTheDocument();
-    fireEvent.click(autoFillBtn);
-
-    // Verify OTP digits are populated
-    expect(screen.getByRole('button', { name: /Verify & Continue/i })).toBeInTheDocument();
+    expect(api.sendOtp).not.toHaveBeenCalled();
   });
 });
 
@@ -189,14 +185,14 @@ describe('Signup Page (Direct Mobile OTP Registration)', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(api.sendOtp).toHaveBeenCalledWith('9876543210', 'customer');
+      expect(api.sendOtp).toHaveBeenCalledWith('9876543210', 'customer', 'login');
     });
 
     expect(await screen.findByText(/Enter 6-Digit Verification Code/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Verify & Create Account/i })).toBeInTheDocument();
   });
 
-  it('handles technician partner signup with on-screen mobile OTP popup', async () => {
+  it('registers a technician through the registration OTP flow', async () => {
     api.sendOtp.mockResolvedValueOnce({
       status: 'success',
       success: true,
@@ -213,17 +209,19 @@ describe('Signup Page (Direct Mobile OTP Registration)', () => {
 
     fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: 'Rajesh Plumber' } });
     fireEvent.change(screen.getByLabelText(/Mobile Number/i), { target: { value: '9876543210' } });
+    fireEvent.change(screen.getByLabelText(/Create Password/i), { target: { value: 'partner-password' } });
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'rajesh@example.test' } });
+    fireEvent.change(screen.getByLabelText(/Aadhaar Number/i), { target: { value: '123456789012' } });
 
     const submitBtn = screen.getByRole('button', { name: /Get Verification OTP/i });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(api.sendOtp).toHaveBeenCalledWith('9876543210', 'technician');
+      expect(api.sendOtp).toHaveBeenCalledWith('9876543210', 'technician', 'registration');
     });
 
     // Check that OTP code 654321 is displayed on screen (both banner and modal)
-    const otpElements = await screen.findAllByText('654321');
-    expect(otpElements.length).toBeGreaterThanOrEqual(1);
+    expect((await screen.findAllByText('654321')).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: /Auto-Fill & Proceed/i })).toBeInTheDocument();
   });
 });

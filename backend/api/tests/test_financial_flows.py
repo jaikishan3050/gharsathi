@@ -4,6 +4,8 @@ from decimal import Decimal
 import pytest
 from django.conf import settings
 from rest_framework.test import APIClient
+from django.contrib.auth import get_user_model
+from api.authentication import AuthenticatedPrincipal
 from api.models import (
     Service,
     SubService,
@@ -16,6 +18,24 @@ from api.models import (
 @pytest.fixture
 def api_client():
     return APIClient()
+
+
+@pytest.fixture
+def authenticate_as(api_client, db):
+    """Authenticate requests as a real project role without weakening API permissions."""
+    def authenticate(role, profile):
+        api_client.force_authenticate(user=AuthenticatedPrincipal(role, profile))
+    return authenticate
+
+
+@pytest.fixture
+def admin_user(db):
+    User = get_user_model()
+    return User.objects.create_superuser(
+        username="ci-admin",
+        email="ci-admin@example.test",
+        password="ci-test-password",
+    )
 
 
 @pytest.fixture
@@ -98,11 +118,12 @@ def active_booking(db, sample_service, verified_technician):
 @pytest.mark.django_db
 class TestFinancialAndOperationalFlows:
 
-    def test_atomic_platform_fee_deduction_on_happy_code(self, api_client, active_booking, verified_technician):
+    def test_atomic_platform_fee_deduction_on_happy_code(self, api_client, active_booking, verified_technician, authenticate_as):
         """
         Tests atomic deduction of ₹149 platform fee upon submitting valid 4-digit Happy Code.
         Verifies wallet balance updates and ledger DEBIT transaction is recorded.
         """
+        authenticate_as('technician', verified_technician)
         initial_balance = verified_technician.wallet_balance  # ₹500.00
         url = f"/api/bookings/{active_booking.id}/complete/"
 
@@ -130,7 +151,7 @@ class TestFinancialAndOperationalFlows:
         active_booking.refresh_from_db()
         assert active_booking.status == "Completed"
 
-    def test_dynamic_custom_service_commission_deduction(self, api_client, verified_technician):
+    def test_dynamic_custom_service_commission_deduction(self, api_client, verified_technician, authenticate_as):
         """
         Tests that when a service has a custom commission fee (e.g. ₹250.00),
         the completion endpoint deducts exactly ₹250.00 from the technician wallet.
@@ -157,6 +178,7 @@ class TestFinancialAndOperationalFlows:
             technician=verified_technician,
         )
 
+        authenticate_as('technician', verified_technician)
         initial_balance = verified_technician.wallet_balance
         url = f"/api/bookings/{custom_booking.id}/complete/"
 
@@ -171,10 +193,11 @@ class TestFinancialAndOperationalFlows:
         assert custom_booking.platform_fee == Decimal("250.00")
         assert custom_booking.status == "Completed"
 
-    def test_service_crud_with_dynamic_commission(self, api_client):
+    def test_service_crud_with_dynamic_commission(self, api_client, admin_user, authenticate_as):
         """
         Tests creating and updating a service with a dynamic commission_fee.
         """
+        authenticate_as('admin', admin_user)
         create_payload = {
             "name": "Microwave Diagnostic & Repair",
             "category": "appliance",
@@ -197,11 +220,12 @@ class TestFinancialAndOperationalFlows:
         assert patch_res.status_code == 200
         assert Decimal(str(patch_res.data["commission_fee"])) == Decimal("220.00")
 
-    def test_invalid_happy_code_rejected_without_deduction(self, api_client, active_booking, verified_technician):
+    def test_invalid_happy_code_rejected_without_deduction(self, api_client, active_booking, verified_technician, authenticate_as):
         """
         Submitting an incorrect Happy Code PIN must return 400 Bad Request
         and leave technician wallet balance completely untouched.
         """
+        authenticate_as('technician', verified_technician)
         initial_balance = verified_technician.wallet_balance
         url = f"/api/bookings/{active_booking.id}/complete/"
 
@@ -215,7 +239,7 @@ class TestFinancialAndOperationalFlows:
         active_booking.refresh_from_db()
         assert active_booking.status == "In Progress"
 
-    def test_low_balance_guardrail_blocks_job_acceptance(self, api_client, sample_service, low_balance_technician):
+    def test_low_balance_guardrail_blocks_job_acceptance(self, api_client, sample_service, low_balance_technician, authenticate_as):
         """
         Technician with wallet balance < ₹150 is blocked with 403 Forbidden
         from accepting new jobs until they recharge.
@@ -233,6 +257,7 @@ class TestFinancialAndOperationalFlows:
             status="Pending",
         )
 
+        authenticate_as('technician', low_balance_technician)
         url = f"/api/bookings/{pending_booking.id}/accept/"
         response = api_client.post(url, {"partner_id": low_balance_technician.partner_id}, format="json")
 
@@ -243,7 +268,7 @@ class TestFinancialAndOperationalFlows:
         assert pending_booking.status == "Pending"
         assert pending_booking.technician is None
 
-    def test_unverified_kyc_blocks_job_acceptance(self, api_client, sample_service, unverified_technician):
+    def test_unverified_kyc_blocks_job_acceptance(self, api_client, sample_service, unverified_technician, authenticate_as):
         """
         Technician with pending KYC must not be allowed to accept jobs.
         """
@@ -260,16 +285,18 @@ class TestFinancialAndOperationalFlows:
             status="Pending",
         )
 
+        authenticate_as('technician', unverified_technician)
         url = f"/api/bookings/{pending_booking.id}/accept/"
         response = api_client.post(url, {"partner_id": unverified_technician.partner_id}, format="json")
 
         assert response.status_code in (400, 403)
         assert "KYC" in response.data.get("error", "")
 
-    def test_razorpay_signature_verification_success(self, api_client, active_booking):
+    def test_razorpay_signature_verification_success(self, api_client, active_booking, verified_technician, authenticate_as):
         """
         Tests Razorpay payment verification with a valid HMAC-SHA256 signature.
         """
+        authenticate_as('technician', verified_technician)
         order_id = "order_test_123456"
         payment_id = "pay_test_987654"
         key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'gharsathi_sandbox_secret_key_12345')
@@ -299,10 +326,11 @@ class TestFinancialAndOperationalFlows:
         assert active_booking.razorpay_order_id == order_id
         assert active_booking.razorpay_payment_id == payment_id
 
-    def test_razorpay_invalid_signature_rejected(self, api_client, active_booking):
+    def test_razorpay_invalid_signature_rejected(self, api_client, active_booking, verified_technician, authenticate_as):
         """
         Submitting a tampered/invalid signature must return 400 Bad Request.
         """
+        authenticate_as('technician', verified_technician)
         url = "/api/payments/razorpay/verify/"
         response = api_client.post(
             url,
@@ -318,12 +346,13 @@ class TestFinancialAndOperationalFlows:
         assert response.status_code == 400
         assert "failed" in response.data.get("error", "").lower()
 
-    def test_subservice_custom_commission_crud_and_deduction(self, api_client, verified_technician, sample_service):
+    def test_subservice_custom_commission_crud_and_deduction(self, api_client, verified_technician, sample_service, admin_user, authenticate_as):
         """
         Verify that SubService can be created with custom commission_fee,
         and when a booking for this subservice is completed, the technician's wallet
         is deducted by the specific subservice's custom commission_fee.
         """
+        authenticate_as('admin', admin_user)
         # 1. Add SubService with custom price & commission fee
         add_url = f"/api/services/{sample_service.id}/add-subservice/"
         res_add = api_client.post(
@@ -380,6 +409,7 @@ class TestFinancialAndOperationalFlows:
             service_pin="5544",
         )
 
+        authenticate_as('technician', verified_technician)
         initial_balance = verified_technician.wallet_balance  # 500.00
         complete_url = f"/api/bookings/{booking.id}/complete/"
         res_comp = api_client.post(complete_url, {"service_pin": "5544"}, format="json")
@@ -390,11 +420,12 @@ class TestFinancialAndOperationalFlows:
         assert verified_technician.wallet_balance == initial_balance - Decimal("250.00")
         assert verified_technician.wallet_balance == Decimal("250.00")
 
-    def test_technician_registration_initial_zero_wallet_balance(self, api_client, db):
+    def test_technician_registration_initial_zero_wallet_balance(self, api_client, admin_user, authenticate_as):
         """
         Tests that all newly registered technicians explicitly start with a ₹0.00 wallet balance.
         Any client-supplied wallet balance in registration payload is ignored.
         """
+        authenticate_as('admin', admin_user)
         # 1. Model default creation
         tech_model = TechnicianProfile.objects.create(
             name="New Tech Model",

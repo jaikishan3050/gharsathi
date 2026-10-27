@@ -174,22 +174,16 @@ class TestOTPAuthenticationFlows:
         assert res.status_code == 404
         assert "nahi mila" in res.data["error"]
 
-    def test_send_otp_returns_debug_otp_payload(self, api_client):
-        """
-        Ensures send-otp returns debug_otp in the API response JSON payload for on-screen popup display.
-        """
+    def test_technician_signin_otp_is_rejected(self, api_client):
+        """Technician sign-in must use the registered mobile number and password."""
         phone = "9876543222"
         response = api_client.post(
             "/api/auth/send-otp/",
             {"phone_number": phone, "role": "technician"},
             format="json",
         )
-        assert response.status_code == 200
-        assert response.data["status"] == "success"
-        assert response.data["success"] is True
-        assert "debug_otp" in response.data
-        assert len(response.data["debug_otp"]) == 6
-        assert response.data["debug_otp"].isdigit()
+        assert response.status_code == 400
+        assert "password" in response.data["error"].lower()
 
     def test_technician_otp_verification_creates_zero_wallet_balance(self, api_client):
         """
@@ -201,20 +195,23 @@ class TestOTPAuthenticationFlows:
 
         phone = "9876543233"
         send_res = api_client.post(
-            "/api/auth/send-otp/",
-            {"phone_number": phone, "role": "technician"},
+            "/api/technicians/send-otp/",
+            {"phone_number": phone},
             format="json",
         )
         assert send_res.status_code == 200
         otp = send_res.data["debug_otp"]
 
         verify_res = api_client.post(
-            "/api/auth/verify-otp/",
+            "/api/technicians/verify-otp/",
             {
                 "phone_number": phone,
                 "otp_code": otp,
                 "role": "technician",
                 "name": "Vikram Singh",
+                "password": "StrongPass123",
+                "email": "vikram@example.test",
+                "aadhaar": "123456789012",
                 "skills": "AC Repair & Servicing",
                 "area": "Danapur",
             },
