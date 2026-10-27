@@ -8,7 +8,6 @@ from .views import (
     ComplaintViewSet,
     AdminWithdrawalViewSet,
     AdminAnalyticsView,
-    ResetDemoView,
     SetupSuperuserView,
     AdminPasswordResetRequestView,
     AdminPasswordResetConfirmView,
@@ -62,7 +61,6 @@ urlpatterns = [
 
     # Admin Management & Analytics Endpoints
     path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin-analytics'),
-    path('admin/reset-demo/', ResetDemoView.as_view(), name='admin-reset-demo'),
     path('admin/setup-superuser/', SetupSuperuserView.as_view(), name='admin-setup-superuser'),
     path('admin/password-reset/request/', AdminPasswordResetRequestView.as_view(), name='admin-password-reset-request'),
     path('admin/password-reset/confirm/', AdminPasswordResetConfirmView.as_view(), name='admin-password-reset-confirm'),

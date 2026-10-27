@@ -619,13 +619,6 @@ export const api = {
     });
   },
 
-  resetDemoData: async () => {
-    return await apiRequest('/admin/reset-demo/', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-  },
-
   // Authentication & Session Persistence
   login: async ({ phone, password, role = 'technician', username }) => {
     return await apiRequest('/auth/login/', {

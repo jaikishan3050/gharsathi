@@ -1,5 +1,6 @@
 import random
 from decimal import Decimal
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from .models import Service, SubService, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal
@@ -233,7 +234,13 @@ TECHNICIANS_DATA = [
 
 
 def seed_database():
-    """Wipes and re-seeds Ghar Sathi demo database."""
+    """Wipes and re-seeds the local development database with demo data."""
+    # This function deletes bookings, technicians, customers and financial
+    # records before inserting fixtures. Never allow it to run in production,
+    # including from a Render build/start hook or management command.
+    if not settings.DEBUG:
+        raise RuntimeError('Demo seeding is disabled when DEBUG is False.')
+
     # Clear existing data
     AdminWithdrawal.objects.all().delete()
     Complaint.objects.all().delete()

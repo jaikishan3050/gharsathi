@@ -47,7 +47,7 @@ from .serializers import (
     AdminWithdrawalSerializer,
     CustomerProfileSerializer,
 )
-from .seed_data import seed_database, purge_database, ensure_production_superuser
+from .seed_data import purge_database, ensure_production_superuser
 from .authentication import (
     IsGharSathiAdmin,
     IsGharSathiAuthenticated,
@@ -1010,19 +1010,6 @@ class AdminAnalyticsView(APIView):
                 'open': Complaint.objects.filter(status='Open').count(),
                 'resolved': Complaint.objects.filter(status='Resolved').count(),
             },
-        })
-
-
-class ResetDemoView(APIView):
-    """Resets database and re-seeds with fresh demo dataset."""
-    permission_classes = [IsGharSathiAdmin]
-
-    def post(self, request):
-        counts = seed_database()
-        return Response({
-            'success': True,
-            'message': 'Ghar Sathi demo database has been re-seeded successfully.',
-            'counts': counts,
         })
 
 
