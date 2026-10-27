@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useGharSathi } from '../context/AppDataContext.jsx';
 import { areas, FIXED_PLATFORM_COMMISSION, serviceCategories } from '../data/services.js';
 import {
@@ -475,6 +476,10 @@ export default function AdminPanel() {
               {adminLoginLoading ? 'Verifying…' : 'Sign In to Admin Dashboard →'}
             </button>
           </form>
+
+          <div style={{ textAlign: 'center', marginTop: '14px' }}>
+            <Link to="/admin/password-reset/request" className="back-link">Forgot password?</Link>
+          </div>
 
           <a href="/" className="back-link">
             ← Back to Home / Switch Panel

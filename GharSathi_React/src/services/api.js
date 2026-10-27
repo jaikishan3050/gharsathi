@@ -33,6 +33,7 @@ export async function apiRequest(endpoint, options = {}, timeoutMs = 4500) {
   const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(send-otp|verify-otp)\//.test(`${path}/`)
+    || /^\/admin\/password-reset\/(request|confirm)\//.test(`${path}/`)
     || /^\/(services|subservices)(\/|$)/.test(path);
   let storedToken = '';
   try {
@@ -602,6 +603,20 @@ export const api = {
   // Admin Analytics & Reset
   getAdminAnalytics: async () => {
     return await apiRequest('/admin/analytics/');
+  },
+
+  requestAdminPasswordReset: async (email) => {
+    return await apiRequest('/admin/password-reset/request/', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  resetAdminPassword: async ({ uid, token, newPassword }) => {
+    return await apiRequest('/admin/password-reset/confirm/', {
+      method: 'POST',
+      body: JSON.stringify({ uid, token, new_password: newPassword }),
+    });
   },
 
   resetDemoData: async () => {

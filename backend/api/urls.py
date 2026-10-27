@@ -10,6 +10,8 @@ from .views import (
     AdminAnalyticsView,
     ResetDemoView,
     SetupSuperuserView,
+    AdminPasswordResetRequestView,
+    AdminPasswordResetConfirmView,
     PurgeProductionDataView,
     RazorpayCreateOrderView,
     RazorpayVerifyPaymentView,
@@ -62,6 +64,8 @@ urlpatterns = [
     path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin-analytics'),
     path('admin/reset-demo/', ResetDemoView.as_view(), name='admin-reset-demo'),
     path('admin/setup-superuser/', SetupSuperuserView.as_view(), name='admin-setup-superuser'),
+    path('admin/password-reset/request/', AdminPasswordResetRequestView.as_view(), name='admin-password-reset-request'),
+    path('admin/password-reset/confirm/', AdminPasswordResetConfirmView.as_view(), name='admin-password-reset-confirm'),
     path('admin/purge-production-data/', PurgeProductionDataView.as_view(), name='admin-purge-production-data'),
 
     # Router ViewSets

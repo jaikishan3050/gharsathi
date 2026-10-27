@@ -206,6 +206,7 @@ REST_FRAMEWORK = {
         # without rapidly locking everyone out; the endpoint also limits each phone.
         'otp_send': '20/hour',
         'otp_verify': '60/hour',
+        'admin_password_reset': '5/hour',
     },
 }
 
@@ -375,11 +376,13 @@ if django.VERSION[0] >= 6:
                 'EMAIL_BACKEND',
                 'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
             ),
-            'HOST': os.environ.get('EMAIL_HOST', 'smtp.gmail.com'),
-            'PORT': int(os.environ.get('EMAIL_PORT', 587)),
-            'USE_TLS': os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1'),
-            'USERNAME': os.environ.get('EMAIL_HOST_USER', 'support@gharsathi.in'),
-            'PASSWORD': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+            'OPTIONS': {
+                'host': os.environ.get('EMAIL_HOST', 'smtp.gmail.com'),
+                'port': int(os.environ.get('EMAIL_PORT', 587)),
+                'use_tls': os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1'),
+                'username': os.environ.get('EMAIL_HOST_USER', 'support@gharsathi.in'),
+                'password': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+            },
         },
     }
 else:
@@ -394,6 +397,7 @@ else:
     EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Ghar Sathi <support@gharsathi.in>')
+FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL', 'https://gharsathi-in.web.app')
 EMAIL_OTP_EXPIRATION_MINUTES = int(os.environ.get('EMAIL_OTP_EXPIRATION_MINUTES', 10))
 
 # Google OAuth Settings

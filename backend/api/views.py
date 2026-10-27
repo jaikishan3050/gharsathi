@@ -8,9 +8,16 @@ from decimal import Decimal
 import jwt
 import requests
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import NotFound
@@ -1030,6 +1037,93 @@ class SetupSuperuserView(APIView):
         )
 
 
+class AdminPasswordResetRequestView(APIView):
+    """Email a one-time password-reset link to an active administrator."""
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'admin_password_reset'
+
+    def post(self, request):
+        email = str(request.data.get('email') or '').strip().lower()
+        if not email or '@' not in email:
+            return Response({'error': 'Valid admin email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        user = User.objects.filter(
+            email__iexact=email, is_active=True, is_staff=True, is_superuser=True
+        ).first()
+        if user:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            base_url = getattr(settings, 'FRONTEND_BASE_URL', 'https://gharsathi-in.web.app').rstrip('/')
+            reset_url = f'{base_url}/admin/password-reset/{uid}/{token}'
+            try:
+                send_mail(
+                    subject='Reset your Ghar Sathi admin password',
+                    message=(
+                        f'Hello {user.get_username()},\n\n'
+                        f'Use this secure link to reset your Ghar Sathi admin password:\n{reset_url}\n\n'
+                        'This link is temporary and expires automatically. If you did not request this, ignore this email.'
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception:
+                logger.exception('Admin password recovery email could not be sent.')
+                return Response(
+                    {'error': 'Password reset email is unavailable right now. Please contact platform support.'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+        # Same response for unknown and known addresses avoids account enumeration.
+        return Response({
+            'success': True,
+            'message': 'If an active admin account uses that email, a password reset link has been sent.',
+        })
+
+
+class AdminPasswordResetConfirmView(APIView):
+    """Validate a one-time email token and update the admin password."""
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'admin_password_reset'
+
+    def post(self, request):
+        uid = str(request.data.get('uid') or '').strip()
+        token = str(request.data.get('token') or '').strip()
+        new_password = str(request.data.get('new_password') or '')
+        if not uid or not token or not new_password:
+            return Response({'error': 'Reset link and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 12:
+            return Response({'error': 'Password must be at least 12 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(
+                pk=user_id, is_active=True, is_staff=True, is_superuser=True
+            )
+        except (TypeError, ValueError, OverflowError, DjangoValidationError, User.DoesNotExist):
+            user = None
+
+        if not user or not default_token_generator.check_token(user, token):
+            return Response(
+                {'error': 'This reset link is invalid or expired. Request a new one.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_password(new_password, user)
+        except DjangoValidationError as exc:
+            return Response({'error': ' '.join(exc.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.last_login = timezone.now()
+        user.save(update_fields=['password', 'last_login'])
+        return Response({'success': True, 'message': 'Admin password updated. You can sign in now.'})
+
+
 class PurgeProductionDataView(APIView):
     """
     Completely flushes and wipes all mock/seeded test data (dummy technicians,
@@ -1500,6 +1594,8 @@ class LoginView(APIView):
                     auth_user = u
 
             if auth_user and (auth_user.is_staff or auth_user.is_superuser):
+                auth_user.last_login = timezone.now()
+                auth_user.save(update_fields=['last_login'])
                 payload = {
                     'user_id': auth_user.id,
                     'username': auth_user.username,

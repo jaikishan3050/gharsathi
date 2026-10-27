@@ -56,6 +56,22 @@ services:
         sync: false
       - key: SMS_PROVIDER
         value: "website_popup"
+      - key: FRONTEND_BASE_URL
+        value: "https://gharsathi-in.web.app"
+      - key: EMAIL_BACKEND
+        value: "django.core.mail.backends.smtp.EmailBackend"
+      - key: EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        value: "support@gharsathi.in"
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        value: "Ghar Sathi <support@gharsathi.in>"
 
   # ============================================================================
   # 2. Redis In-Memory Datastore for Django Channels & WebSockets

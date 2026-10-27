@@ -46,6 +46,11 @@ class GharSathiJWTAuthentication(BaseAuthentication):
             user_id = payload.get('user_id')
             if user_id:
                 profile = get_user_model().objects.filter(pk=user_id, is_active=True, is_staff=True).first()
+                issued_at = payload.get('iat')
+                if profile and profile.last_login and issued_at is not None:
+                    # A successful admin login or password reset invalidates older admin JWTs.
+                    if int(issued_at) < int(profile.last_login.timestamp()):
+                        raise AuthenticationFailed('Admin session expired. Please log in again.')
         elif role == 'technician':
             profile = TechnicianProfile.objects.filter(pk=payload.get('id')).first() if payload.get('id') else None
             if not profile and payload.get('phone'):
