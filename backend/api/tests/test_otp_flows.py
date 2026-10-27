@@ -173,3 +173,58 @@ class TestOTPAuthenticationFlows:
         )
         assert res.status_code == 404
         assert "nahi mila" in res.data["error"]
+
+    def test_send_otp_returns_debug_otp_payload(self, api_client):
+        """
+        Ensures send-otp returns debug_otp in the API response JSON payload for on-screen popup display.
+        """
+        phone = "9876543222"
+        response = api_client.post(
+            "/api/auth/send-otp/",
+            {"phone_number": phone, "role": "technician"},
+            format="json",
+        )
+        assert response.status_code == 200
+        assert response.data["status"] == "success"
+        assert response.data["success"] is True
+        assert "debug_otp" in response.data
+        assert len(response.data["debug_otp"]) == 6
+        assert response.data["debug_otp"].isdigit()
+
+    def test_technician_otp_verification_creates_zero_wallet_balance(self, api_client):
+        """
+        Verifying an OTP for a new technician partner strictly creates their profile
+        with an initial wallet balance of 0.00.
+        """
+        from decimal import Decimal
+        from api.models import TechnicianProfile
+
+        phone = "9876543233"
+        send_res = api_client.post(
+            "/api/auth/send-otp/",
+            {"phone_number": phone, "role": "technician"},
+            format="json",
+        )
+        assert send_res.status_code == 200
+        otp = send_res.data["debug_otp"]
+
+        verify_res = api_client.post(
+            "/api/auth/verify-otp/",
+            {
+                "phone_number": phone,
+                "otp_code": otp,
+                "role": "technician",
+                "name": "Vikram Singh",
+                "skills": "AC Repair & Servicing",
+                "area": "Danapur",
+            },
+            format="json",
+        )
+        assert verify_res.status_code == 200
+        assert verify_res.data["status"] == "success"
+        assert "technician" in verify_res.data
+
+        tech = TechnicianProfile.objects.filter(phone=phone).first()
+        assert tech is not None
+        assert tech.name == "Vikram Singh"
+        assert tech.wallet_balance == Decimal("0.00")

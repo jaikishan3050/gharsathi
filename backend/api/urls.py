@@ -36,6 +36,8 @@ router.register(r'admin/withdrawals', AdminWithdrawalViewSet, basename='admin-wi
 
 urlpatterns = [
     # Specific technician auth endpoints MUST precede router.urls to avoid slug/pk clash
+    path('technicians/send-otp/', SendOTPView.as_view(), name='technician-send-otp'),
+    path('technicians/verify-otp/', VerifyOTPView.as_view(), name='technician-verify-otp'),
     path('technicians/forgot-password/', TechnicianForgotPasswordView.as_view(), name='technician-forgot-password'),
     path('technicians/reset-password-otp/', TechnicianResetPasswordView.as_view(), name='technician-reset-password-otp'),
     path('technicians/login/', LoginView.as_view(), name='technician-login'),

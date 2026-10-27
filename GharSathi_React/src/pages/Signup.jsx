@@ -4,6 +4,7 @@ import { useGharSathi } from '../context/AppDataContext.jsx';
 import api from '../services/api.js';
 import { Brand } from '../components/Common.jsx';
 import { areas } from '../data/services.js';
+import OtpPopupModal from '../components/OtpPopupModal.jsx';
 
 const TECHNICIAN_SKILLS = [
   'AC Repair & Servicing',
@@ -31,7 +32,7 @@ export default function Signup() {
   const [formData, setFormData] = useState({
     name: '',
     email: location.state?.email || '',
-    phone: '',
+    phone: location.state?.phone || '',
     area: areas[0] || 'Maner',
     address: '',
     pincode: '801103',
@@ -39,6 +40,8 @@ export default function Signup() {
   });
 
   // OTP Verification state
+  const [popupOtp, setPopupOtp] = useState('');
+  const [popupOpen, setPopupOpen] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -85,7 +88,7 @@ export default function Signup() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Step 1: Validate Fields & Send Email OTP
+  // Step 1: Validate Fields & Send OTP (Mobile OTP for Technician, Email OTP for Customer)
   const handleRequestOtp = async (e) => {
     if (e) e.preventDefault();
     setErrorMsg('');
@@ -97,17 +100,46 @@ export default function Signup() {
       return;
     }
 
-    // Email validation
-    const cleanEmail = formData.email.trim().toLowerCase();
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setErrorMsg('Kripya valid email address enter karein (e.g. name@example.com).');
-      return;
-    }
-
     // Phone validation (10-digit Indian mobile)
     const cleanPhone = formData.phone.replace(/\D/g, '').slice(-10);
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
       setErrorMsg('Kripya valid 10-digit Indian mobile number enter karein (starting with 6-9).');
+      return;
+    }
+
+    if (role === 'technician') {
+      setLoading(true);
+      try {
+        const res = await api.sendOtp(cleanPhone, 'technician');
+        setStatusMsg(res?.message || `Verification OTP generated for +91 ${cleanPhone}`);
+        setStep('otp');
+        setCountdown(60);
+        setCanResend(false);
+        setOtpDigits(['', '', '', '', '', '']);
+        const otp = res?.debug_otp || res?.otp;
+        if (otp) {
+          setPopupOtp(otp);
+          setPopupOpen(true);
+        }
+        addToast({
+          title: 'Verification OTP Ready! 🔔',
+          message: `OTP: ${otp || 'Generated on screen'}`,
+          type: 'success',
+        });
+      } catch (err) {
+        console.error('Technician OTP request failed:', err);
+        const msg = err?.data?.error || err?.message || 'Failed to generate OTP. Please try again.';
+        setErrorMsg(msg);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Customer role: Email validation
+    const cleanEmail = formData.email.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setErrorMsg('Kripya valid email address enter karein (e.g. name@example.com).');
       return;
     }
 
@@ -133,7 +165,7 @@ export default function Signup() {
     }
   };
 
-  // Step 2: Verify Email OTP & Register Account
+  // Step 2: Verify OTP & Register Account
   const handleVerifyAndSignup = async (e) => {
     if (e) e.preventDefault();
     setErrorMsg('');
@@ -146,24 +178,22 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const cleanEmail = formData.email.trim().toLowerCase();
       const cleanPhone = formData.phone.replace(/\D/g, '').slice(-10);
 
-      const res = await api.verifyEmailOtp({
-        email: cleanEmail,
-        otpCode,
-        phone: cleanPhone,
-        role,
-        name: formData.name.trim(),
-        area: formData.area,
-        address: formData.address.trim(),
-        pincode: formData.pincode.trim() || '801103',
-        skills: role === 'technician' ? formData.skills : '',
-      });
+      if (role === 'technician') {
+        const res = await api.verifyOtp({
+          phoneNumber: cleanPhone,
+          otpCode,
+          role: 'technician',
+          name: formData.name.trim(),
+          area: formData.area,
+          address: formData.address.trim(),
+          skills: formData.skills,
+        });
 
-      if (res && res.success) {
-        if (role === 'technician') {
-          setTechnicianSession(res.user, res.token);
+        const techProfile = res?.technician || res?.user;
+        if (res && res.success && techProfile) {
+          setTechnicianSession(techProfile, res.token);
           addToast({
             title: 'Partner Registration Successful! 🎉',
             message: `Welcome aboard, ${formData.name}! Wallet balance initialized to ₹0.00.`,
@@ -171,6 +201,22 @@ export default function Signup() {
           });
           navigate('/technician', { replace: true });
         } else {
+          setErrorMsg(res?.error || 'Registration verification failed. Please try again.');
+        }
+      } else {
+        const cleanEmail = formData.email.trim().toLowerCase();
+        const res = await api.verifyEmailOtp({
+          email: cleanEmail,
+          otpCode,
+          phone: cleanPhone,
+          role,
+          name: formData.name.trim(),
+          area: formData.area,
+          address: formData.address.trim(),
+          pincode: formData.pincode.trim() || '801103',
+        });
+
+        if (res && res.success) {
           setCustomerSession(res.user, res.token);
           addToast({
             title: 'Welcome to Ghar Sathi! 🎉',
@@ -178,9 +224,9 @@ export default function Signup() {
             type: 'success',
           });
           navigate('/customer', { replace: true });
+        } else {
+          setErrorMsg(res?.error || 'Registration failed. Please check OTP and try again.');
         }
-      } else {
-        setErrorMsg(res?.error || 'Registration failed. Please check OTP and try again.');
       }
     } catch (err) {
       console.error('Signup OTP verify error:', err);
@@ -244,7 +290,12 @@ export default function Signup() {
               className={`auth-role-tab ${role === 'customer' ? 'active' : ''}`}
               onClick={() => {
                 setRole('customer');
+                setStep('form');
                 setErrorMsg('');
+                setStatusMsg('');
+                setPopupOtp('');
+                setPopupOpen(false);
+                setOtpDigits(['', '', '', '', '', '']);
               }}
             >
               <span className="tab-icon">🏡</span>
@@ -257,7 +308,12 @@ export default function Signup() {
               className={`auth-role-tab ${role === 'technician' ? 'active' : ''}`}
               onClick={() => {
                 setRole('technician');
+                setStep('form');
                 setErrorMsg('');
+                setStatusMsg('');
+                setPopupOtp('');
+                setPopupOpen(false);
+                setOtpDigits(['', '', '', '', '', '']);
               }}
             >
               <span className="tab-icon">🧰</span>
@@ -284,7 +340,7 @@ export default function Signup() {
             )}
             {statusMsg && (
               <div className="auth-alert info-alert" role="status">
-                <span className="alert-icon">✉️</span>
+                <span className="alert-icon">{role === 'technician' ? '📲' : '✉️'}</span>
                 <span>{statusMsg}</span>
               </div>
             )}
@@ -309,12 +365,14 @@ export default function Signup() {
                 </div>
 
                 <div className="field">
-                  <label htmlFor="signup-email">Email Address (For Verification OTP) *</label>
+                  <label htmlFor="signup-email">
+                    {role === 'technician' ? 'Email Address (Optional / Account Recovery)' : 'Email Address (For Verification OTP) *'}
+                  </label>
                   <input
                     id="signup-email"
                     name="email"
                     type="email"
-                    required
+                    required={role === 'customer'}
                     placeholder="e.g. ramesh@example.com"
                     value={formData.email}
                     onChange={handleChange}
@@ -324,7 +382,9 @@ export default function Signup() {
                 </div>
 
                 <div className="field">
-                  <label htmlFor="signup-phone">Mobile Number (10 Digits) *</label>
+                  <label htmlFor="signup-phone">
+                    {role === 'technician' ? 'Mobile Number (For Verification OTP) *' : 'Mobile Number (10 Digits) *'}
+                  </label>
                   <div className="phone-input-wrap">
                     <span className="phone-prefix">+91</span>
                     <input
@@ -340,6 +400,11 @@ export default function Signup() {
                       autoComplete="tel"
                     />
                   </div>
+                  {role === 'technician' && (
+                    <small className="field-hint" style={{ marginTop: '6px', display: 'block', color: '#166534', fontWeight: 600 }}>
+                      ⚡ Instant On-Screen OTP — No SMS delay or carrier issues.
+                    </small>
+                  )}
                 </div>
 
                 <div className="field">
@@ -397,13 +462,21 @@ export default function Signup() {
                 <div className="signup-action-row">
                   <button
                     type="submit"
-                    disabled={loading || !formData.email.trim() || !formData.phone.trim() || !formData.name.trim()}
+                    disabled={
+                      loading ||
+                      (role === 'customer' && !formData.email.trim()) ||
+                      !formData.phone.trim() ||
+                      !formData.name.trim()
+                    }
                     className="button button-primary button-wide auth-submit-btn"
                   >
                     {loading ? (
                       <>
-                        <span className="spinner-icon">🔄</span> Sending Verification Code…
+                        <span className="spinner-icon">🔄</span>{' '}
+                        {role === 'technician' ? 'Generating OTP…' : 'Sending Verification Code…'}
                       </>
+                    ) : role === 'technician' ? (
+                      'Get Verification OTP to Screen 📲'
                     ) : (
                       'Send Verification Code to Email →'
                     )}
@@ -411,12 +484,18 @@ export default function Signup() {
                 </div>
               </form>
             ) : (
-              /* Step 2: Email OTP Entry */
+              /* Step 2: OTP Verification Entry */
               <div className="auth-step-otp">
                 <div className="otp-sent-banner">
-                  <span>
-                    ✉️ Enter 6-digit code sent to <strong>{formData.email}</strong>
-                  </span>
+                  {role === 'technician' ? (
+                    <span>
+                      📲 Verification OTP generated for <strong>+91 {formData.phone.replace(/\D/g, '').slice(-10)}</strong>
+                    </span>
+                  ) : (
+                    <span>
+                      ✉️ Enter 6-digit code sent to <strong>{formData.email}</strong>
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -430,8 +509,56 @@ export default function Signup() {
                   </button>
                 </div>
 
+                {/* On-Screen Callout for Technician Partner OTP */}
+                {role === 'technician' && popupOtp && (
+                  <div
+                    className="otp-screen-callout"
+                    role="alert"
+                    style={{
+                      background: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)',
+                      border: '2px dashed #d4af37',
+                      borderRadius: '12px',
+                      padding: '14px 16px',
+                      margin: '12px 0 16px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '11px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
+                      ⚡ Your On-Screen Registration OTP:
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '6px', color: '#0b3d2e', fontFamily: 'monospace' }}>
+                        {popupOtp}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const digits = popupOtp.split('').slice(0, 6);
+                          setOtpDigits(digits);
+                          addToast({ title: 'OTP Auto-Filled! ⚡', message: 'Verification code entered.', type: 'info' });
+                        }}
+                        style={{
+                          background: '#0b3d2e',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ⚡ Auto-Fill
+                      </button>
+                    </div>
+                    <small style={{ fontSize: '11px', color: '#78350f' }}>No SMS wait needed — instant verified access.</small>
+                  </div>
+                )}
+
                 <form onSubmit={handleVerifyAndSignup} className="auth-form-otp">
-                  <label className="otp-input-label">Email Verification Code</label>
+                  <label className="otp-input-label">
+                    {role === 'technician' ? 'Enter 6-Digit Verification Code' : 'Email Verification Code'}
+                  </label>
                   <div className="six-digit-boxes-container" onPaste={handlePaste}>
                     {otpDigits.map((digit, idx) => (
                       <input
@@ -461,14 +588,20 @@ export default function Signup() {
                       </div>
                     ) : (
                       <div className="countdown-pill expired">
-                        <span>Didn't receive email?</span>
+                        <span>{role === 'technician' ? 'Need a new OTP?' : "Didn't receive email?"}</span>
                         <button
                           type="button"
                           disabled={loading || !canResend}
                           onClick={() => handleRequestOtp()}
                           className="resend-action-link"
                         >
-                          {loading ? 'Resending…' : 'Resend Email OTP 🔄'}
+                          {loading
+                            ? role === 'technician'
+                              ? 'Generating…'
+                              : 'Resending…'
+                            : role === 'technician'
+                            ? 'Get New OTP 🔄'
+                            : 'Resend Email OTP 🔄'}
                         </button>
                       </div>
                     )}
@@ -481,6 +614,7 @@ export default function Signup() {
                       onClick={() => {
                         setStep('form');
                         setErrorMsg('');
+                        setStatusMsg('');
                       }}
                     >
                       ← Back
@@ -507,6 +641,19 @@ export default function Signup() {
               </p>
             </div>
           </div>
+
+          {/* On-Screen Popup OTP Modal */}
+          <OtpPopupModal
+            isOpen={popupOpen}
+            otp={popupOtp}
+            phone={role === 'technician' ? formData.phone : ''}
+            title={role === 'technician' ? 'Technician Partner Registration OTP' : 'Verification OTP'}
+            onClose={() => setPopupOpen(false)}
+            onAutoFill={(code) => {
+              const digits = code.split('').slice(0, 6);
+              setOtpDigits(digits);
+            }}
+          />
         </div>
       </main>
     </div>

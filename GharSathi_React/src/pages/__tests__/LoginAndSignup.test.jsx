@@ -14,9 +14,13 @@ vi.mock('../../services/api.js', async (importOriginal) => {
     checkBackendHealth: vi.fn().mockResolvedValue({ online: false }),
     default: {
       ...actual.default,
+      sendOtp: vi.fn(),
+      verifyOtp: vi.fn(),
       sendEmailOtp: vi.fn(),
       verifyEmailOtp: vi.fn(),
       googleAuth: vi.fn(),
+      forgotPasswordTechnician: vi.fn(),
+      resetPasswordTechnician: vi.fn(),
       getMe: vi.fn().mockResolvedValue({ success: false }),
     },
   };
@@ -93,6 +97,48 @@ describe('Login Page (Email OTP & Google Sign-In)', () => {
     expect(screen.getAllByText(/user@example.com/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: /Verify & Continue/i })).toBeInTheDocument();
   });
+
+  it('handles technician partner mobile OTP login with on-screen debug OTP popup', async () => {
+    api.sendOtp.mockResolvedValueOnce({
+      status: 'success',
+      success: true,
+      debug_otp: '482910',
+      otp: '482910',
+      message: 'OTP generated successfully for +91 9876500001.',
+    });
+
+    renderWithProviders(<Login />);
+
+    // Toggle to Technician Partner tab
+    const techTab = screen.getByRole('tab', { name: /Technician Partner/i });
+    fireEvent.click(techTab);
+
+    // Verify Mobile input field is present
+    const phoneInput = screen.getByLabelText(/Mobile Number/i);
+    expect(phoneInput).toBeInTheDocument();
+
+    fireEvent.change(phoneInput, { target: { value: '9876500001' } });
+
+    const sendOtpBtn = screen.getByRole('button', { name: /Send OTP to Screen/i });
+    fireEvent.click(sendOtpBtn);
+
+    await waitFor(() => {
+      expect(api.sendOtp).toHaveBeenCalledWith('9876500001', 'technician');
+    });
+
+    // Check that OTP code 482910 is displayed on screen (both banner and modal)
+    const otpElements = await screen.findAllByText('482910');
+    expect(otpElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/On-Screen/i).length).toBeGreaterThanOrEqual(1);
+
+    // Verify auto-fill action button is available
+    const autoFillBtn = screen.getByRole('button', { name: /Auto-Fill & Proceed/i });
+    expect(autoFillBtn).toBeInTheDocument();
+    fireEvent.click(autoFillBtn);
+
+    // Verify OTP digits are populated
+    expect(screen.getByRole('button', { name: /Verify & Continue/i })).toBeInTheDocument();
+  });
 });
 
 describe('Signup Page (Email, Phone & Email OTP)', () => {
@@ -142,5 +188,36 @@ describe('Signup Page (Email, Phone & Email OTP)', () => {
 
     expect(await screen.findByText(/Email Verification Code/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Verify & Create Account/i })).toBeInTheDocument();
+  });
+
+  it('handles technician partner signup with on-screen mobile OTP popup', async () => {
+    api.sendOtp.mockResolvedValueOnce({
+      status: 'success',
+      success: true,
+      debug_otp: '654321',
+      otp: '654321',
+      message: 'OTP generated successfully for +91 9876543210.',
+    });
+
+    renderWithProviders(<Signup />);
+
+    // Toggle to Technician Partner tab
+    const techTab = screen.getByRole('tab', { name: /Technician Partner/i });
+    fireEvent.click(techTab);
+
+    fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: 'Rajesh Plumber' } });
+    fireEvent.change(screen.getByLabelText(/Mobile Number/i), { target: { value: '9876543210' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Get Verification OTP to Screen/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(api.sendOtp).toHaveBeenCalledWith('9876543210', 'technician');
+    });
+
+    // Check that OTP code 654321 is displayed on screen (both banner and modal)
+    const otpElements = await screen.findAllByText('654321');
+    expect(otpElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('button', { name: /Auto-Fill & Proceed/i })).toBeInTheDocument();
   });
 });
