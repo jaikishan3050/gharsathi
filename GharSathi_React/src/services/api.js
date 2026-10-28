@@ -33,8 +33,7 @@ export async function apiRequest(endpoint, options = {}, timeoutMs = 4500) {
   const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(send-otp|verify-otp)\//.test(`${path}/`)
-    || /^\/admin\/password-reset\/(request|confirm)\//.test(`${path}/`)
-    || /^\/(services|subservices)(\/|$)/.test(path);
+    || /^\/admin\/password-reset\/(request|confirm)\//.test(`${path}/`);
   let storedToken = '';
   try {
     storedToken = sessionStorage.getItem('gharsathi_auth_token_tab') || '';
