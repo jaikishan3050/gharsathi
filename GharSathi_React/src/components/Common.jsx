@@ -386,10 +386,10 @@ export function RatingModal({ booking, onClose, onSubmit }) {
     );
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(booking.id, rating, review, selectedTags);
-    onClose();
+    const result = await onSubmit(booking.id, rating, review, selectedTags);
+    if (result?.success) onClose();
   };
 
   return (
@@ -898,7 +898,7 @@ export function PinVerificationModal({ booking, onClose, onVerify }) {
     setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!pin || pin.trim().length !== 4) {
       setError('Please enter a valid 4-digit Happy Code.');
@@ -907,7 +907,7 @@ export function PinVerificationModal({ booking, onClose, onVerify }) {
     setIsSubmitting(true);
     setError('');
 
-    const res = onVerify(pin.trim());
+    const res = await onVerify(pin.trim());
     if (res && res.error) {
       setError(res.error);
       setIsSubmitting(false);

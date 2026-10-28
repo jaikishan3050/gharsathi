@@ -20,7 +20,7 @@ export default function ManageServices({ onAddServiceClick }) {
     description: '',
   });
 
-  const saveSubPrice = (serviceId, sub) => {
+  const saveSubPrice = async (serviceId, sub) => {
     const rawPrice = subPriceDrafts[sub.id] ?? sub.price;
     const rawComm = subCommDrafts[sub.id] ?? sub.commission_fee ?? sub.commissionFee ?? sub.commission ?? 149;
     const amount = Number(rawPrice);
@@ -33,8 +33,8 @@ export default function ManageServices({ onAddServiceClick }) {
       setNotice('Commission fee zero ya positive number hona chahiye.');
       return;
     }
-    updateSubservicePrice(serviceId, sub.id, amount, commAmount);
-    setNotice(`${sub.name} ka rate ₹${amount} aur commission ₹${commAmount} update ho gaya.`);
+    const result = await updateSubservicePrice(serviceId, sub.id, amount, commAmount);
+    if (result?.success) setNotice(`${sub.name} ka rate ₹${amount} aur commission ₹${commAmount} database mein save ho gaya.`);
     setTimeout(() => setNotice(''), 4000);
   };
 
@@ -55,7 +55,7 @@ export default function ManageServices({ onAddServiceClick }) {
       return;
     }
 
-    await addSubservice(serviceId, {
+    const result = await addSubservice(serviceId, {
       name: subName,
       price,
       commission_fee: comm,
@@ -63,9 +63,11 @@ export default function ManageServices({ onAddServiceClick }) {
       description: newSubForm.description || '',
     });
 
-    setAddingSubserviceFor(null);
-    setNewSubForm({ name: '', price: '', commission_fee: '149', time: '45 mins', description: '' });
-    setNotice(`Naya subservice "${subName}" (Rate: ₹${price}, Comm: ₹${comm}) add ho gaya.`);
+    if (result?.success) {
+      setAddingSubserviceFor(null);
+      setNewSubForm({ name: '', price: '', commission_fee: '149', time: '45 mins', description: '' });
+      setNotice(`Naya subservice "${subName}" database mein save ho gaya.`);
+    }
     setTimeout(() => setNotice(''), 4000);
   };
 
@@ -222,7 +224,10 @@ export default function ManageServices({ onAddServiceClick }) {
                           <button
                             type="button"
                             className="button button-small button-danger"
-                            onClick={() => deleteSubservice(service.id, sub.id)}
+                            onClick={async () => {
+                              const result = await deleteSubservice(service.id, sub.id);
+                              if (result?.success) setNotice(`${sub.name} package deleted.`);
+                            }}
                             title={`Delete ${sub.name}`}
                           >
                             🗑️

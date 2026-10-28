@@ -285,6 +285,27 @@ export const api = {
     });
   },
 
+  updateService: async (serviceId, changes) => {
+    const payload = {
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.categoryId !== undefined || changes.category !== undefined
+        ? { category: String(changes.categoryId || changes.category).toLowerCase() }
+        : {}),
+      ...(changes.price !== undefined ? { base_price: Number(changes.price) } : {}),
+      ...(changes.commissionFee !== undefined || changes.commission_fee !== undefined
+        ? { commission_fee: Number(changes.commissionFee ?? changes.commission_fee) }
+        : {}),
+      ...(changes.description !== undefined ? { description: changes.description } : {}),
+      ...(changes.icon !== undefined ? { icon: changes.icon } : {}),
+      ...(changes.image !== undefined ? { image: changes.image } : {}),
+      ...(changes.subcategories !== undefined ? { subcategories: changes.subcategories } : {}),
+    };
+    return await apiRequest(`/services/${serviceId}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
   updateSubservicePrice: async (serviceId, subserviceId, price, commissionFee) => {
     const payload = { subservice_id: subserviceId };
     if (price !== undefined && price !== null && price !== '') {
@@ -338,6 +359,19 @@ export const api = {
     return await apiRequest(`/customers/${q ? `?${q}` : ''}`);
   },
 
+  updateCustomerProfile: async (customerPk, changes) => {
+    return await apiRequest(`/customers/${customerPk}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: changes.name,
+        email: changes.email || '',
+        address: changes.address || '',
+        area: changes.area || '',
+        pincode: changes.pincode || '',
+      }),
+    });
+  },
+
   registerTechnician: async (techData) => {
     const payload = {
       name: techData.name,
@@ -371,6 +405,30 @@ export const api = {
     return await apiRequest(`/technicians/${technicianPk}/verify-kyc/`, {
       method: 'POST',
       body: JSON.stringify({ kyc_status: kycStatus, kyc_remarks: remarks }),
+    });
+  },
+
+  updateTechnician: async (technicianPk, changes) => {
+    const payload = {
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.phone !== undefined ? { phone: String(changes.phone).replace(/\D/g, '').slice(-10) } : {}),
+      ...(changes.email !== undefined ? { email: changes.email } : {}),
+      ...(changes.skills !== undefined ? { trade: Array.isArray(changes.skills) ? changes.skills.join(', ') : changes.skills } : {}),
+      ...(changes.area !== undefined ? { area: changes.area } : {}),
+      ...(changes.address !== undefined ? { address: changes.address } : {}),
+      ...(changes.status !== undefined ? { kyc_status: changes.status } : {}),
+      ...(changes.kycRemarks !== undefined ? { kyc_remarks: changes.kycRemarks } : {}),
+      ...(changes.aadhaar !== undefined ? { aadhaar_masked: changes.aadhaar } : {}),
+      ...(changes.certificateId !== undefined ? { certificate_id: changes.certificateId } : {}),
+      ...(changes.documentType !== undefined ? { document_type: changes.documentType } : {}),
+      ...(changes.upiId !== undefined ? { upi_id: changes.upiId } : {}),
+      ...(changes.isOnline !== undefined ? { is_online: changes.isOnline } : {}),
+      ...(changes.liveLocation !== undefined ? { live_location: changes.liveLocation } : {}),
+      ...(changes.liveImage !== undefined ? { live_image: changes.liveImage } : {}),
+    };
+    return await apiRequest(`/technicians/${technicianPk}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
     });
   },
 
@@ -411,6 +469,22 @@ export const api = {
 
     return await apiRequest('/bookings/', {
       method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateBooking: async (bookingPk, changes) => {
+    const payload = {
+      ...(changes.status !== undefined ? { status: changes.status } : {}),
+      ...(changes.technicianPk !== undefined ? { technician: changes.technicianPk || null } : {}),
+      ...(changes.technicianName !== undefined ? { technician_name: changes.technicianName } : {}),
+      ...(changes.technicianPhone !== undefined ? { technician_phone: changes.technicianPhone } : {}),
+      ...(changes.scheduled_date !== undefined ? { scheduled_date: changes.scheduled_date || null } : {}),
+      ...(changes.scheduled_time !== undefined ? { scheduled_time: changes.scheduled_time } : {}),
+      ...(changes.notes !== undefined ? { notes: changes.notes } : {}),
+    };
+    return await apiRequest(`/bookings/${bookingPk}/`, {
+      method: 'PATCH',
       body: JSON.stringify(payload),
     });
   },
@@ -469,6 +543,18 @@ export const api = {
     return await apiRequest(`/complaints/${complaintPk}/resolve/`, {
       method: 'POST',
       body: JSON.stringify({ resolution_action: actionText, admin_notes: notes }),
+    });
+  },
+
+  updateComplaint: async (complaintPk, changes) => {
+    const payload = {
+      ...(changes.status !== undefined ? { status: changes.status } : {}),
+      ...(changes.resolutionAction !== undefined ? { resolution_action: changes.resolutionAction } : {}),
+      ...(changes.adminNotes !== undefined ? { admin_notes: changes.adminNotes } : {}),
+    };
+    return await apiRequest(`/complaints/${complaintPk}/`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
     });
   },
 

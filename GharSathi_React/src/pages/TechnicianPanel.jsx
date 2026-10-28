@@ -423,7 +423,7 @@ export default function TechnicianPanel() {
   const isLowBalance = techWalletBalance < MIN_WALLET_BALANCE;
 
   // Accept Job
-  const acceptJob = (booking) => {
+  const acceptJob = async (booking) => {
     if (!currentTechnician || currentTechnician.status !== 'Verified') {
       setNotice('Job accept karne ke liye Admin se pehle profile verify karwayein.');
       return;
@@ -435,12 +435,13 @@ export default function TechnicianPanel() {
       return;
     }
 
-    updateBooking(booking.id, {
+    const result = await updateBooking(booking.id, {
       technicianId: currentTechnician.id,
       technicianName: currentTechnician.name,
       technicianPhone: currentTechnician.phone,
       status: 'Accepted',
     });
+    if (!result?.success) return;
 
     setNotice(`Booking ${booking.id} accept ho gayi! Customer location map mein khul rahi hai.`);
     setActive('myjobs');
@@ -453,18 +454,19 @@ export default function TechnicianPanel() {
   };
 
   // Advance Job Status - Requires 4-digit Happy Code to complete
-  const advanceJob = (booking) => {
+  const advanceJob = async (booking) => {
     if (booking.status === 'Accepted') {
-      updateBooking(booking.id, { status: 'In Progress' });
+      const result = await updateBooking(booking.id, { status: 'In Progress' });
+      if (!result?.success) return;
       setNotice(`Booking ${booking.id} status ab "In Progress" hai. Work step notification customer ko bhej di gayi hai.`);
     } else if (booking.status === 'In Progress') {
       setPinModalBooking(booking);
     }
   };
 
-  const handlePinVerification = (pin) => {
+  const handlePinVerification = async (pin) => {
     if (!pinModalBooking) return { success: false, error: 'No booking selected' };
-    const res = completeJobWithPin(pinModalBooking.id, pin);
+    const res = await completeJobWithPin(pinModalBooking.id, pin);
     if (res.success) {
       setNotice(
         `Booking ${pinModalBooking.id} completed! Fixed platform fee ₹${FIXED_PLATFORM_COMMISSION} deduct ho kar aapka share wallet ledger mein record ho gaya.`
@@ -1155,9 +1157,9 @@ export default function TechnicianPanel() {
 
         <button
           className={`button ${currentTechnician.isOnline ? 'button-outline' : 'button-primary'} button-small`}
-          onClick={() =>
-            updateTechnician(currentTechnician.id, { isOnline: !currentTechnician.isOnline })
-          }
+          onClick={async () => {
+            await updateTechnician(currentTechnician.id, { isOnline: !currentTechnician.isOnline });
+          }}
         >
           {currentTechnician.isOnline ? 'Go Offline' : 'Go Online'}
         </button>

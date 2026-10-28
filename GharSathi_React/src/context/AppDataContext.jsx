@@ -128,6 +128,22 @@ export function AppDataProvider({ children }) {
   const [backendStatus, setBackendStatus] = useState('checking'); // 'checking' | 'live' | 'offline'
   const [lastSyncTime, setLastSyncTime] = useState(null);
 
+  const requireDatabaseWrite = useCallback(() => {
+    if (backendStatus === 'live') return true;
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    const localDevelopment = hostname === 'localhost' || hostname === '127.0.0.1';
+    if (!localDevelopment) {
+      addToast({
+        title: 'Database unavailable',
+        message: 'Server database se connection nahi hai. Change save nahi hua; connection aane par dobara try karein.',
+        type: 'error',
+        duration: 7000,
+      });
+      return false;
+    }
+    return true;
+  }, [backendStatus, addToast]);
+
   const syncFromDjango = useCallback(
     async (notify = false) => {
       const authRole = isAdminLoggedIn
@@ -152,14 +168,48 @@ export function AppDataProvider({ children }) {
           return false;
         }
 
-        const [servicesRes, techsRes, bookingsRes, customersRes, complaintsRes, withdrawalsRes] = await Promise.all([
-          api.getServices().catch(() => null),
-          authRole === 'admin' ? api.getTechnicians().catch(() => null) : Promise.resolve(null),
-          authRole ? api.getBookings().catch(() => null) : Promise.resolve(null),
-          authRole === 'admin' ? api.getCustomers().catch(() => null) : Promise.resolve(null),
-          authRole ? api.getComplaints().catch(() => null) : Promise.resolve(null),
-          authRole === 'admin' ? api.getAdminWithdrawals().catch(() => null) : Promise.resolve(null),
+        const fetchResult = async (request) => {
+          try {
+            return { data: await request(), error: null };
+          } catch (error) {
+            return { data: null, error };
+          }
+        };
+        const [servicesResult, techsResult, bookingsResult, customersResult, complaintsResult, withdrawalsResult] = await Promise.all([
+          fetchResult(() => api.getServices()),
+          authRole === 'admin' ? fetchResult(() => api.getTechnicians()) : Promise.resolve({ data: null, error: null }),
+          authRole ? fetchResult(() => api.getBookings()) : Promise.resolve({ data: null, error: null }),
+          authRole === 'admin' ? fetchResult(() => api.getCustomers()) : Promise.resolve({ data: null, error: null }),
+          authRole ? fetchResult(() => api.getComplaints()) : Promise.resolve({ data: null, error: null }),
+          authRole === 'admin' ? fetchResult(() => api.getAdminWithdrawals()) : Promise.resolve({ data: null, error: null }),
         ]);
+        const servicesRes = servicesResult.data;
+        const techsRes = techsResult.data;
+        const bookingsRes = bookingsResult.data;
+        const customersRes = customersResult.data;
+        const complaintsRes = complaintsResult.data;
+        const withdrawalsRes = withdrawalsResult.data;
+        const syncErrors = [servicesResult, techsResult, bookingsResult, customersResult, complaintsResult, withdrawalsResult]
+          .filter((result) => result.error);
+        const authFailure = syncErrors.find((result) => result.error.status === 401 || result.error.status === 403);
+
+        if (authFailure && authRole) {
+          try {
+            sessionStorage.removeItem(AUTH_TOKEN_KEY);
+            sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
+            sessionStorage.removeItem(TECH_AUTH_KEY);
+            sessionStorage.removeItem(ADMIN_AUTH_KEY);
+          } catch {}
+          if (authRole === 'admin') setIsAdminLoggedIn(false);
+          if (authRole === 'technician') setCurrentTechnician(null);
+          if (authRole === 'customer') setCurrentCustomer(null);
+          addToast({
+            title: 'Session needs sign-in',
+            message: authFailure.error?.data?.detail || authFailure.error?.data?.error || 'Server rejected this session. Please sign in again before changing data.',
+            type: 'error',
+            duration: 7000,
+          });
+        }
 
         setData((current) => {
           let updatedServices = current.services;
@@ -170,10 +220,17 @@ export function AppDataProvider({ children }) {
                 return {
                   ...localSvc,
                   price: Number(remote.base_price ?? localSvc.price),
+                  commissionFee: Number(remote.commission_fee ?? localSvc.commissionFee ?? 149),
+                  commission_fee: Number(remote.commission_fee ?? localSvc.commission_fee ?? 149),
                   pk: remote.id,
                   subcategories:
-                    Array.isArray(remote.subcategories) && remote.subcategories.length > 0
-                      ? remote.subcategories
+                    Array.isArray(remote.subcategories)
+                      ? remote.subcategories.map((sub) => ({
+                          ...sub,
+                          price: Number(sub.price || 0),
+                          commission_fee: Number(sub.commission_fee ?? sub.commission ?? remote.commission_fee ?? 149),
+                          commissionFee: Number(sub.commission_fee ?? sub.commission ?? remote.commission_fee ?? 149),
+                        }))
                       : localSvc.subcategories,
                 };
               }
@@ -195,11 +252,15 @@ export function AppDataProvider({ children }) {
           let updatedTechnicians = current.technicians;
           if (Array.isArray(techsRes)) {
             updatedTechnicians = techsRes.map(normalizeTechnicianFromDjango);
+          } else if (techsResult.error) {
+            updatedTechnicians = [];
           }
 
           let updatedBookings = current.bookings;
           if (Array.isArray(bookingsRes)) {
             updatedBookings = bookingsRes.map(normalizeBookingFromDjango);
+          } else if (bookingsResult.error) {
+            updatedBookings = [];
           }
 
           let updatedCustomers = current.customers;
@@ -221,16 +282,22 @@ export function AppDataProvider({ children }) {
               status: customer.status || 'Active',
               registeredAt: customer.created_at || '',
             }));
+          } else if (customersResult.error) {
+            updatedCustomers = [];
           }
 
           let updatedComplaints = current.complaints;
           if (Array.isArray(complaintsRes)) {
             updatedComplaints = complaintsRes.map(normalizeComplaintFromDjango);
+          } else if (complaintsResult.error) {
+            updatedComplaints = [];
           }
 
           let updatedWithdrawals = current.withdrawals || [];
           if (Array.isArray(withdrawalsRes)) {
             updatedWithdrawals = withdrawalsRes.map(normalizeWithdrawalFromDjango);
+          } else if (withdrawalsResult.error) {
+            updatedWithdrawals = [];
           }
 
           return {
@@ -257,6 +324,19 @@ export function AppDataProvider({ children }) {
 
         setBackendStatus('live');
         setLastSyncTime(new Date());
+
+        if (syncErrors.length) {
+          const syncError = syncErrors[0].error;
+          console.warn('Some records could not be loaded from the database:', syncError);
+          if (notify) {
+            addToast({
+              title: 'Database sync incomplete',
+              message: syncError?.data?.detail || syncError?.data?.error || syncError.message || 'Some records were not loaded.',
+              type: 'error',
+              duration: 7000,
+            });
+          }
+        }
 
         if (notify) {
           addToast({
@@ -510,38 +590,65 @@ export function AppDataProvider({ children }) {
   }, []);
 
   // Customer Management & Authentication
-  const signupCustomer = useCallback(({ name, phone, address, pincode, area }) => {
+  const signupCustomer = useCallback(async ({ name, phone, address, pincode, area, email }) => {
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    const existing = data.customers.find((c) => c.phone === cleanPhone);
+    const matchingCurrent = currentCustomer?.phone?.replace(/\D/g, '').slice(-10) === cleanPhone
+      ? currentCustomer
+      : null;
+    const storedCustomer = data.customers.find((c) => c.phone === cleanPhone);
+    const existing = storedCustomer
+      ? { ...storedCustomer, pk: storedCustomer.pk || (typeof matchingCurrent?.id === 'number' ? matchingCurrent.id : undefined) }
+      : matchingCurrent;
 
-    const customerRecord = existing || {
-      id: `CUS-${Date.now().toString().slice(-6)}`,
+    let customerRecord = {
+      ...(existing || {}),
+      id: existing?.customer_id || existing?.id || `CUS-${Date.now().toString().slice(-6)}`,
+      pk: existing?.pk || (typeof existing?.id === 'number' ? existing.id : undefined),
       name: name.trim(),
       phone: cleanPhone,
+      email: (email || existing?.email || '').trim(),
       address: address.trim(),
       pincode: pincode.trim(),
       area: area || 'Maner',
-      bookings: 0,
-      status: 'Active',
-      registeredAt: new Date().toISOString(),
+      bookings: Number(existing?.bookings || 0),
+      status: existing?.status || 'Active',
+      registeredAt: existing?.registeredAt || new Date().toISOString(),
     };
 
-    if (!existing) {
-      setData((current) => ({
-        ...current,
-        customers: [customerRecord, ...current.customers],
-        activity: [addActivity(`New customer ${customerRecord.name} registered`), ...current.activity].slice(0, 50),
-      }));
+    if (!requireDatabaseWrite()) return null;
+    if (backendStatus === 'live') {
+      try {
+        if (!customerRecord.pk) {
+          throw new Error('Customer profile ID missing; please sign in again before updating profile.');
+        }
+        const savedProfile = await api.updateCustomerProfile(customerRecord.pk, customerRecord);
+        customerRecord = {
+          ...customerRecord,
+          ...savedProfile,
+          pk: savedProfile.id,
+          id: savedProfile.customer_id || savedProfile.id,
+          registeredAt: savedProfile.created_at || customerRecord.registeredAt,
+        };
+      } catch (err) {
+        addToast({ title: 'Profile not saved', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return null;
+      }
     }
+
+    setData((current) => ({
+      ...current,
+      customers: [customerRecord, ...current.customers.filter((c) => c.phone !== cleanPhone)],
+      activity: [addActivity(`Customer ${customerRecord.name} profile updated`), ...current.activity].slice(0, 50),
+    }));
 
     setCurrentCustomer(customerRecord);
     addToast({
-      title: 'Registration Successful! 🎉',
-      message: `Welcome to Ghar Sathi, ${customerRecord.name}!`,
+      title: 'Profile Updated ✓',
+      message: `${customerRecord.name} ka profile database mein save ho gaya.`,
       type: 'success',
     });
     return customerRecord;
-  }, [data.customers, addActivity, addToast]);
+  }, [backendStatus, data.customers, currentCustomer, requireDatabaseWrite, addActivity, addToast]);
 
   const setCustomerSession = useCallback((customer, token = null) => {
     if (token) {
@@ -709,7 +816,7 @@ export function AppDataProvider({ children }) {
   }, [addToast]);
 
   // Create Booking (Customer)
-  const createBooking = useCallback((input) => {
+  const createBooking = useCallback(async (input) => {
     const service = data.services.find((item) => item.id === input.serviceId) || data.services[0];
     let price = input.price || service.price;
     let subcategoryName = input.subcategoryName || '';
@@ -724,7 +831,7 @@ export function AppDataProvider({ children }) {
 
     const cleanPhone = input.phone.replace(/\D/g, '').slice(-10);
 
-    const booking = {
+    let booking = {
       id: `GS-${Date.now().toString().slice(-8)}`,
       customerName: input.customerName.trim(),
       phone: cleanPhone,
@@ -756,32 +863,28 @@ export function AppDataProvider({ children }) {
       commission: 0, // Commission is 0 until job is completed, then strictly fixed at Rs 149!
     };
 
-    // If Django backend is live, asynchronously persist to database
+    if (!requireDatabaseWrite()) return null;
     if (backendStatus === 'live') {
-      api.createBooking(booking, service.pk || 1).catch((err) => {
-        console.warn('Live API createBooking sync warning:', err);
+      try {
+        const savedBooking = await api.createBooking(booking, service.pk || 1);
+        booking = normalizeBookingFromDjango(savedBooking) || booking;
+      } catch (err) {
         const authRejected = err?.status === 401 || err?.status === 403;
         if (authRejected) {
           sessionStorage.removeItem(AUTH_TOKEN_KEY);
           sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
           setCurrentCustomer(null);
         }
-        setData((current) => ({
-          ...current,
-          bookings: current.bookings.filter((item) => item.id !== booking.id),
-          customers: current.customers.filter((item) => item.phone !== cleanPhone),
-          notifications: current.notifications.filter((item) => item.bookingId !== booking.id),
-          activity: current.activity.filter((item) => !item.message?.includes(booking.id)),
-        }));
         addToast({
           title: authRejected ? 'Customer login expired' : 'Booking could not be saved',
           message: authRejected
-            ? 'Customer data was cleared from the database. Sign in again with mobile OTP, then retry the booking.'
+            ? 'Customer sign-in verify nahi hua. Dobara sign in karke booking karein.'
             : err?.data?.detail || err?.data?.error || err?.message || 'Database ne booking save nahi ki. Please retry.',
           type: 'error',
           duration: 7000,
         });
-      });
+        return null;
+      }
     }
 
     setData((current) => {
@@ -852,33 +955,51 @@ export function AppDataProvider({ children }) {
     });
 
     return booking;
-  }, [backendStatus, data.services, addActivity, sendStepNotification, addToast]);
+  }, [backendStatus, data.services, requireDatabaseWrite, addActivity, sendStepNotification, addToast]);
 
   // Update Booking Status & Trigger Work Step Notifications + Toasts
-  const updateBooking = useCallback((id, changes) => {
-    // Sync with Django if live
+  const updateBooking = useCallback(async (id, changes) => {
+    if (!requireDatabaseWrite()) return { success: false };
+    let persistedBooking = null;
     if (backendStatus === 'live') {
-      if (changes.technicianId && changes.technicianName) {
-        api.acceptBooking(id, changes.technicianId, changes.technicianId).catch((err) => {
-          console.warn('Backend acceptBooking sync warning:', err);
-        });
-      } else if (changes.status === 'In Progress') {
-        api.startBooking(id).catch((err) => {
-          console.warn('Backend startBooking sync warning:', err);
-        });
+      try {
+        if (currentTechnician && changes.technicianId && changes.status === 'Accepted') {
+          const response = await api.acceptBooking(id, currentTechnician.pk || currentTechnician.id, currentTechnician.id);
+          persistedBooking = response?.booking || null;
+        } else if (currentTechnician && changes.status === 'In Progress') {
+          const response = await api.startBooking(id);
+          persistedBooking = response?.booking || null;
+        } else if (isAdminLoggedIn) {
+          const assignedTech = data.technicians.find((tech) => tech.id === changes.technicianId);
+          const response = await api.updateBooking(id, {
+            ...changes,
+            technicianPk: changes.technicianId ? (assignedTech?.pk || null) : null,
+          });
+          persistedBooking = response;
+        } else {
+          addToast({ title: 'Update not saved', message: 'Is update ke liye valid customer, technician, ya admin login chahiye.', type: 'error' });
+          return { success: false };
+        }
+      } catch (err) {
+        addToast({ title: 'Booking update failed', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
       }
     }
+
+    const appliedChanges = persistedBooking
+      ? { ...changes, ...normalizeBookingFromDjango(persistedBooking) }
+      : changes;
 
     setData((current) => {
       let updatedBooking = null;
 
       const bookings = current.bookings.map((booking) => {
         if (booking.id !== id) return booking;
-        const next = { ...booking, ...changes };
+        const next = persistedBooking ? normalizeBookingFromDjango(persistedBooking) : { ...booking, ...appliedChanges };
 
         // COMPULSORY FIXED COMMISSION RULE:
         // When status is 'Completed', commission is strictly fixed at Rs 149 (not percentage!)
-        if (changes.status === 'Completed') {
+        if (appliedChanges.status === 'Completed') {
           next.commission = FIXED_PLATFORM_COMMISSION; // Rs 149 fixed!
           next.completedAt = new Date().toISOString();
         }
@@ -891,13 +1012,13 @@ export function AppDataProvider({ children }) {
 
       // Handle Step Notifications based on changes:
       // 1. Technician Assigned
-      if (changes.technicianId && changes.technicianName) {
+      if (appliedChanges.technicianId && appliedChanges.technicianName) {
         sendStepNotification({
           role: 'customer',
           userId: updatedBooking.phone,
           bookingId: updatedBooking.id,
           title: 'Technician Assigned 🧑‍🔧',
-          message: `Aapki booking ${updatedBooking.id} ke liye technician ${changes.technicianName} assign ho gaye hain.`,
+          message: `Aapki booking ${updatedBooking.id} ke liye technician ${appliedChanges.technicianName} assign ho gaye hain.`,
           step: 'Assigned',
           playSound: true,
         });
@@ -905,7 +1026,7 @@ export function AppDataProvider({ children }) {
         // Notify and RING technician!
         sendStepNotification({
           role: 'technician',
-          userId: changes.technicianId,
+          userId: appliedChanges.technicianId,
           bookingId: updatedBooking.id,
           title: 'Work Assigned! 🔔 Ringing',
           message: `Naya kaam assign hua hai: ${updatedBooking.id} (${updatedBooking.serviceName}) for ${updatedBooking.customerName}. Customer location map mein dekhein.`,
@@ -916,13 +1037,13 @@ export function AppDataProvider({ children }) {
 
         addToast({
           title: 'Technician Assigned 🧑‍🔧',
-          message: `${changes.technicianName} assigned to booking ${updatedBooking.id}`,
+          message: `${appliedChanges.technicianName} assigned to booking ${updatedBooking.id}`,
           type: 'info',
         });
       }
 
       // 2. Status advanced to 'In Progress'
-      if (changes.status === 'In Progress') {
+      if (appliedChanges.status === 'In Progress') {
         sendStepNotification({
           role: 'customer',
           userId: updatedBooking.phone,
@@ -941,7 +1062,7 @@ export function AppDataProvider({ children }) {
       }
 
       // 3. Status advanced to 'Completed'
-      if (changes.status === 'Completed') {
+      if (appliedChanges.status === 'Completed') {
         sendStepNotification({
           role: 'customer',
           userId: updatedBooking.phone,
@@ -972,21 +1093,26 @@ export function AppDataProvider({ children }) {
       return {
         ...current,
         bookings,
-        activity: [addActivity(`Booking ${id} status updated to ${changes.status || 'modified'}`), ...current.activity].slice(0, 50),
+        activity: [addActivity(`Booking ${id} status updated to ${appliedChanges.status || 'modified'}`), ...current.activity].slice(0, 50),
       };
     });
-  }, [backendStatus, addActivity, sendStepNotification, addToast]);
+    return { success: true, booking: persistedBooking ? normalizeBookingFromDjango(persistedBooking) : undefined };
+  }, [backendStatus, currentTechnician, isAdminLoggedIn, data.technicians, requireDatabaseWrite, addActivity, sendStepNotification, addToast]);
 
   // Rate Technician (Customer Rating after service)
-  const rateTechnician = useCallback((bookingId, ratingValue, reviewComment, tags = []) => {
+  const rateTechnician = useCallback(async (bookingId, ratingValue, reviewComment, tags = []) => {
+    if (!requireDatabaseWrite()) return { success: false };
     if (backendStatus === 'live') {
-      api.rateBooking(bookingId, ratingValue, reviewComment, tags).catch((err) => {
-        console.warn('Backend rateBooking sync warning:', err);
-      });
+      try {
+        await api.rateBooking(bookingId, ratingValue, reviewComment, tags);
+      } catch (err) {
+        addToast({ title: 'Rating not saved', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
+      }
     }
 
     const booking = data.bookings.find((b) => b.id === bookingId);
-    if (!booking) return;
+    if (!booking) return { success: false };
 
     const techId = booking.technicianId;
 
@@ -1045,18 +1171,58 @@ export function AppDataProvider({ children }) {
       message: `Thank you for rating your service ${ratingValue} stars.`,
       type: 'success',
     });
-  }, [backendStatus, data.bookings, addActivity, sendStepNotification, addToast]);
+    return { success: true };
+  }, [backendStatus, data.bookings, requireDatabaseWrite, addActivity, sendStepNotification, addToast]);
 
   // Add / Update Technician
-  const addTechnician = useCallback((form) => {
-    return registerTechnician(form);
-  }, [registerTechnician]);
+  const addTechnician = useCallback(async (form) => {
+    if (!requireDatabaseWrite()) return null;
+    let technician;
+    if (backendStatus === 'live') {
+      try {
+        const saved = await api.registerTechnician(form);
+        technician = normalizeTechnicianFromDjango(saved);
+      } catch (err) {
+        addToast({ title: 'Technician not saved', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return null;
+      }
+    } else {
+      const cleanPhone = form.phone.replace(/\D/g, '').slice(-10);
+      technician = {
+        id: `TECH-${Date.now().toString().slice(-6)}`,
+        name: form.name.trim(), phone: cleanPhone,
+        email: (form.email || '').trim().toLowerCase(),
+        aadhaar: form.aadhaar || '', area: form.area || 'Maner', address: form.address || '',
+        skills: Array.isArray(form.skills) ? form.skills.join(', ') : (form.skills || ''),
+        status: 'Pending', wallet: 0, walletBalance: 0, walletTransactions: [],
+        completedJobs: 0, rating: 5, ratingCount: 0, isOnline: false,
+        registeredAt: new Date().toISOString(),
+      };
+    }
 
-  const updateTechnician = useCallback((id, changes) => {
-    if (backendStatus === 'live' && changes.status) {
-      api.verifyTechnicianKyc(id, changes.status, changes.kycRemarks || '').catch((err) => {
-        console.warn('Backend verifyTechnicianKyc sync warning:', err);
-      });
+    setData((current) => ({
+      ...current,
+      technicians: [technician, ...current.technicians.filter((item) => item.phone !== technician.phone)],
+      activity: [addActivity(`Technician ${technician.name} added`), ...current.activity].slice(0, 50),
+    }));
+    addToast({ title: 'Technician added', message: `${technician.name} profile saved to the database.`, type: 'success' });
+    return technician;
+  }, [backendStatus, requireDatabaseWrite, addActivity, addToast]);
+
+  const updateTechnician = useCallback(async (id, changes) => {
+    if (!requireDatabaseWrite()) return { success: false };
+    if (backendStatus === 'live') {
+      try {
+        const kycStatus = changes.status === 'Pending Verification' ? 'Pending' : changes.status;
+        if (kycStatus && ['Verified', 'Rejected', 'Pending'].includes(kycStatus)) {
+          await api.verifyTechnicianKyc(id, kycStatus, changes.kycRemarks || '');
+        } else {
+          await api.updateTechnician(id, changes);
+        }
+      } catch (err) {
+        addToast({ title: 'Technician update failed', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
+      }
     }
 
     setData((current) => {
@@ -1070,18 +1236,23 @@ export function AppDataProvider({ children }) {
         activity: [addActivity(`Technician ${id} updated`), ...current.activity].slice(0, 50),
       };
     });
-  }, [backendStatus, addActivity, currentTechnician]);
+    return { success: true };
+  }, [backendStatus, addActivity, currentTechnician, requireDatabaseWrite, addToast]);
 
   // Update Service Price & Dynamic Commission (Admin)
-  const updateServicePrice = useCallback((id, price, commissionFee) => {
+  const updateServicePrice = useCallback(async (id, price, commissionFee) => {
     const amount = Number(price);
     const commFee = commissionFee !== undefined && commissionFee !== null && commissionFee !== '' ? Number(commissionFee) : undefined;
     if (!Number.isFinite(amount) || amount < 0) return;
 
+    if (!requireDatabaseWrite()) return { success: false };
     if (backendStatus === 'live') {
-      api.updateServicePrice(id, amount, commFee).catch((err) => {
-        console.warn('Backend updateServicePrice sync warning:', err);
-      });
+      try {
+        await api.updateServicePrice(id, amount, commFee);
+      } catch (err) {
+        addToast({ title: 'Price not saved', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
+      }
     }
 
     setData((current) => ({
@@ -1098,17 +1269,22 @@ export function AppDataProvider({ children }) {
       message: `Starting rate: ₹${amount}${commFee !== undefined ? ` · Commission: ₹${commFee}` : ''}`,
       type: 'success',
     });
-  }, [backendStatus, addActivity, addToast]);
+    return { success: true };
+  }, [backendStatus, addActivity, addToast, requireDatabaseWrite]);
 
   // Update Subservice Price & Commission (Admin)
-  const updateSubservicePrice = useCallback((serviceId, subserviceId, price, commissionFee) => {
+  const updateSubservicePrice = useCallback(async (serviceId, subserviceId, price, commissionFee) => {
     const amount = price !== undefined && price !== null && price !== '' ? Number(price) : null;
     const comm = commissionFee !== undefined && commissionFee !== null && commissionFee !== '' ? Number(commissionFee) : null;
 
+    if (!requireDatabaseWrite()) return { success: false };
     if (backendStatus === 'live') {
-      api.updateSubservicePrice(serviceId, subserviceId, amount, comm).catch((err) => {
-        console.warn('Backend updateSubservicePrice sync warning:', err);
-      });
+      try {
+        await api.updateSubservicePrice(serviceId, subserviceId, amount, comm);
+      } catch (err) {
+        addToast({ title: 'Package rate not saved', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
+      }
     }
 
     setData((current) => {
@@ -1147,7 +1323,8 @@ export function AppDataProvider({ children }) {
       message: `${amount !== null ? `Rate: ₹${amount} ` : ''}${comm !== null ? `| Comm: ₹${comm}` : ''}`,
       type: 'success',
     });
-  }, [backendStatus, addActivity, addToast]);
+    return { success: true };
+  }, [backendStatus, addActivity, addToast, requireDatabaseWrite]);
 
   // Add New Service (Admin)
   const addService = useCallback(async (form) => {
@@ -1196,6 +1373,7 @@ export function AppDataProvider({ children }) {
       subcategories: subs,
     };
 
+    if (!requireDatabaseWrite()) return { success: false, error: 'Database unavailable' };
     if (backendStatus === 'live') {
       try {
         const res = await api.createService(newServiceObj);
@@ -1204,7 +1382,8 @@ export function AppDataProvider({ children }) {
           if (res.slug) newServiceObj.id = res.slug;
         }
       } catch (err) {
-        console.warn('Backend createService warning:', err);
+        addToast({ title: 'Service not saved', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
       }
     }
 
@@ -1221,7 +1400,7 @@ export function AppDataProvider({ children }) {
     });
 
     return { success: true, service: newServiceObj };
-  }, [backendStatus, addActivity, addToast]);
+  }, [backendStatus, addActivity, addToast, requireDatabaseWrite]);
 
   // Add Subservice to existing service (Admin)
   const addSubservice = useCallback(async (serviceId, subForm) => {
@@ -1238,10 +1417,16 @@ export function AppDataProvider({ children }) {
       description: subForm.description || '',
     };
 
+    let persistedSubcategories = null;
+    if (!requireDatabaseWrite()) return { success: false, error: 'Database unavailable' };
     if (backendStatus === 'live') {
-      api.addSubservice(serviceId, newSub).catch((err) => {
-        console.warn('Backend addSubservice warning:', err);
-      });
+      try {
+        const res = await api.addSubservice(serviceId, newSub);
+        persistedSubcategories = res?.subcategories;
+      } catch (err) {
+        addToast({ title: 'Package not saved', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
+      }
     }
 
     setData((current) => ({
@@ -1250,7 +1435,9 @@ export function AppDataProvider({ children }) {
         if (s.id !== serviceId && s.pk !== serviceId) return s;
         return {
           ...s,
-          subcategories: [...(s.subcategories || []), newSub],
+          subcategories: Array.isArray(persistedSubcategories)
+            ? persistedSubcategories
+            : [...(s.subcategories || []), newSub],
         };
       }),
       activity: [addActivity(`Added subservice ${subName} to ${serviceId}`), ...current.activity].slice(0, 50),
@@ -1261,15 +1448,18 @@ export function AppDataProvider({ children }) {
       message: `${subName} added to service.`,
       type: 'success',
     });
-  }, [backendStatus, addActivity, addToast]);
+    return { success: true };
+  }, [backendStatus, addActivity, addToast, requireDatabaseWrite]);
 
   // Delete Service (Admin)
   const deleteService = useCallback(async (serviceId) => {
+    if (!requireDatabaseWrite()) return { success: false };
     if (backendStatus === 'live') {
       try {
         await api.deleteService(serviceId);
       } catch (err) {
-        console.warn('Backend deleteService warning:', err);
+        addToast({ title: 'Service not deleted', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
       }
     }
 
@@ -1285,15 +1475,17 @@ export function AppDataProvider({ children }) {
       type: 'info',
     });
     return { success: true };
-  }, [backendStatus, addActivity, addToast]);
+  }, [backendStatus, addActivity, addToast, requireDatabaseWrite]);
 
   // Delete Subservice (Admin)
   const deleteSubservice = useCallback(async (serviceId, subserviceId) => {
+    if (!requireDatabaseWrite()) return { success: false };
     if (backendStatus === 'live') {
       try {
         await api.deleteSubservice(serviceId, subserviceId);
       } catch (err) {
-        console.warn('Backend deleteSubservice warning:', err);
+        addToast({ title: 'Package not deleted', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
       }
     }
 
@@ -1315,16 +1507,18 @@ export function AppDataProvider({ children }) {
       type: 'info',
     });
     return { success: true };
-  }, [backendStatus, addActivity, addToast]);
+  }, [backendStatus, addActivity, addToast, requireDatabaseWrite]);
 
   // Purge all demo/mock data (Admin)
   const purgeProductionData = useCallback(async () => {
     let res = null;
+    if (!requireDatabaseWrite()) return { success: false };
     if (backendStatus === 'live') {
       try {
         res = await api.purgeProductionData();
       } catch (err) {
-        console.warn('Backend purgeProductionData warning:', err);
+        addToast({ title: 'Database purge failed', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
       }
     }
 
@@ -1346,27 +1540,32 @@ export function AppDataProvider({ children }) {
       type: 'success',
     });
     return res || { success: true };
-  }, [backendStatus, addActivity, addToast]);
+  }, [backendStatus, addActivity, addToast, requireDatabaseWrite]);
 
   // Complaints
-  const addComplaint = useCallback((form) => {
-    const complaint = {
+  const addComplaint = useCallback(async (form) => {
+    let complaint = {
       id: `CMP-${Date.now().toString().slice(-6)}`,
       ...form,
       status: 'Open',
       createdAt: new Date().toISOString(),
     };
 
+    if (!requireDatabaseWrite()) return null;
     if (backendStatus === 'live') {
-      api.createComplaint({
-        customerName: complaint.customerName || complaint.name,
-        phone: complaint.phone,
-        category: complaint.category,
-        priority: complaint.priority,
-        description: complaint.description,
-      }).catch((err) => {
-        console.warn('Backend createComplaint sync warning:', err);
-      });
+      try {
+        const saved = await api.createComplaint({
+          customerName: complaint.customerName || complaint.name,
+          phone: complaint.phone,
+          category: complaint.category,
+          priority: complaint.priority,
+          description: complaint.description || complaint.message,
+        });
+        complaint = normalizeComplaintFromDjango(saved) || complaint;
+      } catch (err) {
+        addToast({ title: 'Complaint not saved', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return null;
+      }
     }
 
     setData((current) => ({
@@ -1380,13 +1579,18 @@ export function AppDataProvider({ children }) {
       type: 'info',
     });
     return complaint;
-  }, [backendStatus, addActivity, addToast]);
+  }, [backendStatus, requireDatabaseWrite, addActivity, addToast]);
 
-  const updateComplaint = useCallback((id, status, resolutionAction) => {
-    if (backendStatus === 'live' && status === 'Resolved') {
-      api.resolveComplaint(id, resolutionAction || 'Resolved after review', '').catch((err) => {
-        console.warn('Backend resolveComplaint sync warning:', err);
-      });
+  const updateComplaint = useCallback(async (id, status, resolutionAction) => {
+    if (!requireDatabaseWrite()) return { success: false };
+    if (backendStatus === 'live') {
+      try {
+        if (status === 'Resolved') await api.resolveComplaint(id, resolutionAction || 'Resolved after review', '');
+        else await api.updateComplaint(id, { status, resolutionAction });
+      } catch (err) {
+        addToast({ title: 'Complaint update failed', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+        return { success: false, error: err.message };
+      }
     }
 
     setData((current) => ({
@@ -1400,7 +1604,8 @@ export function AppDataProvider({ children }) {
       message: `Ticket ${id} marked as ${status}.`,
       type: 'info',
     });
-  }, [backendStatus, addToast]);
+    return { success: true };
+  }, [backendStatus, requireDatabaseWrite, addToast]);
 
   // Admin Withdrawals / Payout Requests
   const requestAdminWithdrawal = useCallback(
@@ -1450,6 +1655,7 @@ export function AppDataProvider({ children }) {
 
       let createdWithdrawal = null;
 
+      if (!requireDatabaseWrite()) return { success: false, error: 'Database unavailable' };
       if (backendStatus === 'live') {
         try {
           const res = await api.requestAdminWithdrawal({
@@ -1500,16 +1706,18 @@ export function AppDataProvider({ children }) {
 
       return { success: true, withdrawal: createdWithdrawal };
     },
-    [backendStatus, data.bookings, data.withdrawals, addActivity, addToast]
+    [backendStatus, data.bookings, data.withdrawals, requireDatabaseWrite, addActivity, addToast]
   );
 
   const updateAdminWithdrawalStatus = useCallback(
     async (id, newStatus, adminNotes = '') => {
+      if (!requireDatabaseWrite()) return { success: false };
       if (backendStatus === 'live') {
         try {
           await api.updateAdminWithdrawalStatus(id, newStatus, adminNotes);
         } catch (err) {
-          console.warn('Backend updateAdminWithdrawalStatus warning:', err);
+          addToast({ title: 'Withdrawal update failed', message: err?.data?.detail || err?.data?.error || err.message, type: 'error' });
+          return { success: false, error: err.message };
         }
       }
 
@@ -1533,13 +1741,14 @@ export function AppDataProvider({ children }) {
         message: `Payout request ${id} marked as ${newStatus}.`,
         type: newStatus === 'Approved' ? 'success' : 'info',
       });
+      return { success: true };
     },
-    [backendStatus, addActivity, addToast]
+    [backendStatus, requireDatabaseWrite, addActivity, addToast]
   );
 
   // Complete Job With 4-Digit Happy Code Verification & Fixed Platform Fee Wallet Deduction
   const completeJobWithPin = useCallback(
-    (bookingId, enteredPin) => {
+    async (bookingId, enteredPin) => {
       const cleanPin = String(enteredPin || '').trim();
       const booking = data.bookings.find((b) => b.id === bookingId);
 
@@ -1567,11 +1776,17 @@ export function AppDataProvider({ children }) {
       const techId = booking.technicianId || (currentTechnician ? currentTechnician.id : '');
       const completedTimestamp = new Date().toISOString();
 
-      // If backend is live, sync to Django in background
+      if (!requireDatabaseWrite()) return { success: false, error: 'Database unavailable' };
+      let persistedTransaction = null;
       if (backendStatus === 'live') {
-        api.completeBooking(bookingId, cleanPin).catch((err) => {
-          console.warn('Backend completeBooking sync warning:', err);
-        });
+        try {
+          const response = await api.completeBooking(bookingId, cleanPin);
+          persistedTransaction = response?.transaction || null;
+        } catch (err) {
+          const message = err?.data?.detail || err?.data?.error || err.message;
+          addToast({ title: 'Job completion failed', message, type: 'error' });
+          return { success: false, error: message };
+        }
       }
 
       setData((current) => {
@@ -1608,10 +1823,20 @@ export function AppDataProvider({ children }) {
 
           const updated = {
             ...t,
-            wallet: newBal,
-            walletBalance: newBal,
+            wallet: persistedTransaction?.balance_after != null ? Number(persistedTransaction.balance_after) : newBal,
+            walletBalance: persistedTransaction?.balance_after != null ? Number(persistedTransaction.balance_after) : newBal,
             completedJobs: Number(t.completedJobs || 0) + 1,
-            walletTransactions: [tx, ...(t.walletTransactions || [])],
+            walletTransactions: persistedTransaction
+              ? [{
+                  id: persistedTransaction.txn_id,
+                  type: String(persistedTransaction.txn_type || 'DEBIT').toLowerCase(),
+                  amount: Number(persistedTransaction.amount || 0),
+                  balanceAfter: Number(persistedTransaction.balance_after || 0),
+                  description: persistedTransaction.description,
+                  bookingId: persistedTransaction.booking ? `GS-${persistedTransaction.booking}` : '',
+                  timestamp: persistedTransaction.created_at,
+                }, ...(t.walletTransactions || [])]
+              : [tx, ...(t.walletTransactions || [])],
           };
 
           if (currentTechnician && (t.id === currentTechnician.id || t.id === techId)) {
@@ -1668,7 +1893,7 @@ export function AppDataProvider({ children }) {
 
       return { success: true };
     },
-    [backendStatus, data.bookings, currentTechnician, addActivity, sendStepNotification, addToast]
+    [backendStatus, data.bookings, currentTechnician, requireDatabaseWrite, addActivity, sendStepNotification, addToast]
   );
 
   // Recharge Technician Wallet (via Verified Razorpay Online Payment)
@@ -1684,6 +1909,8 @@ export function AppDataProvider({ children }) {
         });
         return { success: false, error: 'Invalid amount' };
       }
+
+      if (!requireDatabaseWrite()) return { success: false, error: 'Database unavailable' };
 
       let backendRes = null;
       if (backendStatus === 'live') {
@@ -1769,7 +1996,7 @@ export function AppDataProvider({ children }) {
 
       return { success: true, balance: finalBalance, amount: numAmount };
     },
-    [backendStatus, currentTechnician, addActivity, addToast]
+    [backendStatus, currentTechnician, requireDatabaseWrite, addActivity, addToast]
   );
 
   // Clear local cached data and re-sync from the database; never restore demo fixtures.

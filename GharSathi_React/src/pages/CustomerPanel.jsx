@@ -346,11 +346,12 @@ export default function CustomerPanel() {
     }
 
     // Cash on Service flow
-    const created = createBooking({
+    const created = await createBooking({
       ...bookingPayload,
       payment: 'Cash on Service',
       paymentStatus: 'Pending',
     });
+    if (!created) return;
 
     setBookingNotice(`Booking request ${created.id} submit ho gayi! Work step notification bhej diya gaya hai.`);
     setActive('bookings');
@@ -372,7 +373,7 @@ export default function CustomerPanel() {
       console.warn('Backend payment verification fallback:', err);
     }
 
-    const created = createBooking({
+    const created = await createBooking({
       ...pendingBookingPayload,
       payment: 'Online / Razorpay UPI',
       paymentStatus: 'Paid',
@@ -380,6 +381,7 @@ export default function CustomerPanel() {
       razorpayPaymentId: paymentResponse.razorpay_payment_id,
       razorpaySignature: paymentResponse.razorpay_signature,
     });
+    if (!created) return;
 
     setPendingBookingPayload(null);
     setBookingNotice(`Payment Verified! 💳 Booking ${created.id} confirmed via Razorpay (${paymentResponse.razorpay_payment_id}).`);
@@ -409,30 +411,32 @@ export default function CustomerPanel() {
   };
 
   // Profile Save
-  const saveProfile = (event) => {
+  const saveProfile = async (event) => {
     event.preventDefault();
     if (currentCustomer) {
-      signupCustomer({
+      const saved = await signupCustomer({
         name: form.customerName,
         phone: form.phone,
         address: form.address,
         pincode: form.pincode,
         area: form.area,
+        email: form.email,
       });
-      setProfileNotice('Profile information browser mein update ho gayi.');
+      if (saved) setProfileNotice('Profile information database mein save ho gayi.');
     }
   };
 
   // Complaint Submit
-  const submitComplaint = (event) => {
+  const submitComplaint = async (event) => {
     event.preventDefault();
     if (!currentCustomer) {
       setAuthModalOpen(true);
       setAuthError('Complaint submit karne ke liye pehle login karein.');
       return;
     }
-    const created = addComplaint(complaint);
-    setBookingNotice(`Complaint ${created.id} save ho gayi. Admin panel se resolve ki jayegi.`);
+    const created = await addComplaint(complaint);
+    if (!created) return;
+    setBookingNotice(`Complaint ${created.id} database mein save ho gayi. Admin panel se resolve ki jayegi.`);
     setComplaint({
       customerName: currentCustomer?.name || '',
       phone: currentCustomer?.phone || '',
@@ -1485,9 +1489,10 @@ export default function CustomerPanel() {
         <RatingModal
           booking={ratingBooking}
           onClose={() => setRatingBooking(null)}
-          onSubmit={(bId, stars, rev, tags) => {
-            rateTechnician(bId, stars, rev, tags);
-            setBookingNotice(`Dhanyawaad! Booking ${bId} ke liye rating submit ho gayi.`);
+          onSubmit={async (bId, stars, rev, tags) => {
+            const result = await rateTechnician(bId, stars, rev, tags);
+            if (result?.success) setBookingNotice(`Dhanyawaad! Booking ${bId} ki rating database mein save ho gayi.`);
+            return result;
           }}
         />
       )}

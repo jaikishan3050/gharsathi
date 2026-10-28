@@ -87,3 +87,5 @@ class HasGharSathiRole:
 IsGharSathiAdmin = HasGharSathiRole.for_roles('admin')
 IsGharSathiCustomer = HasGharSathiRole.for_roles('customer')
 IsGharSathiTechnician = HasGharSathiRole.for_roles('technician')
+IsGharSathiAdminOrCustomer = HasGharSathiRole.for_roles('admin', 'customer')
+IsGharSathiTechnicianOrAdmin = HasGharSathiRole.for_roles('technician', 'admin')

@@ -52,7 +52,9 @@ from .authentication import (
     IsGharSathiAdmin,
     IsGharSathiAuthenticated,
     IsGharSathiCustomer,
+    IsGharSathiAdminOrCustomer,
     IsGharSathiTechnician,
+    IsGharSathiTechnicianOrAdmin,
 )
 
 logger = logging.getLogger(__name__)
@@ -294,7 +296,14 @@ class TechnicianProfileViewSet(viewsets.ModelViewSet):
 
     permission_classes = [IsGharSathiAdmin]
 
+    def get_permissions(self):
+        if self.action in ('update', 'partial_update'):
+            return [IsGharSathiTechnicianOrAdmin()]
+        return [IsGharSathiAdmin()]
+
     def get_object(self):
+        if getattr(self.request.user, 'role', None) == 'technician':
+            return self.request.user.profile
         pk = self.kwargs.get('pk')
         if str(pk).isdigit():
             obj = self.get_queryset().filter(pk=pk).first()
@@ -321,6 +330,17 @@ class TechnicianProfileViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Explicitly enforce 0.00 wallet balance upon technician registration
         serializer.save(wallet_balance=Decimal('0.00'))
+
+    def perform_update(self, serializer):
+        if getattr(self.request.user, 'role', None) == 'technician':
+            allowed_self_service_fields = {
+                'name', 'email', 'trade', 'area', 'address', 'is_online',
+                'live_location', 'live_image', 'upi_id',
+            }
+            for field in list(serializer.validated_data):
+                if field not in allowed_self_service_fields:
+                    serializer.validated_data.pop(field)
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def recharge(self, request, pk=None):
@@ -1288,7 +1308,14 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerProfileSerializer
     permission_classes = [IsGharSathiAdmin]
 
+    def get_permissions(self):
+        if self.action in ('update', 'partial_update'):
+            return [IsGharSathiAdminOrCustomer()]
+        return [IsGharSathiAdmin()]
+
     def get_object(self):
+        if getattr(self.request.user, 'role', None) == 'customer':
+            return self.request.user.profile
         pk = self.kwargs.get('pk')
         if str(pk).isdigit():
             obj = self.get_queryset().filter(pk=pk).first()
@@ -1297,6 +1324,12 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
         if not obj:
             raise NotFound('Customer profile not found')
         return obj
+
+    def perform_update(self, serializer):
+        if getattr(self.request.user, 'role', None) == 'customer':
+            serializer.validated_data.pop('phone', None)
+            serializer.validated_data.pop('status', None)
+        serializer.save()
 
 
 class SendOTPView(APIView):

@@ -244,7 +244,7 @@ export default function AdminPanel() {
     }
   };
 
-  const addNewTechnician = (event) => {
+  const addNewTechnician = async (event) => {
     event.preventDefault();
     const cleanPhone = techForm.phone.replace(/\D/g, '').slice(-10);
     if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
@@ -256,7 +256,8 @@ export default function AdminPanel() {
       setNotice('Is mobile number se technician pehle se listed hai.');
       return;
     }
-    const record = addTechnician(techForm);
+    const record = await addTechnician(techForm);
+    if (!record) return;
     setNotice(`${record.name} add ho gaye. Verification pending hai.`);
     setTechForm({
       name: '',
@@ -271,14 +272,15 @@ export default function AdminPanel() {
     setTechFormOpen(false);
   };
 
-  const setBookingAssignment = (booking, technicianId) => {
+  const setBookingAssignment = async (booking, technicianId) => {
     const tech = data.technicians.find((item) => item.id === technicianId);
-    updateBooking(booking.id, {
+    const result = await updateBooking(booking.id, {
       technicianId: tech?.id || '',
       technicianName: tech?.name || '',
       technicianPhone: tech?.phone || '',
       ...(tech && booking.status === 'Pending' ? { status: 'Accepted' } : {}),
     });
+    if (!result?.success) return;
     setNotice(
       tech
         ? `${booking.id} ko technician ${tech.name} assign ho gaye. Work step notification sent!`
@@ -286,12 +288,13 @@ export default function AdminPanel() {
     );
   };
 
-  const setBookingStatus = (booking, status) => {
+  const setBookingStatus = async (booking, status) => {
     if (status === 'Completed' && !booking.technicianId) {
       setNotice('Job complete mark karne se pehle technician assign karein.');
       return;
     }
-    updateBooking(booking.id, { status });
+    const result = await updateBooking(booking.id, { status });
+    if (!result?.success) return;
     if (status === 'Completed') {
       setNotice(
         `${booking.id} marked Completed. Fixed platform commission of ₹${FIXED_PLATFORM_COMMISSION} recorded.`
@@ -301,7 +304,7 @@ export default function AdminPanel() {
     }
   };
 
-  const savePrice = (service) => {
+  const savePrice = async (service) => {
     const raw = priceDrafts[service.id] ?? service.price;
     const rawCommission = commissionDrafts[service.id] ?? (service.commission_fee ?? service.commissionFee ?? 149);
     const amount = Number(raw);
@@ -314,11 +317,11 @@ export default function AdminPanel() {
       setNotice('Commission fee zero ya positive number hona chahiye.');
       return;
     }
-    updateServicePrice(service.id, amount, commAmount);
-    setNotice(`${service.name} ka price (₹${amount}) aur commission (₹${commAmount}) update ho gaya.`);
+    const result = await updateServicePrice(service.id, amount, commAmount);
+    if (result?.success) setNotice(`${service.name} ka price (₹${amount}) aur commission (₹${commAmount}) database mein save ho gaya.`);
   };
 
-  const saveSubPrice = (serviceId, sub) => {
+  const saveSubPrice = async (serviceId, sub) => {
     const rawPrice = subPriceDrafts[sub.id] ?? sub.price;
     const rawComm = subCommDrafts[sub.id] ?? sub.commission_fee ?? sub.commissionFee ?? sub.commission ?? 149;
     const amount = Number(rawPrice);
@@ -331,8 +334,8 @@ export default function AdminPanel() {
       setNotice('Commission fee zero ya positive number hona chahiye.');
       return;
     }
-    updateSubservicePrice(serviceId, sub.id, amount, commAmount);
-    setNotice(`${sub.name} ka rate ₹${amount} aur commission ₹${commAmount} update ho gaya.`);
+    const result = await updateSubservicePrice(serviceId, sub.id, amount, commAmount);
+    if (result?.success) setNotice(`${sub.name} ka rate ₹${amount} aur commission ₹${commAmount} database mein save ho gaya.`);
   };
 
   const handleCreateSubservice = async (serviceId) => {
@@ -352,7 +355,7 @@ export default function AdminPanel() {
       return;
     }
 
-    await addSubservice(serviceId, {
+    const result = await addSubservice(serviceId, {
       name: subName,
       price,
       commission_fee: comm,
@@ -360,9 +363,11 @@ export default function AdminPanel() {
       description: newSubForm.description || '',
     });
 
-    setAddingSubserviceFor(null);
-    setNewSubForm({ name: '', price: '', commission_fee: '149', time: '45 mins', description: '' });
-    setNotice(`Naya subservice "${subName}" (Rate: ₹${price}, Comm: ₹${comm}) add ho gaya.`);
+    if (result?.success) {
+      setAddingSubserviceFor(null);
+      setNewSubForm({ name: '', price: '', commission_fee: '149', time: '45 mins', description: '' });
+      setNotice(`Naya subservice "${subName}" (Rate: ₹${price}, Comm: ₹${comm}) database mein save ho gaya.`);
+    }
   };
 
   // Withdrawal Form Submission & FinTech Payout Controls
@@ -1278,9 +1283,9 @@ export default function AdminPanel() {
                             {tech.status !== 'Verified' ? (
                               <button
                                 className="button button-small button-primary"
-                                onClick={() => {
-                                  updateTechnician(tech.id, { status: 'Verified' });
-                                  setNotice(`${tech.name} verified ho gaye.`);
+                                onClick={async () => {
+                                  const result = await updateTechnician(tech.id, { status: 'Verified' });
+                                  if (result?.success) setNotice(`${tech.name} database mein verified ho gaye.`);
                                 }}
                               >
                                 Approve & Verify
@@ -1288,9 +1293,9 @@ export default function AdminPanel() {
                             ) : (
                               <button
                                 className="button button-small button-outline"
-                                onClick={() => {
-                                  updateTechnician(tech.id, { status: 'Pending Verification' });
-                                  setNotice(`${tech.name} verification hold par rakhi gayi.`);
+                                onClick={async () => {
+                                  const result = await updateTechnician(tech.id, { status: 'Pending Verification' });
+                                  if (result?.success) setNotice(`${tech.name} verification hold par rakhi gayi.`);
                                 }}
                               >
                                 Put On Hold
@@ -1298,9 +1303,9 @@ export default function AdminPanel() {
                             )}
                             <button
                               className="button button-small button-quiet"
-                              onClick={() => {
-                                updateTechnician(tech.id, { isOnline: !tech.isOnline });
-                                setNotice(`${tech.name} online status toggle hua.`);
+                              onClick={async () => {
+                                const result = await updateTechnician(tech.id, { isOnline: !tech.isOnline });
+                                if (result?.success) setNotice(`${tech.name} online status database mein update hua.`);
                               }}
                             >
                               {tech.isOnline ? 'Set Offline' : 'Set Online'}
@@ -2193,9 +2198,11 @@ export default function AdminPanel() {
                 type="button"
                 className="button button-danger"
                 onClick={async () => {
-                  await deleteService(deleteServiceModal.id);
-                  setDeleteServiceModal(null);
-                  setNotice(`Service "${deleteServiceModal.name}" deleted.`);
+                  const result = await deleteService(deleteServiceModal.id);
+                  if (result?.success) {
+                    setDeleteServiceModal(null);
+                    setNotice(`Service "${deleteServiceModal.name}" database se deleted.`);
+                  }
                 }}
               >
                 Confirm Delete Service 🗑️
@@ -2229,9 +2236,11 @@ export default function AdminPanel() {
                 type="button"
                 className="button button-danger"
                 onClick={async () => {
-                  await deleteSubservice(deleteSubserviceModal.serviceId, deleteSubserviceModal.sub.id);
-                  setDeleteSubserviceModal(null);
-                  setNotice(`Package "${deleteSubserviceModal.sub.name}" deleted.`);
+                  const result = await deleteSubservice(deleteSubserviceModal.serviceId, deleteSubserviceModal.sub.id);
+                  if (result?.success) {
+                    setDeleteSubserviceModal(null);
+                    setNotice(`Package "${deleteSubserviceModal.sub.name}" database se deleted.`);
+                  }
                 }}
               >
                 Confirm Delete Package 🗑️
