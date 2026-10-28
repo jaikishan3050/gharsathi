@@ -129,20 +129,11 @@ export function AppDataProvider({ children }) {
   const [lastSyncTime, setLastSyncTime] = useState(null);
 
   const requireDatabaseWrite = useCallback(() => {
-    if (backendStatus === 'live') return true;
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-    const localDevelopment = hostname === 'localhost' || hostname === '127.0.0.1';
-    if (!localDevelopment) {
-      addToast({
-        title: 'Database unavailable',
-        message: 'Server database se connection nahi hai. Change save nahi hua; connection aane par dobara try karein.',
-        type: 'error',
-        duration: 7000,
-      });
-      return false;
-    }
+    // In production, allow write operations to reach the backend API;
+    // if the server is unreachable or fails, the API call's try/catch block
+    // will present the exact error message.
     return true;
-  }, [backendStatus, addToast]);
+  }, []);
 
   const syncFromDjango = useCallback(
     async (notify = false) => {
@@ -252,15 +243,11 @@ export function AppDataProvider({ children }) {
           let updatedTechnicians = current.technicians;
           if (Array.isArray(techsRes)) {
             updatedTechnicians = techsRes.map(normalizeTechnicianFromDjango);
-          } else if (techsResult.error) {
-            updatedTechnicians = [];
           }
 
           let updatedBookings = current.bookings;
           if (Array.isArray(bookingsRes)) {
             updatedBookings = bookingsRes.map(normalizeBookingFromDjango);
-          } else if (bookingsResult.error) {
-            updatedBookings = [];
           }
 
           let updatedCustomers = current.customers;
@@ -282,22 +269,16 @@ export function AppDataProvider({ children }) {
               status: customer.status || 'Active',
               registeredAt: customer.created_at || '',
             }));
-          } else if (customersResult.error) {
-            updatedCustomers = [];
           }
 
           let updatedComplaints = current.complaints;
           if (Array.isArray(complaintsRes)) {
             updatedComplaints = complaintsRes.map(normalizeComplaintFromDjango);
-          } else if (complaintsResult.error) {
-            updatedComplaints = [];
           }
 
           let updatedWithdrawals = current.withdrawals || [];
           if (Array.isArray(withdrawalsRes)) {
             updatedWithdrawals = withdrawalsRes.map(normalizeWithdrawalFromDjango);
-          } else if (withdrawalsResult.error) {
-            updatedWithdrawals = [];
           }
 
           return {
@@ -367,11 +348,32 @@ export function AppDataProvider({ children }) {
     syncFromDjango(false);
   }, [syncFromDjango]);
 
+  // Resilient auto-recovery polling: if marked offline during a traffic spike, re-check every 20s
+  useEffect(() => {
+    if (backendStatus !== 'offline') return;
+    const interval = setInterval(async () => {
+      const health = await checkBackendHealth();
+      if (health.online) {
+        syncFromDjango(false);
+      }
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [backendStatus, syncFromDjango]);
+
   // Real-Time Live Job Dispatch via Django Channels & WebSockets
-  const [wsStatus, setWsStatus] = useState('connecting');
+  // Dedicated to logged-in technicians & admins so general traffic does not saturate socket limits
+  const [wsStatus, setWsStatus] = useState('disconnected');
 
   useEffect(() => {
-    jobWebSocket.connect();
+    if (!currentTechnician && !isAdminLoggedIn) {
+      if (typeof jobWebSocket.disconnect === 'function') {
+        jobWebSocket.disconnect();
+      }
+      setWsStatus('disconnected');
+      return;
+    }
+
+    jobWebSocket.connect(currentTechnician?.area);
 
     const unsubscribe = jobWebSocket.subscribe((data) => {
       if (data.type === 'status_change') {
@@ -432,7 +434,7 @@ export function AppDataProvider({ children }) {
     return () => {
       unsubscribe();
     };
-  }, [addToast]);
+  }, [currentTechnician, isAdminLoggedIn, addToast]);
 
   // Cross-panel / Cross-tab synchronization via storage event
   useEffect(() => {

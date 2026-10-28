@@ -202,11 +202,11 @@ REST_FRAMEWORK = {
     ],
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S.%fZ',
     'DEFAULT_THROTTLE_RATES': {
-        # Per-IP caps should allow households and shared networks to sign in
-        # without rapidly locking everyone out; the endpoint also limits each phone.
-        'otp_send': '20/hour',
-        'otp_verify': '60/hour',
-        'admin_password_reset': '5/hour',
+        # Per-IP caps accommodate mobile carrier CGNAT, corporate and household Wi-Fi
+        # without blocking legitimate users; each phone number is strictly rate-limited separately.
+        'otp_send': '120/hour',
+        'otp_verify': '360/hour',
+        'admin_password_reset': '20/hour',
     },
 }
 
@@ -253,10 +253,14 @@ else:
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
     import dj_database_url
+    # With ASGI / Daphne, persistent connections (conn_max_age > 0) keep a Postgres connection
+    # open per worker thread, quickly exhausting PostgreSQL's connection limits under traffic.
+    # Defaulting to 0 ensures connections are released back immediately after request completion.
+    db_conn_max_age = int(os.environ.get('DB_CONN_MAX_AGE', '0'))
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
-            conn_max_age=600,
+            conn_max_age=db_conn_max_age,
             conn_health_checks=True,
         )
     }

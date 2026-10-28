@@ -24,11 +24,10 @@ export function getApiBaseUrl() {
 }
 
 export const API_BASE_URL = getApiBaseUrl();
-// Short-timeout fetch wrapper to detect live backend status quickly
-export async function apiRequest(endpoint, options = {}, timeoutMs = 4500) {
+
+// Production-ready resilient fetch wrapper with configurable timeout & automatic retry for traffic spikes
+export async function apiRequest(endpoint, options = {}, timeoutMs = 15000, retries = 1) {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(forgot-password|reset-password-otp)\//.test(`${path}/`)
@@ -39,46 +38,65 @@ export async function apiRequest(endpoint, options = {}, timeoutMs = 4500) {
     storedToken = sessionStorage.getItem('gharsathi_auth_token_tab') || '';
   } catch {}
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(storedToken && !publicAuthRequest ? { Authorization: `Bearer ${storedToken}` } : {}),
-        ...(options.headers || {}),
-      },
-      signal: controller.signal,
-      ...options,
-    });
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    clearTimeout(timeoutId);
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(storedToken && !publicAuthRequest ? { Authorization: `Bearer ${storedToken}` } : {}),
+          ...(options.headers || {}),
+        },
+        signal: controller.signal,
+        ...options,
+      });
 
-    if (!response.ok) {
-      let errBody = {};
-      try {
-        errBody = await response.json();
-      } catch {
-        const text = await response.text().catch(() => '');
-        errBody = { error: text || response.statusText };
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        // Under high traffic, cloud instances can return 502/503/504 temporarily; retry once
+        if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          continue;
+        }
+
+        let errBody = {};
+        try {
+          errBody = await response.json();
+        } catch {
+          const text = await response.text().catch(() => '');
+          errBody = { error: text || response.statusText };
+        }
+        const err = new Error(errBody.error || errBody.detail || `API Request failed (${response.status})`);
+        err.status = response.status;
+        err.data = errBody;
+        throw err;
       }
-      const err = new Error(errBody.error || errBody.detail || `API Request failed (${response.status})`);
-      err.status = response.status;
-      err.data = errBody;
-      throw err;
-    }
 
-    if (response.status === 204) return null;
-    return await response.json();
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
+      if (response.status === 204) return null;
+      return await response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      lastError = error;
+      // Retry once on transient network drop, connection reset, or timeout
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        continue;
+      }
+      throw error;
+    }
   }
+  throw lastError;
 }
 
-// Quick health check to test if Django server is reachable
+// Health check to test if Django server is reachable with realistic traffic-tolerant timeout
 export async function checkBackendHealth() {
   try {
-    const data = await apiRequest('/services/', { method: 'GET' }, 2000);
+    const data = await apiRequest('/services/', { method: 'GET' }, 8000, 1);
     return { online: true, source: 'django', data };
   } catch {
     return { online: false, source: 'local' };

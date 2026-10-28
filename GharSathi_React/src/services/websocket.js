@@ -28,11 +28,9 @@ class JobWebSocketService {
     const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 
     // Production environment (Firebase Hosting / Cloud Run / Render)
+    // Firebase Hosting cannot proxy WebSocket upgrades; always target the Render ASGI server
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
       const areaSuffix = area ? `/${encodeURIComponent(area)}/` : '/';
-      if (hostname.includes('gharsathi.in') || hostname.endsWith('.web.app') || hostname.endsWith('.firebaseapp.com')) {
-        return `${protocol}//${window.location.host}/ws/jobs${areaSuffix}`;
-      }
       return `wss://gharsathi-a9er.onrender.com/ws/jobs${areaSuffix}`;
     }
 

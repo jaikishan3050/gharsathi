@@ -27,6 +27,8 @@ vi.mock('../../services/api.js', async (importOriginal) => {
 vi.mock('../../services/websocket.js', () => ({
   default: {
     connect: vi.fn(),
+    disconnect: vi.fn(),
+    isConnected: vi.fn(() => false),
     subscribe: vi.fn(() => () => {}),
   },
 }));

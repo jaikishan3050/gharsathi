@@ -24,4 +24,4 @@ echo "Configuring administrator from managed server secrets..."
 python manage.py bootstrap_admin
 
 echo "Starting Daphne ASGI server on port ${TARGET_PORT} (HTTP + WebSockets)..."
-exec daphne -b 0.0.0.0 -p "${TARGET_PORT}" gharsathi_backend.asgi:application
+exec daphne -b 0.0.0.0 -p "${TARGET_PORT}" --proxy-headers --http-timeout 60 gharsathi_backend.asgi:application

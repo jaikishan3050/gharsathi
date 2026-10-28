@@ -1,1 +1,1 @@
-web: daphne -b 0.0.0.0 -p $PORT gharsathi_backend.asgi:application
+web: daphne -b 0.0.0.0 -p $PORT --proxy-headers --http-timeout 60 gharsathi_backend.asgi:application
