@@ -130,6 +130,14 @@ export function AppDataProvider({ children }) {
 
   const syncFromDjango = useCallback(
     async (notify = false) => {
+      const authRole = isAdminLoggedIn
+        ? 'admin'
+        : currentTechnician
+          ? 'technician'
+          : currentCustomer
+            ? 'customer'
+            : null;
+
       try {
         const health = await checkBackendHealth();
         if (!health.online) {
@@ -146,11 +154,11 @@ export function AppDataProvider({ children }) {
 
         const [servicesRes, techsRes, bookingsRes, customersRes, complaintsRes, withdrawalsRes] = await Promise.all([
           api.getServices().catch(() => null),
-          api.getTechnicians().catch(() => null),
-          api.getBookings().catch(() => null),
-          api.getCustomers().catch(() => null),
-          api.getComplaints().catch(() => null),
-          api.getAdminWithdrawals().catch(() => null),
+          authRole === 'admin' ? api.getTechnicians().catch(() => null) : Promise.resolve(null),
+          authRole ? api.getBookings().catch(() => null) : Promise.resolve(null),
+          authRole === 'admin' ? api.getCustomers().catch(() => null) : Promise.resolve(null),
+          authRole ? api.getComplaints().catch(() => null) : Promise.resolve(null),
+          authRole === 'admin' ? api.getAdminWithdrawals().catch(() => null) : Promise.resolve(null),
         ]);
 
         setData((current) => {
@@ -271,7 +279,7 @@ export function AppDataProvider({ children }) {
         return false;
       }
     },
-    [addToast]
+    [addToast, currentCustomer, currentTechnician, isAdminLoggedIn]
   );
 
   // Auto-sync on initial mount
@@ -541,6 +549,8 @@ export function AppDataProvider({ children }) {
         sessionStorage.setItem(AUTH_TOKEN_KEY, token);
       } catch {}
     }
+    setCurrentTechnician(null);
+    setIsAdminLoggedIn(false);
     setCurrentCustomer(customer);
     try {
       sessionStorage.setItem(CUSTOMER_AUTH_KEY, JSON.stringify(customer));
@@ -556,6 +566,8 @@ export function AppDataProvider({ children }) {
       } catch {}
     }
     const normalized = normalizeTechnicianFromDjango(technician) || technician;
+    setCurrentCustomer(null);
+    setIsAdminLoggedIn(false);
     setCurrentTechnician(normalized);
     try {
       sessionStorage.setItem(TECH_AUTH_KEY, JSON.stringify(normalized));
@@ -566,6 +578,8 @@ export function AppDataProvider({ children }) {
 
   const logoutCustomer = useCallback(() => {
     setCurrentCustomer(null);
+    setCurrentTechnician(null);
+    setIsAdminLoggedIn(false);
     try {
       sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
       sessionStorage.removeItem(AUTH_TOKEN_KEY);
@@ -648,6 +662,8 @@ export function AppDataProvider({ children }) {
 
   const logoutTechnician = useCallback(() => {
     setCurrentTechnician(null);
+    setCurrentCustomer(null);
+    setIsAdminLoggedIn(false);
     sessionStorage.removeItem(TECH_AUTH_KEY);
     sessionStorage.removeItem(AUTH_TOKEN_KEY);
     addToast({
@@ -667,8 +683,9 @@ export function AppDataProvider({ children }) {
       sessionStorage.setItem(AUTH_TOKEN_KEY, res.token);
       sessionStorage.removeItem(CUSTOMER_AUTH_KEY);
       sessionStorage.removeItem(TECH_AUTH_KEY);
+      setCurrentCustomer(null);
+      setCurrentTechnician(null);
       setIsAdminLoggedIn(true);
-      await syncFromDjango(false);
       addToast({ title: 'Admin sign-in successful', message: 'Admin access verified by the server.', type: 'success' });
       return { success: true };
     } catch (err) {
@@ -676,10 +693,12 @@ export function AppDataProvider({ children }) {
       addToast({ title: 'Admin Login Failed', message: error, type: 'error' });
       return { success: false, error };
     }
-  }, [addToast, syncFromDjango]);
+  }, [addToast]);
 
   const logoutAdmin = useCallback(() => {
     setIsAdminLoggedIn(false);
+    setCurrentCustomer(null);
+    setCurrentTechnician(null);
     sessionStorage.removeItem(ADMIN_AUTH_KEY);
     sessionStorage.removeItem(AUTH_TOKEN_KEY);
     addToast({
@@ -1772,9 +1791,7 @@ export function AppDataProvider({ children }) {
     setCurrentTechnician(null);
     setIsAdminLoggedIn(false);
 
-    if (backendStatus === 'live') {
-      syncFromDjango(false);
-    } else {
+    if (backendStatus !== 'live') {
       setData(initialDemoData);
     }
 
@@ -1783,7 +1800,7 @@ export function AppDataProvider({ children }) {
       message: 'Browser cache cleared. Production database records will load on sync.',
       type: 'success',
     });
-  }, [backendStatus, syncFromDjango, addToast]);
+  }, [backendStatus, addToast]);
 
   const value = useMemo(
     () => ({
