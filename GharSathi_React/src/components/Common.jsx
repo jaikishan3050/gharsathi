@@ -196,7 +196,6 @@ export function MobileRoleLinks() {
     <div className="role-links">
       <NavLink to="/customer">Customer</NavLink>
       <NavLink to="/technician">Technician</NavLink>
-      <NavLink to="/admin">Admin</NavLink>
     </div>
   );
 }

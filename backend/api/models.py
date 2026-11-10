@@ -97,8 +97,10 @@ class TechnicianProfile(models.Model):
     def set_password(self, raw_password):
         """Sets and hashes the technician password using standard Django password hashing."""
         from django.contrib.auth.hashers import make_password
-        self.password = make_password(raw_password)
-        self.save(update_fields=['password', 'updated_at'])
+        from django.db import transaction
+        with transaction.atomic():
+            self.password = make_password(raw_password)
+            self.save(update_fields=['password', 'updated_at'])
 
     def check_password(self, raw_password):
         """Validates raw password against stored password using Django's check_password."""
@@ -116,8 +118,14 @@ class TechnicianProfile(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.partner_id:
-            rand_suffix = random.randint(100, 999)
-            self.partner_id = f"TECH-{rand_suffix}"
+            for _ in range(20):
+                rand_suffix = random.randint(10000, 99999)
+                candidate_id = f"TECH-{rand_suffix}"
+                if not TechnicianProfile.objects.filter(partner_id=candidate_id).exists():
+                    self.partner_id = candidate_id
+                    break
+            if not self.partner_id:
+                self.partner_id = f"TECH-{int(timezone.now().timestamp() * 1000) % 1000000}"
         super().save(*args, **kwargs)
 
 
@@ -332,8 +340,14 @@ class CustomerProfile(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.customer_id:
-            rand_id = random.randint(100, 999)
-            self.customer_id = f"CUS-{rand_id}"
+            for _ in range(20):
+                rand_id = random.randint(10000, 99999)
+                candidate_id = f"CUS-{rand_id}"
+                if not CustomerProfile.objects.filter(customer_id=candidate_id).exists():
+                    self.customer_id = candidate_id
+                    break
+            if not self.customer_id:
+                self.customer_id = f"CUS-{int(timezone.now().timestamp() * 1000) % 1000000}"
         super().save(*args, **kwargs)
 
 

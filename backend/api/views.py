@@ -1500,60 +1500,61 @@ class VerifyOTPView(APIView):
             )
 
         # User Authentication & Profile Resolution
-        user_profile_data = {}
-        if role == 'technician':
-            tech = TechnicianProfile.objects.create(
-                name=registration_name,
-                phone=clean_phone,
-                email=registration_email,
-                area=request.data.get('area') or 'Patna to Danapur',
-                trade=request.data.get('skills') or 'Home Services',
-                address=request.data.get('address') or '',
-                aadhaar_masked=f'XXXX XXXX {aadhaar_digits[-4:]}',
-                live_location=request.data.get('live_location') or {},
-                live_image=request.data.get('live_image') or '',
-                wallet_balance=Decimal('0.00'),
-                otp_code='',
-                otp_expires_at=None,
-                otp_attempts=0,
-            )
-            tech.set_password(registration_password)
-
-            user_profile_data = TechnicianProfileSerializer(tech).data
-            user_profile_data['userType'] = 'technician'
-        else:
-            # Customer role
-            customer = CustomerProfile.objects.filter(phone=clean_phone).first()
-            if not customer:
-                customer = CustomerProfile.objects.create(
+        with transaction.atomic():
+            user_profile_data = {}
+            if role == 'technician':
+                tech = TechnicianProfile.objects.create(
+                    name=registration_name,
                     phone=clean_phone,
-                    name=request.data.get('name', f"Customer {clean_phone[-4:]}"),
-                    area=request.data.get('area', 'Patna to Danapur'),
-                    address=request.data.get('address', ''),
-                    pincode=request.data.get('pincode', '801103'),
+                    email=registration_email,
+                    area=request.data.get('area') or 'Patna to Danapur',
+                    trade=request.data.get('skills') or 'Home Services',
+                    address=request.data.get('address') or '',
+                    aadhaar_masked=f'XXXX XXXX {aadhaar_digits[-4:]}',
+                    live_location=request.data.get('live_location') or {},
+                    live_image=request.data.get('live_image') or '',
+                    wallet_balance=Decimal('0.00'),
+                    otp_code='',
+                    otp_expires_at=None,
+                    otp_attempts=0,
                 )
+                tech.set_password(registration_password)
+
+                user_profile_data = TechnicianProfileSerializer(tech).data
+                user_profile_data['userType'] = 'technician'
             else:
-                updated = False
-                if request.data.get('name'):
-                    customer.name = request.data.get('name')
-                    updated = True
-                if request.data.get('address'):
-                    customer.address = request.data.get('address')
-                    updated = True
-                if request.data.get('pincode'):
-                    customer.pincode = request.data.get('pincode')
-                    updated = True
-                if request.data.get('area'):
-                    customer.area = request.data.get('area')
-                    updated = True
-                if updated:
-                    customer.save()
+                # Customer role
+                customer, created = CustomerProfile.objects.get_or_create(
+                    phone=clean_phone,
+                    defaults={
+                        'name': request.data.get('name', f"Customer {clean_phone[-4:]}"),
+                        'area': request.data.get('area', 'Patna to Danapur'),
+                        'address': request.data.get('address', ''),
+                        'pincode': request.data.get('pincode', '801103'),
+                    }
+                )
+                if not created:
+                    updated = False
+                    if request.data.get('name'):
+                        customer.name = request.data.get('name')
+                        updated = True
+                    if request.data.get('address'):
+                        customer.address = request.data.get('address')
+                        updated = True
+                    if request.data.get('pincode'):
+                        customer.pincode = request.data.get('pincode')
+                        updated = True
+                    if request.data.get('area'):
+                        customer.area = request.data.get('area')
+                        updated = True
+                    if updated:
+                        customer.save()
 
-            user_profile_data = CustomerProfileSerializer(customer).data
-            user_profile_data['userType'] = 'customer'
+                user_profile_data = CustomerProfileSerializer(customer).data
+                user_profile_data['userType'] = 'customer'
 
-        otp_record.is_verified = True
-        otp_record.save(update_fields=['is_verified'])
+            otp_record.is_verified = True
+            otp_record.save(update_fields=['is_verified'])
 
         # Generate standard JWT Token (valid 7 days)
         payload = {

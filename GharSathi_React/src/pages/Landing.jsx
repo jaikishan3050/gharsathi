@@ -18,14 +18,6 @@ const roles = [
     description: 'Login with mobile/password, partner signup with live selfie & Aadhaar, work assigned ringtone alert, customer location map redirect, and direct wallet earnings.',
     action: 'Open technician panel',
   },
-  {
-    to: '/admin',
-    icon: '📊',
-    title: 'Admin Dashboard',
-    tag: 'EMAIL & PASSWORD LOGIN',
-    description: 'Secure admin portal, total customer count display, progress & growth graphs tab, booking lifecycle management, and verified service reports.',
-    action: 'Open admin dashboard',
-  },
 ];
 
 export default function Landing() {
@@ -36,8 +28,14 @@ export default function Landing() {
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <BackendStatusBadge />
           <span className="landing-pill">
-            <span className="online-dot" /> ONE PLATFORM · THREE PANELS · 100% QUALITY GUARANTEE
+            <span className="online-dot" /> ONE PLATFORM · 100% QUALITY GUARANTEE
           </span>
+          <Link to="/login" className="button button-outline button-small" style={{ borderRadius: '8px', padding: '6px 14px', fontSize: '11px' }}>
+            Sign In
+          </Link>
+          <Link to="/signup" className="button button-gold button-small" style={{ borderRadius: '8px', padding: '6px 14px', fontSize: '11px', fontWeight: 800 }}>
+            Sign Up
+          </Link>
         </div>
       </header>
 
@@ -84,7 +82,7 @@ export default function Landing() {
               <p className="eyebrow">CHOOSE YOUR WORKSPACE</p>
               <h2>Welcome to Ghar Sathi</h2>
             </div>
-            <p>Select your panel to explore features designed for Customers, Technicians, and Super Admins.</p>
+            <p>Select your panel to explore features designed for Customers and Verified Technician Partners.</p>
           </div>
 
           <div className="role-grid">
@@ -151,7 +149,7 @@ export default function Landing() {
             <strong>Interactive Multi-Panel System Ready</strong>
             <p>
               All customer OTP login/signup flows, technician selfie & GPS registration, work-assigned ringing sound,
-              Google Maps redirection, customer ratings, and Admin progress graphs with verified service reports are active.
+              Google Maps redirection, customer ratings, and technician wallet earnings with verified service reports are active.
             </p>
           </div>
         </div>

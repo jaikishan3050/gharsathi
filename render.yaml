@@ -35,6 +35,10 @@ services:
         fromDatabase:
           name: gharsathi-postgres
           property: connectionString
+      - key: DB_CONN_MAX_AGE
+        value: "60"
+      - key: WEB_CONCURRENCY
+        value: "2" 
       - key: REDIS_URL
         fromService:
           type: redis

@@ -251,24 +251,33 @@ else:
 
 # Database configuration - PostgreSQL for production / SQLite fallback for CI testing
 DATABASE_URL = os.environ.get('DATABASE_URL')
+DB_CONN_MAX_AGE = int(os.environ.get('DB_CONN_MAX_AGE', '60'))
+
 if DATABASE_URL:
     import dj_database_url
-    # With ASGI / Daphne, persistent connections (conn_max_age > 0) keep a Postgres connection
-    # open per worker thread, quickly exhausting PostgreSQL's connection limits under traffic.
-    # Defaulting to 0 ensures connections are released back immediately after request completion.
-    db_conn_max_age = int(os.environ.get('DB_CONN_MAX_AGE', '0'))
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
-            conn_max_age=db_conn_max_age,
+            conn_max_age=DB_CONN_MAX_AGE,
             conn_health_checks=True,
         )
     }
+    DATABASES['default']['CONN_MAX_AGE'] = DB_CONN_MAX_AGE
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+    if 'postgresql' in DATABASES['default'].get('ENGINE', ''):
+        DATABASES['default'].setdefault('OPTIONS', {})
+        DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 10)
+    elif 'sqlite' in DATABASES['default'].get('ENGINE', ''):
+        DATABASES['default'].setdefault('OPTIONS', {})
+        DATABASES['default']['OPTIONS'].setdefault('timeout', 20)
 elif 'test' in sys.argv or 'pytest' in sys.modules or os.environ.get('USE_SQLITE_TEST') == 'true':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'test_db.sqlite3',
+            'OPTIONS': {
+                'timeout': 20,
+            },
         }
     }
 else:
@@ -280,6 +289,11 @@ else:
             'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
             'HOST': os.getenv('DB_HOST', 'localhost'),
             'PORT': os.getenv('DB_PORT', '5432'),
+            'CONN_MAX_AGE': DB_CONN_MAX_AGE,
+            'CONN_HEALTH_CHECKS': True,
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
         }
     }
 
