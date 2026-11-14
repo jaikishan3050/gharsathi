@@ -736,7 +736,8 @@ def test_email_only_customer_booking_uses_account_owner_not_contact_phone(
     assert booking.customer_phone == old_owner.phone
     visible = api_client.get("/api/bookings/")
     assert visible.status_code == 200
-    ids = [b["id"] for b in visible.data.get("results", visible.data)]
+    rows = visible.data["results"] if isinstance(visible.data, dict) else visible.data
+    ids = [b["id"] for b in rows]
     assert booking.pk in ids
     assert legacy.pk not in ids
     forbidden = api_client.get(f"/api/bookings/{legacy.pk}/")
