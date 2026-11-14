@@ -866,10 +866,17 @@ export function AppDataProvider({ children }) {
     };
 
     if (!requireDatabaseWrite()) return null;
-    if (backendStatus === 'live') {
+    {
       try {
+        // Booking confirmation requires a successful database write regardless of cached health status.
         const savedBooking = await api.createBooking(booking, service.pk || 1);
-        booking = normalizeBookingFromDjango(savedBooking) || booking;
+        if (!savedBooking?.id) {
+          throw new Error('Database did not confirm the booking. Please retry.');
+        }
+        booking = normalizeBookingFromDjango(savedBooking);
+        if (!booking?.pk) {
+          throw new Error('Database booking response was incomplete. Please contact support.');
+        }
       } catch (err) {
         const authRejected = err?.status === 401 || err?.status === 403;
         if (authRejected) {
