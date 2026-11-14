@@ -108,7 +108,10 @@ class BookingSerializer(serializers.ModelSerializer):
         allowed = (request is not None
                    and getattr(request.user, 'role', None) == 'customer'
                    and getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'screen'
-                   and instance.status == 'In Progress')
+                   and instance.status == 'In Progress'
+                   and bool(getattr(request.user, 'phone', None))
+                   and ''.join(filter(str.isdigit, str(request.user.phone)))[-10:]
+                       == ''.join(filter(str.isdigit, str(instance.customer_phone)))[-10:])
         if not allowed:
             data.pop('service_pin', None)
         return data
