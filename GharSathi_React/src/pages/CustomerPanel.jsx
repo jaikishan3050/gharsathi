@@ -160,8 +160,11 @@ export default function CustomerPanel() {
   const customerBookings = useMemo(() => {
     if (!currentCustomer) return [];
     const phone = (currentCustomer.phone || '').replace(/\D/g, '').slice(-10);
-    if (!phone) return [];
-    return data.bookings.filter((b) => b.phone.replace(/\D/g, '').slice(-10) === phone);
+    const customerPk = currentCustomer.pk || (typeof currentCustomer.id === 'number' ? currentCustomer.id : null);
+    return data.bookings.filter((b) =>
+      (b.customerPk && customerPk && String(b.customerPk) === String(customerPk)) ||
+      (!b.customerPk && phone.length === 10 && (b.phone || '').replace(/\D/g, '').slice(-10) === phone)
+    );
   }, [data.bookings, currentCustomer]);
 
   // Filtered Customer Bookings (Real-time Search & Status Filter)
@@ -248,7 +251,7 @@ export default function CustomerPanel() {
 
     if (!currentCustomer) {
       setAuthModalOpen(true);
-      setAuthError('🔒 Booking request submit karne se pehle Mobile OTP se login karein.');
+      setAuthError('🔒 Booking request submit karne se pehle account mein login karein.');
       return;
     }
 
@@ -904,7 +907,7 @@ export default function CustomerPanel() {
                   />
                 </Field>
 
-                <Field label="Mobile Number *" hint="Verified OTP account number">
+                <Field label="Contact Mobile Number *" hint="Booking updates aur technician contact ke liye; email-only accounts ke liye phone ownership verify nahi hoti">
                   <input
                     required
                     inputMode="numeric"
@@ -1319,10 +1322,10 @@ export default function CustomerPanel() {
                   />
                 </Field>
 
-                <Field label="Mobile Number (Verified via OTP)">
+                <Field label={currentCustomer.phone ? "Mobile Number (OTP account)" : "Account verification"}>
                   <input
                     disabled
-                    value={currentCustomer.phone}
+                    value={currentCustomer.phone || "Email verified — phone not verified"}
                     className="disabled-input"
                   />
                 </Field>
