@@ -18,10 +18,18 @@ describe('EmailLinkForm', () => {
     fireEvent.click(screen.getByRole('button', { name: /Send Email Verification Code/i }));
     await waitFor(() => expect(linkCustomerEmail).toHaveBeenCalledWith('test@example.com', ''));
     expect(onLinked).not.toHaveBeenCalled();
+    expect(screen.getByText(/Email not verified/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('6-digit email code'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: /Verify & Link Email/i }));
     await waitFor(() => expect(onLinked).toHaveBeenCalledWith('test@example.com'));
     expect(linkCustomerEmail).toHaveBeenCalledWith('test@example.com', '123456');
+    expect(screen.getByText(/Email verified — Email OTP login enabled/)).toBeInTheDocument();
+  });
+
+  it('shows existing verified status without sending a code', () => {
+    render(<EmailLinkForm currentEmail="verified@example.com" emailVerified />);
+    expect(screen.getByText(/Email verified — Email OTP login enabled/)).toBeInTheDocument();
+    expect(linkCustomerEmail).not.toHaveBeenCalled();
   });
 
   it('shows delivery errors without advancing to verification', async () => {
