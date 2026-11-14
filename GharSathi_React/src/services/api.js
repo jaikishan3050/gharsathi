@@ -125,7 +125,7 @@ export function normalizeBookingFromDjango(b) {
     platformFee: Number(b.platform_fee || 149),
     commission: Number(b.platform_fee || 149),
     status: b.status,
-    servicePin: b.service_pin || '4829',
+    servicePin: b.service_pin || '',
     technicianId: b.technician_details?.partner_id || (b.technician ? `TECH-${b.technician}` : ''),
     technicianPk: b.technician,
     technicianName: b.technician_name || b.technician_details?.name || '',
@@ -612,6 +612,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature, booking_id }),
     });
+  },
+
+  linkCustomerEmail: async (email, otpCode = '') => {
+    return apiRequest('/auth/link-email/', {
+      method: 'POST',
+      body: JSON.stringify({ email, ...(otpCode ? { otp_code: otpCode } : {}) }),
+    }, 15000, 0);
   },
 
   // Mobile OTP Authentication (Direct On-Screen with SMS Fallback)
