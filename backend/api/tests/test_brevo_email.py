@@ -77,3 +77,29 @@ def test_linked_customer_can_verify_hashed_email_otp():
     }, format="json")
     assert verified.status_code == 200
     assert "token" in verified.data
+
+
+@pytest.mark.django_db
+def test_email_link_requires_authenticated_customer():
+    response = APIClient().post("/api/auth/link-email/", {"email": "new@example.com"}, format="json")
+    assert response.status_code in (401, 403)
+
+
+@pytest.mark.django_db
+def test_authenticated_customer_can_link_email():
+    from api.authentication import AuthenticatedPrincipal
+    customer = CustomerProfile.objects.create(phone="9876543066", name="Existing")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal('customer', customer))
+    with patch("api.views.send_login_otp") as send:
+        response = client.post("/api/auth/link-email/", {"email": "linked@example.com"}, format="json")
+    assert response.status_code == 200
+    customer.refresh_from_db()
+    assert customer.email == ""
+    code = send.call_args.args[1]
+    bad = client.post("/api/auth/link-email/", {"email": "linked@example.com", "otp_code": "000000"}, format="json")
+    assert bad.status_code == 400
+    confirmed = client.post("/api/auth/link-email/", {"email": "linked@example.com", "otp_code": code}, format="json")
+    assert confirmed.status_code == 200
+    customer.refresh_from_db()
+    assert customer.email == "linked@example.com"
