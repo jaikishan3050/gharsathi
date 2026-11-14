@@ -658,3 +658,19 @@ def test_happy_code_email_requires_customer_email(
     assert response.status_code == 503
     active_booking.refresh_from_db()
     assert active_booking.status == 'Accepted'
+
+
+@pytest.mark.django_db
+def test_screen_happy_code_visible_only_to_customer_when_job_started(active_booking, settings):
+    from types import SimpleNamespace
+    from api.serializers import BookingSerializer
+    settings.HAPPY_CODE_CHANNEL = 'screen'
+    active_booking.status = 'In Progress'
+    active_booking.save(update_fields=['status'])
+    customer_request = SimpleNamespace(user=SimpleNamespace(role='customer'))
+    technician_request = SimpleNamespace(user=SimpleNamespace(role='technician'))
+    assert BookingSerializer(active_booking, context={'request': customer_request}).data['service_pin'] == '4829'
+    assert BookingSerializer(active_booking, context={'request': technician_request}).data['service_pin'] == ''
+    assert BookingSerializer(active_booking).data['service_pin'] == ''
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    assert BookingSerializer(active_booking, context={'request': customer_request}).data['service_pin'] == ''
