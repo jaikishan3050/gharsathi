@@ -302,7 +302,7 @@ export default function OtpModal({
                   className="button button-gold button-wide"
                   style={{ marginTop: '20px' }}
                 >
-                  {loading ? 'OTP bana rahe hain…' : 'Send OTP by {emailOtp ? 'Email' : 'SMS'}'}
+                  {loading ? 'OTP bana rahe hain…' : `Send OTP by ${emailOtp ? 'Email' : 'SMS'}`}
                 </button>
 
               </form>
@@ -403,7 +403,7 @@ export default function OtpModal({
                   className="button button-gold button-wide"
                   style={{ marginTop: '16px' }}
                 >
-                  {loading ? 'Sending OTP…' : 'Verify {emailOtp ? 'Email' : 'Mobile'} with OTP'}
+                  {loading ? 'Sending OTP…' : `Verify ${emailOtp ? 'Email' : 'Mobile'} with OTP`}
                 </button>
               </form>
             )}
