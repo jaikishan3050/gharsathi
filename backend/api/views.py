@@ -1394,6 +1394,10 @@ class CustomerEmailLinkView(APIView):
                 return Response({'error': 'Invalid verification code.'}, status=400)
             if CustomerProfile.objects.filter(email__iexact=email).exclude(pk=customer.pk).exists():
                 return Response({'error': 'Email is already linked to another account.'}, status=409)
+            # A successful link invalidates any other outstanding challenges for this phone.
+            OTPVerification.objects.filter(
+                phone=customer.phone, role='customer', is_verified=False,
+            ).exclude(pk=otp.pk).update(is_verified=True)
             customer.email = email
             customer.email_verified = True
             customer.save(update_fields=['email', 'email_verified'])
