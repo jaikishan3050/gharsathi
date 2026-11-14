@@ -633,17 +633,18 @@ class BookingViewSet(viewsets.ModelViewSet):
                     {'error': f"Only 'Accepted' bookings can be moved to 'In Progress'. Current status: {booking.status}."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            # Fail closed: never mark a job started when its required email cannot be sent.
+            if getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'email':
+                customer = CustomerProfile.objects.filter(phone=booking.customer_phone).first()
+                if not customer or not customer.email:
+                    return Response({'error': 'Customer email is unavailable for Happy Code delivery.'}, status=503)
+                try:
+                    send_happy_code(customer.email, booking.booking_code, booking.service_pin)
+                except EmailDeliveryError:
+                    return Response({'error': 'Happy Code email could not be delivered. Contact support.'}, status=503)
             booking.status = 'In Progress'
             booking.save(update_fields=['status'])
 
-        if getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'email':
-            customer = CustomerProfile.objects.filter(phone=booking.customer_phone).first()
-            if not customer or not customer.email:
-                return Response({'error': 'Customer email is unavailable for Happy Code delivery.'}, status=503)
-            try:
-                send_happy_code(customer.email, booking.booking_code, booking.service_pin)
-            except EmailDeliveryError:
-                return Response({'error': 'Happy Code email could not be delivered. Contact support.'}, status=503)
         broadcast_booking_event(booking, event_type='JOB_STARTED')
 
         return Response({
@@ -664,15 +665,15 @@ class BookingViewSet(viewsets.ModelViewSet):
             if booking.technician_id != request.user.profile.pk:
                 return Response({'error': 'This job is not assigned to your technician account.'}, status=status.HTTP_403_FORBIDDEN)
 
-            if booking.status == 'Completed':
-                return Response({'error': 'Booking is already completed.'}, status=status.HTTP_400_BAD_REQUEST)
+            if booking.status != 'In Progress':
+                return Response({'error': 'Only an In Progress booking can be completed.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # 4-Digit Happy Code Verification
             expected_pin = str(booking.service_pin or '').strip()
             if not expected_pin or submitted_pin != expected_pin:
                 return Response(
                     {
-                        'error': 'Invalid Happy Code! Customer ki screen par display ho raha 4-digit code confirm karein.'
+                        'error': 'Invalid Happy Code. Ask the customer for the service verification code.'
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
