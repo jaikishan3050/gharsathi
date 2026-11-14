@@ -10,6 +10,7 @@ from api.models import (
     Service,
     SubService,
     TechnicianProfile,
+    CustomerProfile,
     Booking,
     WalletTransaction,
 )
@@ -296,7 +297,8 @@ class TestFinancialAndOperationalFlows:
         """
         Tests Razorpay payment verification with a valid HMAC-SHA256 signature.
         """
-        authenticate_as('technician', verified_technician)
+        customer = CustomerProfile.objects.create(phone=active_booking.customer_phone, name=active_booking.customer_name)
+        authenticate_as('customer', customer)
         order_id = "order_test_123456"
         payment_id = "pay_test_987654"
         key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'gharsathi_sandbox_secret_key_12345')
