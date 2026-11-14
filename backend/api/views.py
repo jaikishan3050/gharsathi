@@ -1393,6 +1393,11 @@ class CustomerEmailLinkView(APIView):
             except EmailDeliveryError:
                 otp.delete()
                 return Response({'error': 'Email delivery unavailable.'}, status=503)
+            # Only the newest successfully delivered link code may be redeemed.
+            # Do not revoke prior codes on delivery failure.
+            OTPVerification.objects.filter(
+                phone=customer.phone, role='customer', is_verified=False,
+            ).exclude(pk=otp.pk).update(is_verified=True)
             return Response({'success': True, 'message': 'Email verification code sent.'})
 
         with transaction.atomic():
