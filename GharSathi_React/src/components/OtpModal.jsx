@@ -85,11 +85,6 @@ export default function OtpModal({
       return;
     }
 
-    if (emailOtp && tab === 'signup') {
-      setErrorMsg('New account ke liye pehle mobile ownership verify karna zaroori hai. Email-only signup abhi available nahi hai.');
-      return;
-    }
-
     if (emailOtp && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setErrorMsg('Valid email address enter karein.');
       return;
@@ -112,7 +107,9 @@ export default function OtpModal({
 
     setLoading(true);
     try {
-      const res = await api.sendOtp(cleanPhone, role, 'login', emailOtp ? email.trim().toLowerCase() : '');
+      const res = emailOtp && tab === 'signup'
+        ? await api.sendEmailSignupOtp(email.trim().toLowerCase())
+        : await api.sendOtp(cleanPhone, role, 'login', emailOtp ? email.trim().toLowerCase() : '');
       setLoading(false);
       setStep('otp');
       setCountdown(60);
@@ -179,7 +176,11 @@ export default function OtpModal({
 
     setLoading(true);
     try {
-      const res = await api.verifyOtp({
+      const res = emailOtp && tab === 'signup' ? await api.verifyEmailSignupOtp({
+        email: email.trim().toLowerCase(), otpCode: fullOtp,
+        name: signupData.name, area: signupData.area,
+        address: signupData.address, pincode: signupData.pincode,
+      }) : await api.verifyOtp({
         phoneNumber: cleanPhone,
         email: emailOtp ? email.trim().toLowerCase() : '',
         otpCode: fullOtp,
@@ -274,7 +275,7 @@ export default function OtpModal({
                   Apna mobile number {emailOtp ? 'aur email' : ''} enter karein. 6-digit OTP {emailOtp ? 'email' : 'SMS'} se milega.
                 </p>
 
-                <div className="field-block">
+                {!emailOtp && <div className="field-block">
                   <label className="field-label">
                     Mobile Number <span className="req">*</span>
                   </label>
@@ -320,7 +321,7 @@ export default function OtpModal({
               >
                 <p className="auth-intro">
                   {emailOtp
-                    ? 'Security ke liye new registration mein mobile ownership verification zaroori hai. Email-only signup abhi available nahi hai; support se contact karein.'
+                    ? 'Email OTP se account banayein. Aapka contact mobile number account ownership proof nahi maana jayega.'
                     : 'Ghar Sathi par naya account banane ke liye details enter karein aur mobile OTP verify karein.'}
                 </p>
 
@@ -406,7 +407,7 @@ export default function OtpModal({
                 )}
                 <button
                   type="submit"
-                  disabled={loading || cleanPhone.length !== 10 || emailOtp}
+                  disabled={loading || (!emailOtp && cleanPhone.length !== 10)}
                   className="button button-gold button-wide"
                   style={{ marginTop: '16px' }}
                 >
