@@ -362,7 +362,7 @@ class OTPVerification(models.Model):
 
     phone = models.CharField(max_length=20, blank=True, default='', db_index=True)
     email = models.EmailField(blank=True, default='', db_index=True)
-    otp_code = models.CharField(max_length=6)
+    otp_code = models.CharField(max_length=64)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
