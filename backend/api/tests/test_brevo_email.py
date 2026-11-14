@@ -357,3 +357,47 @@ def test_email_link_delivery_failure_leaves_no_usable_challenge():
         "email": "failed-link@example.com", "otp_code": "123456",
     }, format="json")
     assert verify.status_code == 400
+
+
+@pytest.mark.django_db
+def test_resending_email_link_code_revokes_old_code_only_after_delivery():
+    from api.services.brevo import EmailDeliveryError
+    customer = CustomerProfile.objects.create(phone="9876543133", name="Resend Customer")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", customer))
+    with patch("api.views.send_login_otp") as deliver:
+        first = client.post("/api/auth/link-email/", {
+            "email": "first-resend@example.com",
+        }, format="json")
+    assert first.status_code == 200
+    first_code = deliver.call_args.args[1]
+    first_otp = OTPVerification.objects.get(phone=customer.phone)
+    OTPVerification.objects.filter(pk=first_otp.pk).update(
+        created_at=timezone.now() - timedelta(minutes=2),
+    )
+    with patch("api.views.send_login_otp", side_effect=EmailDeliveryError()):
+        failed = client.post("/api/auth/link-email/", {
+            "email": "second-resend@example.com",
+        }, format="json")
+    assert failed.status_code == 503
+    first_otp.refresh_from_db()
+    assert first_otp.is_verified is False
+    with patch("api.views.send_login_otp") as deliver:
+        second = client.post("/api/auth/link-email/", {
+            "email": "second-resend@example.com",
+        }, format="json")
+    assert second.status_code == 200
+    second_code = deliver.call_args.args[1]
+    first_otp.refresh_from_db()
+    assert first_otp.is_verified is True
+    old_attempt = client.post("/api/auth/link-email/", {
+        "email": "first-resend@example.com", "otp_code": first_code,
+    }, format="json")
+    assert old_attempt.status_code == 400
+    confirmed = client.post("/api/auth/link-email/", {
+        "email": "second-resend@example.com", "otp_code": second_code,
+    }, format="json")
+    assert confirmed.status_code == 200
+    customer.refresh_from_db()
+    assert customer.email == "second-resend@example.com"
+    assert customer.email_verified is True
