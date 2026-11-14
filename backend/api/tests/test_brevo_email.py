@@ -169,3 +169,42 @@ def test_email_otp_verification_rechecks_verified_status_and_cannot_edit_profile
     customer.refresh_from_db()
     assert customer.name == "Original"
     assert customer.address == "Original address"
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_otp_cannot_be_replayed_after_success():
+    customer = CustomerProfile.objects.create(
+        phone="9876543022", email="replay@example.com", email_verified=True,
+        name="Replay Test",
+    )
+    client = APIClient()
+    with patch("api.views.send_login_otp") as send:
+        sent = client.post("/api/auth/send-otp/", {
+            "phone_number": customer.phone, "email": customer.email, "role": "customer",
+        }, format="json")
+    assert sent.status_code == 200
+    payload = {
+        "phone_number": customer.phone, "email": customer.email,
+        "otp_code": send.call_args.args[1], "role": "customer",
+    }
+    first = client.post("/api/auth/verify-otp/", payload, format="json")
+    assert first.status_code == 200
+    second = client.post("/api/auth/verify-otp/", payload, format="json")
+    assert second.status_code == 400
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_only_new_customer_cannot_claim_existing_phone():
+    victim = CustomerProfile.objects.create(phone="9876543001", name="Victim")
+    with patch("api.views.send_login_otp") as send:
+        response = APIClient().post("/api/auth/send-otp/", {
+            "phone_number": victim.phone, "email": "attacker@example.com",
+            "role": "customer", "name": "Attacker",
+        }, format="json")
+    assert response.status_code == 409
+    send.assert_not_called()
+    victim.refresh_from_db()
+    assert victim.email == ""
+    assert victim.name == "Victim"
