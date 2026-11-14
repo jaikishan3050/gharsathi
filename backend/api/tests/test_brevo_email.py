@@ -103,3 +103,18 @@ def test_authenticated_customer_can_link_email():
     assert confirmed.status_code == 200
     customer.refresh_from_db()
     assert customer.email == "linked@example.com"
+
+
+@pytest.mark.django_db
+def test_customer_profile_patch_cannot_bypass_email_verification():
+    from api.authentication import AuthenticatedPrincipal
+    customer = CustomerProfile.objects.create(phone="9876543055", name="Protected", email="verified@example.com")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal('customer', customer))
+    response = client.patch(f"/api/customers/{customer.pk}/", {
+        "email": "attacker@example.com", "name": "Updated"
+    }, format="json")
+    assert response.status_code == 200
+    customer.refresh_from_db()
+    assert customer.email == "verified@example.com"
+    assert customer.name == "Updated"
