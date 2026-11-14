@@ -337,6 +337,13 @@ class CustomerProfile(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                models.functions.Lower('email'),
+                condition=~models.Q(email=''),
+                name='unique_customer_email_ci_when_present',
+            ),
+        ]
 
     def __str__(self):
         identifier = self.email or self.phone
