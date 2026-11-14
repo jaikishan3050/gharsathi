@@ -29,7 +29,7 @@ export const API_BASE_URL = getApiBaseUrl();
 export async function apiRequest(endpoint, options = {}, timeoutMs = 15000, retries = 1) {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|signup-email\/send-otp|signup-email\/verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
+  const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|signup-email\/send-otp|signup-email\/verify-otp|login-email\/send-otp|login-email\/verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(send-otp|verify-otp)\//.test(`${path}/`)
     || /^\/admin\/password-reset\/(request|confirm)\//.test(`${path}/`);
