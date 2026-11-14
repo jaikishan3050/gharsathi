@@ -596,3 +596,65 @@ def test_happy_code_lockout_after_five_wrong_attempts(api_client, active_booking
     active_booking.refresh_from_db()
     assert active_booking.status == 'In Progress'
     assert not WalletTransaction.objects.filter(booking=active_booking, txn_type='DEBIT').exists()
+
+
+@pytest.mark.django_db
+def test_happy_code_email_start_sends_only_to_customer_and_is_idempotent(
+    api_client, active_booking, verified_technician, authenticate_as, settings
+):
+    from unittest.mock import patch
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    customer = CustomerProfile.objects.create(
+        phone=active_booking.customer_phone, name=active_booking.customer_name,
+        email='happy-customer@example.com',
+    )
+    active_booking.status = 'Accepted'
+    active_booking.save(update_fields=['status'])
+    authenticate_as('technician', verified_technician)
+    url = f'/api/bookings/{active_booking.pk}/start/'
+    with patch('api.views.send_happy_code') as send:
+        response = api_client.post(url, {}, format='json')
+        assert response.status_code == 200
+        send.assert_called_once_with(customer.email, active_booking.booking_code, active_booking.service_pin)
+        assert 'service_pin' not in response.data['booking']
+        again = api_client.post(url, {}, format='json')
+        assert again.status_code == 400
+        send.assert_called_once()
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'In Progress'
+
+
+@pytest.mark.django_db
+def test_happy_code_email_failure_keeps_booking_accepted(
+    api_client, active_booking, verified_technician, authenticate_as, settings
+):
+    from unittest.mock import patch
+    from api.services.brevo import EmailDeliveryError
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    CustomerProfile.objects.create(
+        phone=active_booking.customer_phone, name=active_booking.customer_name,
+        email='happy-customer@example.com',
+    )
+    active_booking.status = 'Accepted'
+    active_booking.save(update_fields=['status'])
+    authenticate_as('technician', verified_technician)
+    with patch('api.views.send_happy_code', side_effect=EmailDeliveryError):
+        response = api_client.post(f'/api/bookings/{active_booking.pk}/start/', {}, format='json')
+    assert response.status_code == 503
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'Accepted'
+    assert not WalletTransaction.objects.filter(booking=active_booking, txn_type='DEBIT').exists()
+
+
+@pytest.mark.django_db
+def test_happy_code_email_requires_customer_email(
+    api_client, active_booking, verified_technician, authenticate_as, settings
+):
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    active_booking.status = 'Accepted'
+    active_booking.save(update_fields=['status'])
+    authenticate_as('technician', verified_technician)
+    response = api_client.post(f'/api/bookings/{active_booking.pk}/start/', {}, format='json')
+    assert response.status_code == 503
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'Accepted'
