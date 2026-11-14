@@ -1,3 +1,4 @@
+import secrets
 import random
 from decimal import Decimal
 from django.db import models
@@ -174,6 +175,7 @@ class Booking(models.Model):
     razorpay_signature = models.CharField(max_length=200, blank=True, default='')
     status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='Pending')
     service_pin = models.CharField(max_length=6, blank=True, default='')  # 4-Digit Happy Code
+    happy_code_attempts = models.PositiveSmallIntegerField(default=0, editable=False)
     notes = models.TextField(blank=True, default='')
     rating = models.IntegerField(null=True, blank=True)
     review_text = models.TextField(blank=True, default='')
@@ -193,7 +195,7 @@ class Booking(models.Model):
             rand_code = random.randint(1000000, 9999999)
             self.booking_code = f"GS-{rand_code}"
         if not self.service_pin:
-            self.service_pin = str(random.randint(1000, 9999))
+            self.service_pin = str(secrets.randbelow(9000) + 1000)
         if not self.invoice_number:
             rand_inv = random.randint(100000, 999999)
             self.invoice_number = f"INV-{rand_inv}"
