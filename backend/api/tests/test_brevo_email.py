@@ -536,3 +536,48 @@ def test_customer_email_unique_case_insensitive_database_constraint():
     # Phone-only legacy customer accounts must continue to support blank email.
     CustomerProfile.objects.create(phone="9876543893", email="")
     CustomerProfile.objects.create(phone="9876543894", email="")
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_new_customer_signup_jwt_can_access_only_own_bookings():
+    from decimal import Decimal
+    from api.models import Service, Booking
+    service = Service.objects.create(
+        name="Email Signup Test Service", slug="email-signup-service",
+        base_price=Decimal("499.00"),
+    )
+    existing = CustomerProfile.objects.create(
+        phone="9876543991", name="Existing Phone Owner",
+    )
+    other_booking = Booking.objects.create(
+        customer_name="Existing Phone Owner", customer_phone=existing.phone,
+        address="Other home", area="Patna", service=service,
+        base_price=Decimal("499.00"), total_amount=Decimal("499.00"),
+    )
+    client = APIClient()
+    with patch("api.views.send_login_otp") as send:
+        sent = client.post("/api/auth/signup-email/send-otp/", {
+            "email": "authenticated-booker@example.com",
+        }, format="json")
+    assert sent.status_code == 200
+    signup = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": "authenticated-booker@example.com",
+        "otp_code": send.call_args.args[1], "name": "Email Booker",
+    }, format="json")
+    assert signup.status_code == 200
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {signup.data['token']}")
+    created = client.post("/api/bookings/", {
+        "service": service.pk, "customer_name": "Email Booker",
+        "customer_phone": existing.phone,
+        "address": "Own house", "area": "Patna",
+        "base_price": "499.00", "total_amount": "499.00",
+    }, format="json")
+    assert created.status_code == 201, created.data
+    owner = CustomerProfile.objects.get(email="authenticated-booker@example.com")
+    assert Booking.objects.get(pk=created.data['id']).customer_id == owner.pk
+    assert client.get(f"/api/bookings/{created.data['id']}/").status_code == 200
+    assert client.get(f"/api/bookings/{other_booking.id}/").status_code == 404
+    # The original phone owner must never inherit the new email-only booking.
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", existing))
+    assert client.get(f"/api/bookings/{created.data['id']}/").status_code == 404
