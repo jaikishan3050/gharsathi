@@ -580,3 +580,165 @@ class TestFinancialAndOperationalFlows:
         assert Decimal(str(res_inject.data["wallet_balance"])) == Decimal("0.00")
 
 
+
+
+@pytest.mark.django_db
+def test_happy_code_lockout_after_five_wrong_attempts(api_client, active_booking, verified_technician, authenticate_as):
+    authenticate_as('technician', verified_technician)
+    url = f"/api/bookings/{active_booking.pk}/complete/"
+    for _ in range(5):
+        response = api_client.post(url, {"service_pin": "0000"}, format="json")
+        assert response.status_code == 400
+    active_booking.refresh_from_db()
+    assert active_booking.happy_code_attempts == 5
+    response = api_client.post(url, {"service_pin": "4829"}, format="json")
+    assert response.status_code == 429
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'In Progress'
+    assert not WalletTransaction.objects.filter(booking=active_booking, txn_type='DEBIT').exists()
+
+
+@pytest.mark.django_db
+def test_happy_code_email_start_sends_only_to_customer_and_is_idempotent(
+    api_client, active_booking, verified_technician, authenticate_as, settings
+):
+    from unittest.mock import patch
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    customer = CustomerProfile.objects.create(
+        phone=active_booking.customer_phone, name=active_booking.customer_name,
+        email='happy-customer@example.com', email_verified=True,
+    )
+    active_booking.status = 'Accepted'
+    active_booking.save(update_fields=['status'])
+    authenticate_as('technician', verified_technician)
+    url = f'/api/bookings/{active_booking.pk}/start/'
+    with patch('api.views.send_happy_code') as send:
+        response = api_client.post(url, {}, format='json')
+        assert response.status_code == 200
+        send.assert_called_once_with(customer.email, active_booking.booking_code, active_booking.service_pin)
+        assert 'service_pin' not in response.data['booking']
+        again = api_client.post(url, {}, format='json')
+        assert again.status_code == 400
+        send.assert_called_once()
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'In Progress'
+
+
+@pytest.mark.django_db
+def test_happy_code_email_failure_keeps_booking_accepted(
+    api_client, active_booking, verified_technician, authenticate_as, settings
+):
+    from unittest.mock import patch
+    from api.services.brevo import EmailDeliveryError
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    CustomerProfile.objects.create(
+        phone=active_booking.customer_phone, name=active_booking.customer_name,
+        email='happy-customer@example.com', email_verified=True,
+    )
+    active_booking.status = 'Accepted'
+    active_booking.save(update_fields=['status'])
+    authenticate_as('technician', verified_technician)
+    with patch('api.views.send_happy_code', side_effect=EmailDeliveryError):
+        response = api_client.post(f'/api/bookings/{active_booking.pk}/start/', {}, format='json')
+    assert response.status_code == 503
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'Accepted'
+    assert not WalletTransaction.objects.filter(booking=active_booking, txn_type='DEBIT').exists()
+
+
+@pytest.mark.django_db
+def test_happy_code_email_requires_customer_email(
+    api_client, active_booking, verified_technician, authenticate_as, settings
+):
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    active_booking.status = 'Accepted'
+    active_booking.save(update_fields=['status'])
+    authenticate_as('technician', verified_technician)
+    response = api_client.post(f'/api/bookings/{active_booking.pk}/start/', {}, format='json')
+    assert response.status_code == 503
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'Accepted'
+
+
+@pytest.mark.django_db
+def test_screen_happy_code_visible_only_to_customer_when_job_started(active_booking, settings):
+    from types import SimpleNamespace
+    from api.serializers import BookingSerializer
+    settings.HAPPY_CODE_CHANNEL = 'screen'
+    active_booking.status = 'In Progress'
+    active_booking.save(update_fields=['status'])
+    customer_request = SimpleNamespace(user=SimpleNamespace(role='customer', phone=active_booking.customer_phone))
+    technician_request = SimpleNamespace(user=SimpleNamespace(role='technician'))
+    assert BookingSerializer(active_booking, context={'request': customer_request}).data['service_pin'] == '4829'
+    stranger_request = SimpleNamespace(user=SimpleNamespace(role='customer', phone='9999999999'))
+    assert 'service_pin' not in BookingSerializer(active_booking, context={'request': stranger_request}).data
+    assert 'service_pin' not in BookingSerializer(active_booking, context={'request': technician_request}).data
+    assert 'service_pin' not in BookingSerializer(active_booking).data
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    assert 'service_pin' not in BookingSerializer(active_booking, context={'request': customer_request}).data
+
+
+@pytest.mark.django_db
+def test_happy_code_email_requires_verified_customer(
+    api_client, active_booking, verified_technician, authenticate_as, settings
+):
+    from unittest.mock import patch
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    customer = CustomerProfile.objects.create(
+        phone=active_booking.customer_phone,
+        email='unverified-happy@example.com',
+        email_verified=False,
+    )
+    active_booking.status = 'Accepted'
+    active_booking.save(update_fields=['status'])
+    authenticate_as('technician', verified_technician)
+    url = f'/api/bookings/{active_booking.pk}/start/'
+    with patch('api.views.send_happy_code') as send:
+        response = api_client.post(url, {}, format='json')
+    assert response.status_code == 503
+    send.assert_not_called()
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'Accepted'
+    customer.email_verified = True
+    customer.save(update_fields=['email_verified'])
+    with patch('api.views.send_happy_code') as send:
+        response = api_client.post(url, {}, format='json')
+    assert response.status_code == 200
+    send.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_email_only_customer_booking_uses_account_owner_not_contact_phone(
+    api_client, sample_service,
+):
+    old_owner = CustomerProfile.objects.create(
+        phone="9876543444", name="Legacy Customer",
+    )
+    newcomer = CustomerProfile.objects.create(
+        phone="", email="new-booker@example.com", email_verified=True,
+        name="Verified Email Customer",
+    )
+    legacy = Booking.objects.create(
+        service=sample_service, customer_name="Legacy Customer",
+        customer_phone=old_owner.phone, address="Old address", area="Patna",
+        base_price=Decimal("499.00"), total_amount=Decimal("499.00"),
+    )
+    api_client.force_authenticate(user=AuthenticatedPrincipal("customer", newcomer))
+    created = api_client.post("/api/bookings/", {
+        "service": sample_service.pk, "service_name": sample_service.name,
+        "customer_name": newcomer.name,
+        "customer_phone": old_owner.phone, "address": "New booking address",
+        "area": "Patna", "base_price": "499.00", "total_amount": "499.00",
+    }, format="json")
+    assert created.status_code == 201, created.data
+    booking = Booking.objects.get(pk=created.data["id"])
+    assert booking.customer_id == newcomer.pk
+    assert booking.customer_phone == old_owner.phone
+    visible = api_client.get("/api/bookings/")
+    assert visible.status_code == 200
+    rows = visible.data["results"] if isinstance(visible.data, dict) else visible.data
+    ids = [b["id"] for b in rows]
+    assert booking.pk in ids
+    assert legacy.pk not in ids
+    forbidden = api_client.get(f"/api/bookings/{legacy.pk}/")
+    assert forbidden.status_code == 404

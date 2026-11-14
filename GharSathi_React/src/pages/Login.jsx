@@ -17,6 +17,8 @@ export default function Login() {
   // Auth flow states
   const [step, setStep] = useState('input'); // 'input' | 'otp'
   const [phone, setPhone] = useState(location.state?.phone || '');
+  const [email, setEmail] = useState('');
+  const emailOtp = role === 'customer' && import.meta.env.VITE_CUSTOMER_OTP_CHANNEL === 'email';
   const [password, setPassword] = useState('');
   const [popupOtp, setPopupOtp] = useState('');
   const [popupOpen, setPopupOpen] = useState(false);
@@ -69,14 +71,14 @@ export default function Login() {
     setStatusMsg('');
 
     const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
-    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+    if (!emailOtp && !/^[6-9]\d{9}$/.test(cleanPhone)) {
       setErrorMsg('Kripya valid 10-digit Indian mobile number enter karein (e.g. 9876500001).');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await api.sendOtp(cleanPhone, role);
+      const res = emailOtp ? await api.sendEmailLoginOtp(email.trim().toLowerCase()) : await api.sendOtp(cleanPhone, role);
       setStatusMsg(res?.message || `Verification OTP generated for +91 ${cleanPhone}`);
       setStep('otp');
       setCountdown(60);
@@ -89,7 +91,7 @@ export default function Login() {
       }
       addToast({
         title: 'Verification OTP Ready! 🔔',
-        message: otp ? `Development OTP: ${otp}` : 'OTP aapke mobile par SMS se bheja gaya hai.',
+        message: otp ? `Development OTP: ${otp}` : (emailOtp ? 'OTP email par bheja gaya hai.' : 'OTP mobile par SMS se bheja gaya hai.'),
         type: 'success',
       });
     } catch (err) {
@@ -135,7 +137,7 @@ export default function Login() {
     setLoading(true);
     try {
       const cleanPhone = (phone || '').replace(/\D/g, '').slice(-10);
-      const res = await api.verifyOtp({
+      const res = emailOtp ? await api.verifyEmailLoginOtp({ email: email.trim().toLowerCase(), otpCode }) : await api.verifyOtp({
         phoneNumber: cleanPhone,
         otpCode,
         role,
@@ -274,6 +276,15 @@ export default function Login() {
             {step === 'input' ? (
               <div className="auth-step-input">
                 <form onSubmit={role === 'technician' ? handleTechnicianPasswordLogin : handleSendOtp} className="auth-form-email">
+                  {emailOtp ? (
+                    <div className="field">
+                      <label htmlFor="login-email">Verified Email Address</label>
+                      <input id="login-email" type="email" required autoComplete="email"
+                        value={email} onChange={(e) => setEmail(e.target.value)}
+                        disabled={loading} placeholder="you@example.com" />
+                      <small className="field-hint">OTP registered email par bheja jayega.</small>
+                    </div>
+                  ) : (
                   <div className="field">
                     <label htmlFor="login-phone">Mobile Number (10 Digits)</label>
                     <div className="phone-input-wrap">
@@ -298,6 +309,7 @@ export default function Login() {
                     )}
                   </div>
 
+                  )}
                   {role === 'technician' && (
                     <div className="field">
                       <label htmlFor="technician-login-password">Password</label>
@@ -315,7 +327,7 @@ export default function Login() {
 
                   <button
                     type="submit"
-                    disabled={loading || phone.replace(/\D/g, '').length !== 10 || (role === 'technician' && !password)}
+                    disabled={loading || (emailOtp ? !email.trim() : phone.replace(/\D/g, '').length !== 10) || (role === 'technician' && !password)}
                     className="button button-primary button-wide auth-submit-btn"
                   >
                     {loading ? (

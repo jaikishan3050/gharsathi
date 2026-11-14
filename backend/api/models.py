@@ -1,6 +1,8 @@
+import secrets
 import random
 from decimal import Decimal
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
@@ -140,6 +142,7 @@ class Booking(models.Model):
 
     booking_code = models.CharField(max_length=30, unique=True, db_index=True)
     invoice_number = models.CharField(max_length=40, unique=True, blank=True)
+    customer = models.ForeignKey('CustomerProfile', on_delete=models.SET_NULL, null=True, blank=True, related_name='bookings')
     customer_name = models.CharField(max_length=120)
     customer_phone = models.CharField(max_length=15)
     address = models.TextField()
@@ -174,6 +177,7 @@ class Booking(models.Model):
     razorpay_signature = models.CharField(max_length=200, blank=True, default='')
     status = models.CharField(max_length=25, choices=STATUS_CHOICES, default='Pending')
     service_pin = models.CharField(max_length=6, blank=True, default='')  # 4-Digit Happy Code
+    happy_code_attempts = models.PositiveSmallIntegerField(default=0, editable=False)
     notes = models.TextField(blank=True, default='')
     rating = models.IntegerField(null=True, blank=True)
     review_text = models.TextField(blank=True, default='')
@@ -193,7 +197,7 @@ class Booking(models.Model):
             rand_code = random.randint(1000000, 9999999)
             self.booking_code = f"GS-{rand_code}"
         if not self.service_pin:
-            self.service_pin = str(random.randint(1000, 9999))
+            self.service_pin = str(secrets.randbelow(9000) + 1000)
         if not self.invoice_number:
             rand_inv = random.randint(100000, 999999)
             self.invoice_number = f"INV-{rand_inv}"
@@ -323,6 +327,7 @@ class CustomerProfile(models.Model):
     customer_id = models.CharField(max_length=30, unique=True, db_index=True)
     phone = models.CharField(max_length=20, blank=True, default='', db_index=True)
     email = models.EmailField(blank=True, default='', db_index=True)
+    email_verified = models.BooleanField(default=False, editable=False)
     name = models.CharField(max_length=120, blank=True, default='')
     address = models.TextField(blank=True, default='')
     area = models.CharField(max_length=100, default='Patna to Danapur')
@@ -333,6 +338,13 @@ class CustomerProfile(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                Lower('email'),
+                condition=~models.Q(email=''),
+                name='unique_customer_email_ci_when_present',
+            ),
+        ]
 
     def __str__(self):
         identifier = self.email or self.phone
@@ -360,7 +372,7 @@ class OTPVerification(models.Model):
 
     phone = models.CharField(max_length=20, blank=True, default='', db_index=True)
     email = models.EmailField(blank=True, default='', db_index=True)
-    otp_code = models.CharField(max_length=6)
+    otp_code = models.CharField(max_length=64)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()

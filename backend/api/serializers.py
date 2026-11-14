@@ -1,5 +1,6 @@
 from decimal import Decimal
 from rest_framework import serializers
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from .models import Service, SubService, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal, CustomerProfile, OTPVerification
@@ -98,13 +99,36 @@ class TechnicianProfileSerializer(serializers.ModelSerializer):
 
 
 class BookingSerializer(serializers.ModelSerializer):
+    # The screen fallback must never disclose the Happy Code to technicians.
+    service_pin = serializers.CharField(read_only=True)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        allowed = (request is not None
+                   and getattr(request.user, 'role', None) == 'customer'
+                   and getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'screen'
+                   and instance.status == 'In Progress'
+                   and (
+                       (instance.customer_id is not None and
+                        instance.customer_id == getattr(request.user.profile, 'pk', None))
+                       or
+                       (instance.customer_id is None and
+                        len(''.join(filter(str.isdigit, str(getattr(request.user, 'phone', ''))))[-10:]) == 10 and
+                        ''.join(filter(str.isdigit, str(request.user.phone)))[-10:]
+                        == ''.join(filter(str.isdigit, str(instance.customer_phone)))[-10:])
+                   ))
+        if not allowed:
+            data.pop('service_pin', None)
+        return data
+
     service_details = ServiceSerializer(source='service', read_only=True)
     technician_details = TechnicianProfileSerializer(source='technician', read_only=True)
 
     class Meta:
         model = Booking
         fields = [
-            'id', 'booking_code', 'invoice_number', 'customer_name',
+            'id', 'booking_code', 'invoice_number', 'customer', 'customer_name',
             'customer_phone', 'address', 'area', 'pincode',
             'latitude', 'longitude', 'service', 'service_name',
             'subcategory_id', 'subcategory_name',
@@ -118,13 +142,12 @@ class BookingSerializer(serializers.ModelSerializer):
             'service_details', 'technician_details'
         ]
         read_only_fields = [
-            'invoice_number', 'platform_fee', 'created_at', 'completed_at',
+            'customer', 'invoice_number', 'platform_fee', 'created_at', 'completed_at',
             'payment_status', 'razorpay_order_id', 'razorpay_payment_id',
             'razorpay_signature',
         ]
         extra_kwargs = {
             'booking_code': {'required': False},
-            'service_pin': {'required': False},
         }
 
 
@@ -159,9 +182,9 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerProfile
         fields = [
-            'id', 'customer_id', 'phone', 'email', 'name', 'address',
+            'id', 'customer_id', 'phone', 'email', 'email_verified', 'name', 'address',
             'area', 'pincode', 'status', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['customer_id', 'created_at', 'updated_at']
+        read_only_fields = ['customer_id', 'email_verified', 'created_at', 'updated_at']
 
 

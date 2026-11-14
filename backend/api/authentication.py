@@ -23,6 +23,7 @@ class AuthenticatedPrincipal:
         self.role = role
         self.profile = profile
         self.id = profile.pk
+        self.pk = profile.pk  # DRF throttles identify authenticated users by .pk
         self.phone = getattr(profile, 'phone', '')
         self.is_staff = role == 'admin' and bool(profile.is_staff or profile.is_superuser)
 

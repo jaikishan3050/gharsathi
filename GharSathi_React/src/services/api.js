@@ -29,7 +29,7 @@ export const API_BASE_URL = getApiBaseUrl();
 export async function apiRequest(endpoint, options = {}, timeoutMs = 15000, retries = 1) {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
+  const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|signup-email\/send-otp|signup-email\/verify-otp|login-email\/send-otp|login-email\/verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(send-otp|verify-otp)\//.test(`${path}/`)
     || /^\/admin\/password-reset\/(request|confirm)\//.test(`${path}/`);
@@ -113,6 +113,7 @@ export function normalizeBookingFromDjango(b) {
     id: b.booking_code || `GS-${b.id}`,
     pk: b.id,
     customerName: b.customer_name,
+    customerPk: b.customer || null,
     phone: b.customer_phone,
     address: b.address,
     area: b.area,
@@ -125,7 +126,7 @@ export function normalizeBookingFromDjango(b) {
     platformFee: Number(b.platform_fee || 149),
     commission: Number(b.platform_fee || 149),
     status: b.status,
-    servicePin: b.service_pin || '4829',
+    servicePin: b.service_pin || '',
     technicianId: b.technician_details?.partner_id || (b.technician ? `TECH-${b.technician}` : ''),
     technicianPk: b.technician,
     technicianName: b.technician_name || b.technician_details?.name || '',
@@ -614,15 +615,41 @@ export const api = {
     });
   },
 
+  linkCustomerEmail: async (email, otpCode = '') => {
+    return apiRequest('/auth/link-email/', {
+      method: 'POST',
+      body: JSON.stringify({ email, ...(otpCode ? { otp_code: otpCode } : {}) }),
+    }, 15000, 0);
+  },
+
+  sendEmailLoginOtp: async (email) => apiRequest('/auth/login-email/send-otp/', {
+    method: 'POST', body: JSON.stringify({ email }),
+  }, 15000, 0),
+  verifyEmailLoginOtp: async ({ email, otpCode }) =>
+    apiRequest('/auth/login-email/verify-otp/', {
+      method: 'POST', body: JSON.stringify({ email, otp_code: otpCode }),
+    }, 15000, 0),
+
+  // Verified email-only signup never claims a mobile number.
+  sendEmailSignupOtp: async (email) => apiRequest('/auth/signup-email/send-otp/', {
+    method: 'POST', body: JSON.stringify({ email }),
+  }, 15000, 0),
+  verifyEmailSignupOtp: async ({ email, otpCode, name, area, address, pincode }) =>
+    apiRequest('/auth/signup-email/verify-otp/', {
+      method: 'POST', body: JSON.stringify({
+        email, otp_code: otpCode, name, area, address, pincode,
+      }),
+    }, 15000, 0),
+
   // Mobile OTP Authentication (Direct On-Screen with SMS Fallback)
-  sendOtp: async (phoneNumber, role = 'customer', purpose = 'login') => {
+  sendOtp: async (phoneNumber, role = 'customer', purpose = 'login', email = '') => {
     const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
     const endpoint = role === 'technician' && purpose === 'registration'
       ? '/technicians/send-otp/'
       : '/auth/send-otp/';
     return await apiRequest(endpoint, {
       method: 'POST',
-      body: JSON.stringify({ phone_number: cleanPhone, role }),
+      body: JSON.stringify({ phone_number: cleanPhone, role, ...(email ? { email } : {}) }),
     });
   },
 

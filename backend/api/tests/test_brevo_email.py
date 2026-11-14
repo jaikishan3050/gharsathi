@@ -1,0 +1,583 @@
+from unittest.mock import patch
+from datetime import timedelta
+from django.utils import timezone
+import pytest
+from django.test import override_settings
+from rest_framework.test import APIClient
+from api.models import OTPVerification, CustomerProfile
+from api.views import email_otp_digest
+from api.authentication import AuthenticatedPrincipal
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_customer_email_otp_sends_to_brevo():
+    CustomerProfile.objects.create(phone="9876543011", email="customer@example.com", email_verified=True, name="Customer")
+    client = APIClient()
+    with patch("api.views.send_login_otp") as send:
+        response = client.post("/api/auth/send-otp/", {
+            "phone_number": "9876543011", "email": "customer@example.com", "role": "customer"
+        }, format="json")
+    assert response.status_code == 200
+    send.assert_called_once()
+    assert send.call_args.args[0] == "customer@example.com"
+    otp = OTPVerification.objects.get(phone="9876543011")
+    assert otp.email == "customer@example.com"
+    assert len(otp.otp_code) == 64
+    assert otp.otp_code != send.call_args.args[1]
+    assert otp.otp_code == email_otp_digest(otp.phone, otp.email, send.call_args.args[1])
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_customer_email_otp_rejects_missing_email():
+    response = APIClient().post("/api/auth/send-otp/", {
+        "phone_number": "9876543012", "role": "customer"
+    }, format="json")
+    assert response.status_code == 400
+    assert not OTPVerification.objects.filter(phone="9876543012").exists()
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_customer_email_otp_delivery_failure_fails_closed():
+    from api.services.brevo import EmailDeliveryError
+    CustomerProfile.objects.create(phone="9876543013", email="customer@example.com", email_verified=True, name="Customer")
+    with patch("api.views.send_login_otp", side_effect=EmailDeliveryError()):
+        response = APIClient().post("/api/auth/send-otp/", {
+            "phone_number": "9876543013", "email": "customer@example.com", "role": "customer"
+        }, format="json")
+    assert response.status_code == 503
+    assert not OTPVerification.objects.filter(phone="9876543013").exists()
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_unlinked_phone_cannot_claim_email_account():
+    CustomerProfile.objects.create(phone="9876543099", email="victim@example.com", name="Victim")
+    with patch("api.views.send_login_otp") as send:
+        response = APIClient().post("/api/auth/send-otp/", {
+            "phone_number": "9876543088", "email": "victim@example.com", "role": "customer"
+        }, format="json")
+    assert response.status_code == 409
+    send.assert_not_called()
+    assert not OTPVerification.objects.filter(phone="9876543088").exists()
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_linked_customer_can_verify_hashed_email_otp():
+    CustomerProfile.objects.create(phone="9876543077", email="linked@example.com", email_verified=True, name="Linked")
+    with patch("api.views.send_login_otp") as send:
+        sent = APIClient().post("/api/auth/send-otp/", {
+            "phone_number": "9876543077", "email": "linked@example.com", "role": "customer"
+        }, format="json")
+    assert sent.status_code == 200
+    code = send.call_args.args[1]
+    verified = APIClient().post("/api/auth/verify-otp/", {
+        "phone_number": "9876543077", "email": "linked@example.com",
+        "otp_code": code, "role": "customer"
+    }, format="json")
+    assert verified.status_code == 200
+    assert "token" in verified.data
+
+
+@pytest.mark.django_db
+def test_email_link_requires_authenticated_customer():
+    response = APIClient().post("/api/auth/link-email/", {"email": "new@example.com"}, format="json")
+    assert response.status_code in (401, 403)
+
+
+@pytest.mark.django_db
+def test_authenticated_customer_can_link_email():
+    from api.authentication import AuthenticatedPrincipal
+    customer = CustomerProfile.objects.create(phone="9876543066", name="Existing")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal('customer', customer))
+    with patch("api.views.send_login_otp") as send:
+        response = client.post("/api/auth/link-email/", {"email": "linked@example.com"}, format="json")
+    assert response.status_code == 200
+    customer.refresh_from_db()
+    assert customer.email == ""
+    code = send.call_args.args[1]
+    bad = client.post("/api/auth/link-email/", {"email": "linked@example.com", "otp_code": "000000"}, format="json")
+    assert bad.status_code == 400
+    confirmed = client.post("/api/auth/link-email/", {"email": "linked@example.com", "otp_code": code}, format="json")
+    assert confirmed.status_code == 200
+    customer.refresh_from_db()
+    assert customer.email == "linked@example.com"
+    assert customer.email_verified is True
+
+
+@pytest.mark.django_db
+def test_customer_profile_patch_cannot_bypass_email_verification():
+    from api.authentication import AuthenticatedPrincipal
+    customer = CustomerProfile.objects.create(phone="9876543055", name="Protected", email="verified@example.com")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal('customer', customer))
+    response = client.patch(f"/api/customers/{customer.pk}/", {
+        "email": "attacker@example.com", "name": "Updated"
+    }, format="json")
+    assert response.status_code == 200
+    customer.refresh_from_db()
+    assert customer.email == "verified@example.com"
+    assert customer.name == "Updated"
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_legacy_unverified_email_cannot_login():
+    CustomerProfile.objects.create(
+        phone="9876543044", email="legacy@example.com", name="Legacy",
+    )
+    with patch("api.views.send_login_otp") as send:
+        response = APIClient().post("/api/auth/send-otp/", {
+            "phone_number": "9876543044", "email": "legacy@example.com", "role": "customer"
+        }, format="json")
+    assert response.status_code == 409
+    send.assert_not_called()
+    assert not OTPVerification.objects.filter(phone="9876543044").exists()
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_otp_verification_rechecks_verified_status_and_cannot_edit_profile():
+    customer = CustomerProfile.objects.create(
+        phone="9876543033", email="linked2@example.com", email_verified=True,
+        name="Original", address="Original address",
+    )
+    client = APIClient()
+    with patch("api.views.send_login_otp") as send:
+        sent = client.post("/api/auth/send-otp/", {
+            "phone_number": customer.phone, "email": customer.email, "role": "customer"
+        }, format="json")
+    assert sent.status_code == 200
+    code = send.call_args.args[1]
+    customer.email_verified = False
+    customer.save(update_fields=["email_verified"])
+    denied = client.post("/api/auth/verify-otp/", {
+        "phone_number": customer.phone, "email": customer.email,
+        "otp_code": code, "role": "customer"
+    }, format="json")
+    assert denied.status_code == 409
+
+    customer.email_verified = True
+    customer.save(update_fields=["email_verified"])
+    verified = client.post("/api/auth/verify-otp/", {
+        "phone_number": customer.phone, "email": customer.email,
+        "otp_code": code, "role": "customer",
+        "name": "Attacker", "address": "Tampered address",
+    }, format="json")
+    assert verified.status_code == 200
+    customer.refresh_from_db()
+    assert customer.name == "Original"
+    assert customer.address == "Original address"
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_otp_cannot_be_replayed_after_success():
+    customer = CustomerProfile.objects.create(
+        phone="9876543022", email="replay@example.com", email_verified=True,
+        name="Replay Test",
+    )
+    client = APIClient()
+    with patch("api.views.send_login_otp") as send:
+        sent = client.post("/api/auth/send-otp/", {
+            "phone_number": customer.phone, "email": customer.email, "role": "customer",
+        }, format="json")
+    assert sent.status_code == 200
+    payload = {
+        "phone_number": customer.phone, "email": customer.email,
+        "otp_code": send.call_args.args[1], "role": "customer",
+    }
+    first = client.post("/api/auth/verify-otp/", payload, format="json")
+    assert first.status_code == 200
+    second = client.post("/api/auth/verify-otp/", payload, format="json")
+    assert second.status_code == 400
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_only_new_customer_cannot_claim_existing_phone():
+    victim = CustomerProfile.objects.create(phone="9876543001", name="Victim")
+    with patch("api.views.send_login_otp") as send:
+        response = APIClient().post("/api/auth/send-otp/", {
+            "phone_number": victim.phone, "email": "attacker@example.com",
+            "role": "customer", "name": "Attacker",
+        }, format="json")
+    assert response.status_code == 409
+    send.assert_not_called()
+    victim.refresh_from_db()
+    assert victim.email == ""
+    assert victim.name == "Victim"
+
+
+@pytest.mark.django_db
+def test_linking_email_invalidates_other_pending_challenges():
+    customer = CustomerProfile.objects.create(phone="9876543088", name="Customer")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", customer))
+    old = OTPVerification.objects.create(
+        phone=customer.phone, email="old@example.com", role="customer",
+        otp_code=email_otp_digest(customer.phone, "old@example.com", "111111"),
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    current = OTPVerification.objects.create(
+        phone=customer.phone, email="new@example.com", role="customer",
+        otp_code=email_otp_digest(customer.phone, "new@example.com", "222222"),
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    response = client.post("/api/auth/link-email/", {
+        "email": "new@example.com", "otp_code": "222222",
+    }, format="json")
+    assert response.status_code == 200
+    old.refresh_from_db()
+    current.refresh_from_db()
+    customer.refresh_from_db()
+    assert old.is_verified is True
+    assert current.is_verified is True
+    assert customer.email == "new@example.com"
+    assert customer.email_verified is True
+    replay = client.post("/api/auth/link-email/", {
+        "email": "old@example.com", "otp_code": "111111",
+    }, format="json")
+    assert replay.status_code == 400
+    customer.refresh_from_db()
+    assert customer.email == "new@example.com"
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_otp_rejects_sms_style_plaintext_record():
+    customer = CustomerProfile.objects.create(
+        phone="9876543099", email="channel@example.com", email_verified=True,
+    )
+    OTPVerification.objects.create(
+        phone=customer.phone, role="customer", email=customer.email,
+        otp_code="123456", expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    response = APIClient().post("/api/auth/verify-otp/", {
+        "phone_number": customer.phone, "email": customer.email,
+        "otp_code": "123456", "role": "customer",
+    }, format="json")
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="sms")
+def test_sms_mode_rejects_email_digest_otp():
+    customer = CustomerProfile.objects.create(
+        phone="9876543066", email="sms@example.com", email_verified=True,
+    )
+    OTPVerification.objects.create(
+        phone=customer.phone, role="customer", email=customer.email,
+        otp_code=email_otp_digest(customer.phone, customer.email, "654321"),
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    response = APIClient().post("/api/auth/verify-otp/", {
+        "phone_number": customer.phone, "otp_code": "654321", "role": "customer",
+    }, format="json")
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_admin_email_change_revokes_verification_and_pending_codes():
+    from django.contrib.auth import get_user_model
+    customer = CustomerProfile.objects.create(
+        phone="9876543077", email="old-admin@example.com",
+        email_verified=True, name="Customer",
+    )
+    pending = OTPVerification.objects.create(
+        phone=customer.phone, email="pending@example.com", role="customer",
+        otp_code="unused", expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    admin = get_user_model().objects.create_superuser(
+        username="email-admin-test", email="admin@example.com", password="TestAdminPassword123!"
+    )
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("admin", admin))
+    response = client.patch(f"/api/customers/{customer.pk}/", {
+        "email": "changed-admin@example.com",
+    }, format="json")
+    assert response.status_code == 200
+    customer.refresh_from_db()
+    pending.refresh_from_db()
+    assert customer.email == "changed-admin@example.com"
+    assert customer.email_verified is False
+    assert pending.is_verified is True
+
+
+@pytest.mark.django_db
+def test_admin_phone_change_revokes_email_verification():
+    from django.contrib.auth import get_user_model
+    customer = CustomerProfile.objects.create(
+        phone="9876543044", email="verified-phone@example.com",
+        email_verified=True, name="Customer",
+    )
+    pending = OTPVerification.objects.create(
+        phone=customer.phone, email=customer.email, role="customer",
+        otp_code="unused", expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    admin = get_user_model().objects.create_superuser(
+        username="phone-admin-test", email="phone-admin@example.com",
+        password="TestAdminPassword123!",
+    )
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("admin", admin))
+    response = client.patch(f"/api/customers/{customer.pk}/", {
+        "phone": "9876543055",
+    }, format="json")
+    assert response.status_code == 200
+    customer.refresh_from_db()
+    pending.refresh_from_db()
+    assert customer.phone == "9876543055"
+    assert customer.email_verified is False
+    assert pending.is_verified is True
+
+
+@pytest.mark.django_db
+def test_email_link_delivery_failure_leaves_no_usable_challenge():
+    from api.services.brevo import EmailDeliveryError
+    customer = CustomerProfile.objects.create(phone="9876543123", name="Delivery Failure")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", customer))
+    with patch("api.views.send_login_otp", side_effect=EmailDeliveryError()):
+        response = client.post("/api/auth/link-email/", {
+            "email": "failed-link@example.com",
+        }, format="json")
+    assert response.status_code == 503
+    assert not OTPVerification.objects.filter(
+        phone=customer.phone, email="failed-link@example.com",
+    ).exists()
+    customer.refresh_from_db()
+    assert customer.email == ""
+    assert customer.email_verified is False
+    verify = client.post("/api/auth/link-email/", {
+        "email": "failed-link@example.com", "otp_code": "123456",
+    }, format="json")
+    assert verify.status_code == 400
+
+
+@pytest.mark.django_db
+def test_resending_email_link_code_revokes_old_code_only_after_delivery():
+    from api.services.brevo import EmailDeliveryError
+    customer = CustomerProfile.objects.create(phone="9876543133", name="Resend Customer")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", customer))
+    with patch("api.views.send_login_otp") as deliver:
+        first = client.post("/api/auth/link-email/", {
+            "email": "first-resend@example.com",
+        }, format="json")
+    assert first.status_code == 200
+    first_code = deliver.call_args.args[1]
+    first_otp = OTPVerification.objects.get(phone=customer.phone)
+    OTPVerification.objects.filter(pk=first_otp.pk).update(
+        created_at=timezone.now() - timedelta(minutes=2),
+    )
+    with patch("api.views.send_login_otp", side_effect=EmailDeliveryError()):
+        failed = client.post("/api/auth/link-email/", {
+            "email": "second-resend@example.com",
+        }, format="json")
+    assert failed.status_code == 503
+    first_otp.refresh_from_db()
+    assert first_otp.is_verified is False
+    with patch("api.views.send_login_otp") as deliver:
+        second = client.post("/api/auth/link-email/", {
+            "email": "second-resend@example.com",
+        }, format="json")
+    assert second.status_code == 200
+    second_code = deliver.call_args.args[1]
+    first_otp.refresh_from_db()
+    assert first_otp.is_verified is True
+    old_attempt = client.post("/api/auth/link-email/", {
+        "email": "first-resend@example.com", "otp_code": first_code,
+    }, format="json")
+    assert old_attempt.status_code == 400
+    confirmed = client.post("/api/auth/link-email/", {
+        "email": "second-resend@example.com", "otp_code": second_code,
+    }, format="json")
+    assert confirmed.status_code == 200
+    customer.refresh_from_db()
+    assert customer.email == "second-resend@example.com"
+    assert customer.email_verified is True
+
+
+@pytest.mark.django_db
+def test_inactive_customer_cannot_request_or_redeem_email_link_code():
+    customer = CustomerProfile.objects.create(
+        phone="9876543144", name="Suspended Customer", status="Inactive",
+    )
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", customer))
+    with patch("api.views.send_login_otp") as deliver:
+        request = client.post("/api/auth/link-email/", {
+            "email": "inactive@example.com",
+        }, format="json")
+    assert request.status_code == 403
+    deliver.assert_not_called()
+    OTPVerification.objects.create(
+        phone=customer.phone, email="inactive@example.com", role="customer",
+        otp_code=email_otp_digest(customer.phone, "inactive@example.com", "456789"),
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    verify = client.post("/api/auth/link-email/", {
+        "email": "inactive@example.com", "otp_code": "456789",
+    }, format="json")
+    assert verify.status_code == 403
+    customer.refresh_from_db()
+    assert customer.email == ""
+    assert customer.email_verified is False
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_new_customer_email_signup_login_and_replay_protection():
+    client = APIClient()
+    with patch("api.views.send_login_otp") as sender:
+        sent = client.post("/api/auth/signup-email/send-otp/", {
+            "email": "new-email-only@example.com",
+        }, format="json")
+    assert sent.status_code == 200
+    otp = sender.call_args.args[1]
+    assert CustomerProfile.objects.filter(email="new-email-only@example.com").count() == 0
+    bad = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": "new-email-only@example.com", "otp_code": "000000", "name": "Email Customer",
+    }, format="json")
+    assert bad.status_code == 400
+    confirmed = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": "new-email-only@example.com", "otp_code": otp, "name": "Email Customer",
+    }, format="json")
+    assert confirmed.status_code == 200
+    customer = CustomerProfile.objects.get(email="new-email-only@example.com")
+    assert customer.phone == ""
+    assert customer.email_verified is True
+    assert confirmed.data["user"]["id"] == customer.id
+    replay = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": customer.email, "otp_code": otp, "name": "Replay",
+    }, format="json")
+    assert replay.status_code in (400, 409)
+    existing_phone = CustomerProfile.objects.create(
+        phone="9876543311", email="phone-account@example.com", email_verified=True,
+    )
+    assert existing_phone.phone == "9876543311"
+    with patch("api.views.send_login_otp") as sender:
+        login_sent = client.post("/api/auth/login-email/send-otp/", {
+            "email": customer.email,
+        }, format="json")
+    assert login_sent.status_code == 429  # just issued a signup code; cooldown applies
+    OTPVerification.objects.filter(email=customer.email).update(
+        created_at=timezone.now() - timedelta(minutes=2),
+    )
+    with patch("api.views.send_login_otp") as sender:
+        login_sent = client.post("/api/auth/login-email/send-otp/", {
+            "email": customer.email,
+        }, format="json")
+    assert login_sent.status_code == 200
+    login_code = sender.call_args.args[1]
+    login = client.post("/api/auth/login-email/verify-otp/", {
+        "email": customer.email, "otp_code": login_code,
+    }, format="json")
+    assert login.status_code == 200
+    assert login.data["user"]["id"] == customer.id
+    second = client.post("/api/auth/login-email/verify-otp/", {
+        "email": customer.email, "otp_code": login_code,
+    }, format="json")
+    assert second.status_code == 400
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_signup_cannot_claim_existing_customer_phone():
+    existing = CustomerProfile.objects.create(
+        phone="9876543355", name="Existing Phone Customer",
+    )
+    client = APIClient()
+    with patch("api.views.send_login_otp") as sender:
+        sent = client.post("/api/auth/signup-email/send-otp/", {
+            "email": "separate@example.com", "phone_number": existing.phone,
+        }, format="json")
+    assert sent.status_code == 200
+    verified = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": "separate@example.com", "otp_code": sender.call_args.args[1],
+        "phone_number": existing.phone, "name": "New Customer",
+    }, format="json")
+    assert verified.status_code == 200
+    newcomer = CustomerProfile.objects.get(email="separate@example.com")
+    assert newcomer.phone == ""
+    existing.refresh_from_db()
+    assert existing.email == ""
+    assert existing.name == "Existing Phone Customer"
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_signup_delivery_failure_leaves_no_pending_code():
+    from api.services.brevo import EmailDeliveryError
+    with patch("api.views.send_login_otp", side_effect=EmailDeliveryError()):
+        failed = APIClient().post("/api/auth/signup-email/send-otp/", {
+            "email": "delivery-failed-signup@example.com",
+        }, format="json")
+    assert failed.status_code == 503
+    assert not OTPVerification.objects.filter(email="delivery-failed-signup@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_customer_email_unique_case_insensitive_database_constraint():
+    from django.db import IntegrityError, transaction
+    CustomerProfile.objects.create(
+        phone="9876543891", email="Unique.Email@example.com",
+    )
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            CustomerProfile.objects.create(
+                phone="9876543892", email="unique.email@EXAMPLE.com",
+            )
+    # Phone-only legacy customer accounts must continue to support blank email.
+    CustomerProfile.objects.create(phone="9876543893", email="")
+    CustomerProfile.objects.create(phone="9876543894", email="")
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_new_customer_signup_jwt_can_access_only_own_bookings():
+    from decimal import Decimal
+    from api.models import Service, Booking
+    service = Service.objects.create(
+        name="Email Signup Test Service", slug="email-signup-service",
+        base_price=Decimal("499.00"),
+    )
+    existing = CustomerProfile.objects.create(
+        phone="9876543991", name="Existing Phone Owner",
+    )
+    other_booking = Booking.objects.create(
+        customer_name="Existing Phone Owner", customer_phone=existing.phone,
+        address="Other home", area="Patna", service=service,
+        base_price=Decimal("499.00"), total_amount=Decimal("499.00"),
+    )
+    client = APIClient()
+    with patch("api.views.send_login_otp") as send:
+        sent = client.post("/api/auth/signup-email/send-otp/", {
+            "email": "authenticated-booker@example.com",
+        }, format="json")
+    assert sent.status_code == 200
+    signup = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": "authenticated-booker@example.com",
+        "otp_code": send.call_args.args[1], "name": "Email Booker",
+    }, format="json")
+    assert signup.status_code == 200
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {signup.data['token']}")
+    created = client.post("/api/bookings/", {
+        "service": service.pk, "customer_name": "Email Booker",
+        "customer_phone": existing.phone,
+        "address": "Own house", "area": "Patna",
+        "base_price": "499.00", "total_amount": "499.00",
+    }, format="json")
+    assert created.status_code == 201, created.data
+    owner = CustomerProfile.objects.get(email="authenticated-booker@example.com")
+    assert Booking.objects.get(pk=created.data['id']).customer_id == owner.pk
+    assert client.get(f"/api/bookings/{created.data['id']}/").status_code == 200
+    assert client.get(f"/api/bookings/{other_booking.id}/").status_code == 404
+    # The original phone owner must never inherit the new email-only booking.
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", existing))
+    assert client.get(f"/api/bookings/{created.data['id']}/").status_code == 404

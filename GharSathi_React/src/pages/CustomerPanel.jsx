@@ -21,6 +21,7 @@ import LocationPickerMap from '../components/LocationPickerMap.jsx';
 import BookingMiniMap from '../components/BookingMiniMap.jsx';
 import { prepareCheckout, confirmCheckout } from '../services/checkout.js';
 import OtpModal from '../components/OtpModal.jsx';
+import EmailLinkForm from '../components/EmailLinkForm.jsx';
 
 const items = [
   { id: 'home', icon: '⌂', label: 'Home' },
@@ -159,8 +160,11 @@ export default function CustomerPanel() {
   const customerBookings = useMemo(() => {
     if (!currentCustomer) return [];
     const phone = (currentCustomer.phone || '').replace(/\D/g, '').slice(-10);
-    if (!phone) return [];
-    return data.bookings.filter((b) => b.phone.replace(/\D/g, '').slice(-10) === phone);
+    const customerPk = currentCustomer.pk || (typeof currentCustomer.id === 'number' ? currentCustomer.id : null);
+    return data.bookings.filter((b) =>
+      (b.customerPk && customerPk && String(b.customerPk) === String(customerPk)) ||
+      (!b.customerPk && phone.length === 10 && (b.phone || '').replace(/\D/g, '').slice(-10) === phone)
+    );
   }, [data.bookings, currentCustomer]);
 
   // Filtered Customer Bookings (Real-time Search & Status Filter)
@@ -247,7 +251,7 @@ export default function CustomerPanel() {
 
     if (!currentCustomer) {
       setAuthModalOpen(true);
-      setAuthError('🔒 Booking request submit karne se pehle Mobile OTP se login karein.');
+      setAuthError('🔒 Booking request submit karne se pehle account mein login karein.');
       return;
     }
 
@@ -903,7 +907,7 @@ export default function CustomerPanel() {
                   />
                 </Field>
 
-                <Field label="Mobile Number *" hint="Verified OTP account number">
+                <Field label="Contact Mobile Number *" hint="Booking updates aur technician contact ke liye; email-only accounts ke liye phone ownership verify nahi hoti">
                   <input
                     required
                     inputMode="numeric"
@@ -1302,6 +1306,7 @@ export default function CustomerPanel() {
               </button>
             </div>
           ) : (
+            <>
             <form className="form-card narrow-form" onSubmit={saveProfile}>
               <div className="profile-avatar">
                 {currentCustomer.name.charAt(0).toUpperCase()}
@@ -1317,10 +1322,10 @@ export default function CustomerPanel() {
                   />
                 </Field>
 
-                <Field label="Mobile Number (Verified via OTP)">
+                <Field label={currentCustomer.phone ? "Mobile Number (OTP account)" : "Account verification"}>
                   <input
                     disabled
-                    value={currentCustomer.phone}
+                    value={currentCustomer.phone || "Email verified — phone not verified"}
                     className="disabled-input"
                   />
                 </Field>
@@ -1369,6 +1374,11 @@ export default function CustomerPanel() {
 
               {profileNotice && <p className="success-text">{profileNotice}</p>}
             </form>
+            <EmailLinkForm key={currentCustomer.id || currentCustomer.customer_id || currentCustomer.phone}
+              currentEmail={currentCustomer.email || ''}
+              emailVerified={currentCustomer.email_verified === true}
+              onLinked={() => setProfileNotice('Email verified! Profile reload karke updated email dekh sakte hain.')} />
+            </>
           )}
         </>
       )}
