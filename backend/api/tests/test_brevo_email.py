@@ -334,3 +334,26 @@ def test_admin_phone_change_revokes_email_verification():
     assert customer.phone == "9876543055"
     assert customer.email_verified is False
     assert pending.is_verified is True
+
+
+@pytest.mark.django_db
+def test_email_link_delivery_failure_leaves_no_usable_challenge():
+    from api.services.brevo import EmailDeliveryError
+    customer = CustomerProfile.objects.create(phone="9876543123", name="Delivery Failure")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", customer))
+    with patch("api.views.send_login_otp", side_effect=EmailDeliveryError()):
+        response = client.post("/api/auth/link-email/", {
+            "email": "failed-link@example.com",
+        }, format="json")
+    assert response.status_code == 503
+    assert not OTPVerification.objects.filter(
+        phone=customer.phone, email="failed-link@example.com",
+    ).exists()
+    customer.refresh_from_db()
+    assert customer.email == ""
+    assert customer.email_verified is False
+    verify = client.post("/api/auth/link-email/", {
+        "email": "failed-link@example.com", "otp_code": "123456",
+    }, format="json")
+    assert verify.status_code == 400
