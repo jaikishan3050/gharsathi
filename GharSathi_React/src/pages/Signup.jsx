@@ -24,6 +24,7 @@ export default function Signup() {
   // Role: 'customer' | 'technician'
   const initialRole = location.state?.role || (location.pathname.includes('technician') ? 'technician' : 'customer');
   const [role, setRole] = useState(initialRole);
+  const emailOtp = role === 'customer' && import.meta.env.VITE_CUSTOMER_OTP_CHANNEL === 'email';
 
   // Flow step: 'form' | 'otp'
   const [step, setStep] = useState('form');
@@ -104,7 +105,7 @@ export default function Signup() {
 
     // Phone validation (10-digit Indian mobile)
     const cleanPhone = formData.phone.replace(/\D/g, '').slice(-10);
-    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+    if (!emailOtp && !/^[6-9]\d{9}$/.test(cleanPhone)) {
       setErrorMsg('Kripya valid 10-digit Indian mobile number enter karein (starting with 6-9).');
       return;
     }
@@ -117,7 +118,7 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const res = await api.sendOtp(cleanPhone, role, role === 'technician' ? 'registration' : 'login');
+      const res = emailOtp ? await api.sendEmailSignupOtp(formData.email.trim().toLowerCase()) : await api.sendOtp(cleanPhone, role, role === 'technician' ? 'registration' : 'login');
       setStatusMsg(res?.message || `Verification OTP generated for +91 ${cleanPhone}`);
       setStep('otp');
       setCountdown(60);
@@ -130,7 +131,7 @@ export default function Signup() {
       }
       addToast({
         title: 'Verification OTP Ready! 🔔',
-        message: otp ? `Development OTP: ${otp}` : 'OTP aapke mobile par SMS se bheja gaya hai.',
+        message: otp ? `Development OTP: ${otp}` : (emailOtp ? 'OTP email par bheja gaya hai.' : 'OTP mobile par SMS se bheja gaya hai.'),
         type: 'success',
       });
     } catch (err) {
@@ -157,7 +158,11 @@ export default function Signup() {
     try {
       const cleanPhone = formData.phone.replace(/\D/g, '').slice(-10);
 
-      const res = await api.verifyOtp({
+      const res = emailOtp ? await api.verifyEmailSignupOtp({
+        email: formData.email.trim().toLowerCase(), otpCode,
+        name: formData.name.trim(), area: formData.area,
+        address: formData.address.trim(), pincode: formData.pincode,
+      }) : await api.verifyOtp({
         phoneNumber: cleanPhone,
         otpCode,
         role,
@@ -332,6 +337,7 @@ export default function Signup() {
                   />
                 </div>
 
+                {!emailOtp && (
                 <div className="field">
                   <label htmlFor="signup-phone">Mobile Number (10 Digits) *</label>
                   <div className="phone-input-wrap">
@@ -353,6 +359,17 @@ export default function Signup() {
                     ⚡ Verification OTP SMS se bheja jayega.
                   </small>
                 </div>
+
+                )}
+                {emailOtp && (
+                  <div className="field">
+                    <label htmlFor="customer-signup-email">Email Address *</label>
+                    <input id="customer-signup-email" name="email" type="email" required
+                      autoComplete="email" value={formData.email} onChange={handleChange}
+                      disabled={loading} placeholder="you@example.com" />
+                    <small className="field-hint">OTP email par bheja jayega; mobile ownership claim nahi hogi.</small>
+                  </div>
+                )}
 
                 <div className="field">
                   <label htmlFor="signup-area">Service Area / City *</label>
@@ -457,7 +474,7 @@ export default function Signup() {
                 <div className="signup-action-row">
                   <button
                     type="submit"
-                    disabled={loading || !formData.phone.trim() || !formData.name.trim()}
+                    disabled={loading || (emailOtp ? !formData.email.trim() : !formData.phone.trim()) || !formData.name.trim()}
                     className="button button-primary button-wide auth-submit-btn"
                   >
                     {loading ? (
