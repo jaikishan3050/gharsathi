@@ -100,5 +100,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker Containers
+        env:
+          POSTGRES_PASSWORD: ci-only-not-a-production-secret
         run: |
           docker compose build --parallel
