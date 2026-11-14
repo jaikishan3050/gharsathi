@@ -600,54 +600,19 @@ export const api = {
     });
   },
 
-  // Razorpay Sandbox Payment Methods
+  // Payment operations must be confirmed by the backend; never fake success locally.
   createRazorpayOrder: async ({ amount, bookingId, serviceName }) => {
-    try {
-      return await apiRequest('/payments/create-order/', {
-        method: 'POST',
-        body: JSON.stringify({
-          amount,
-          booking_id: bookingId,
-          service_name: serviceName,
-        }),
-      });
-    } catch (err) {
-      console.warn('Backend payment create-order fallback:', err);
-      return {
-        order_id: `order_demo_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-        amount: Math.round(Number(amount) * 100),
-        amount_in_rupees: Number(amount),
-        currency: 'INR',
-        key_id: 'rzp_test_gharsathi_demo',
-        booking_id: bookingId,
-        service_name: serviceName,
-        platform_fee: 149,
-      };
-    }
+    return apiRequest('/payments/create-order/', {
+      method: 'POST',
+      body: JSON.stringify({ amount, booking_id: bookingId, service_name: serviceName }),
+    });
   },
 
   verifyRazorpayPayment: async ({ razorpay_order_id, razorpay_payment_id, razorpay_signature, booking_id }) => {
-    try {
-      return await apiRequest('/payments/verify/', {
-        method: 'POST',
-        body: JSON.stringify({
-          razorpay_order_id,
-          razorpay_payment_id,
-          razorpay_signature: razorpay_signature || 'simulated_sandbox_signature',
-          booking_id,
-        }),
-      });
-    } catch (err) {
-      console.warn('Backend payment verify fallback:', err);
-      return {
-        success: true,
-        message: 'Payment simulated successfully in browser demo mode.',
-        payment_status: 'Paid',
-        razorpay_order_id,
-        razorpay_payment_id,
-        booking_code: booking_id,
-      };
-    }
+    return apiRequest('/payments/verify/', {
+      method: 'POST',
+      body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature, booking_id }),
+    });
   },
 
   // Mobile OTP Authentication (Direct On-Screen with SMS Fallback)
