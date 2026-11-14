@@ -520,3 +520,19 @@ def test_email_signup_delivery_failure_leaves_no_pending_code():
         }, format="json")
     assert failed.status_code == 503
     assert not OTPVerification.objects.filter(email="delivery-failed-signup@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_customer_email_unique_case_insensitive_database_constraint():
+    from django.db import IntegrityError, transaction
+    CustomerProfile.objects.create(
+        phone="9876543891", email="Unique.Email@example.com",
+    )
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            CustomerProfile.objects.create(
+                phone="9876543892", email="unique.email@EXAMPLE.com",
+            )
+    # Phone-only legacy customer accounts must continue to support blank email.
+    CustomerProfile.objects.create(phone="9876543893", email="")
+    CustomerProfile.objects.create(phone="9876543894", email="")
