@@ -606,7 +606,7 @@ def test_happy_code_email_start_sends_only_to_customer_and_is_idempotent(
     settings.HAPPY_CODE_CHANNEL = 'email'
     customer = CustomerProfile.objects.create(
         phone=active_booking.customer_phone, name=active_booking.customer_name,
-        email='happy-customer@example.com',
+        email='happy-customer@example.com', email_verified=True,
     )
     active_booking.status = 'Accepted'
     active_booking.save(update_fields=['status'])
@@ -633,7 +633,7 @@ def test_happy_code_email_failure_keeps_booking_accepted(
     settings.HAPPY_CODE_CHANNEL = 'email'
     CustomerProfile.objects.create(
         phone=active_booking.customer_phone, name=active_booking.customer_name,
-        email='happy-customer@example.com',
+        email='happy-customer@example.com', email_verified=True,
     )
     active_booking.status = 'Accepted'
     active_booking.save(update_fields=['status'])
@@ -674,3 +674,30 @@ def test_screen_happy_code_visible_only_to_customer_when_job_started(active_book
     assert 'service_pin' not in BookingSerializer(active_booking).data
     settings.HAPPY_CODE_CHANNEL = 'email'
     assert 'service_pin' not in BookingSerializer(active_booking, context={'request': customer_request}).data
+
+
+@pytest.mark.django_db
+def test_happy_code_email_requires_verified_customer(
+    api_client, active_booking, verified_technician, authenticate_as, settings
+):
+    from unittest.mock import patch
+    settings.HAPPY_CODE_CHANNEL = 'email'
+    customer = CustomerProfile.objects.create(
+        phone=active_booking.customer_phone,
+        email='unverified-happy@example.com',
+        email_verified=False,
+    )
+    authenticate_as('technician', verified_technician)
+    url = f'/api/bookings/{active_booking.pk}/start/'
+    with patch('api.views.send_happy_code') as send:
+        response = api_client.post(url, {}, format='json')
+    assert response.status_code == 503
+    send.assert_not_called()
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'Accepted'
+    customer.email_verified = True
+    customer.save(update_fields=['email_verified'])
+    with patch('api.views.send_happy_code') as send:
+        response = api_client.post(url, {}, format='json')
+    assert response.status_code == 200
+    send.assert_called_once()
