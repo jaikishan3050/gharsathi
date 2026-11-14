@@ -1342,6 +1342,16 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
             serializer.validated_data.pop('phone', None)
             serializer.validated_data.pop('email', None)
             serializer.validated_data.pop('status', None)
+        if getattr(self.request.user, 'role', None) == 'admin':
+            previous = serializer.instance
+            new_email = serializer.validated_data.get('email', previous.email)
+            if new_email.strip().lower() != (previous.email or '').strip().lower():
+                serializer.save(email_verified=False)
+                # Any pending verification for the old identity is no longer valid.
+                OTPVerification.objects.filter(
+                    phone=previous.phone, role='customer', is_verified=False,
+                ).update(is_verified=True)
+                return
         serializer.save()
 
 
