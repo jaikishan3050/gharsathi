@@ -245,3 +245,37 @@ def test_linking_email_invalidates_other_pending_challenges():
     assert replay.status_code == 400
     customer.refresh_from_db()
     assert customer.email == "new@example.com"
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_otp_rejects_sms_style_plaintext_record():
+    customer = CustomerProfile.objects.create(
+        phone="9876543099", email="channel@example.com", email_verified=True,
+    )
+    OTPVerification.objects.create(
+        phone=customer.phone, role="customer", email=customer.email,
+        otp_code="123456", expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    response = APIClient().post("/api/auth/verify-otp/", {
+        "phone_number": customer.phone, "email": customer.email,
+        "otp_code": "123456", "role": "customer",
+    }, format="json")
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="sms")
+def test_sms_mode_rejects_email_digest_otp():
+    customer = CustomerProfile.objects.create(
+        phone="9876543066", email="sms@example.com", email_verified=True,
+    )
+    OTPVerification.objects.create(
+        phone=customer.phone, role="customer", email=customer.email,
+        otp_code=email_otp_digest(customer.phone, customer.email, "654321"),
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    response = APIClient().post("/api/auth/verify-otp/", {
+        "phone_number": customer.phone, "otp_code": "654321", "role": "customer",
+    }, format="json")
+    assert response.status_code == 400
