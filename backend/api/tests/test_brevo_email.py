@@ -1,4 +1,6 @@
 from unittest.mock import patch
+from datetime import timedelta
+from django.utils import timezone
 import pytest
 from django.test import override_settings
 from rest_framework.test import APIClient
