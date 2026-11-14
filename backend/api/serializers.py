@@ -128,7 +128,7 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
-            'id', 'booking_code', 'invoice_number', 'customer_name',
+            'id', 'booking_code', 'invoice_number', 'customer', 'customer_name',
             'customer_phone', 'address', 'area', 'pincode',
             'latitude', 'longitude', 'service', 'service_name',
             'subcategory_id', 'subcategory_name',
@@ -142,7 +142,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'service_details', 'technician_details'
         ]
         read_only_fields = [
-            'invoice_number', 'platform_fee', 'created_at', 'completed_at',
+            'customer', 'invoice_number', 'platform_fee', 'created_at', 'completed_at',
             'payment_status', 'razorpay_order_id', 'razorpay_payment_id',
             'razorpay_signature',
         ]
