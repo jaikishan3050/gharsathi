@@ -339,6 +339,41 @@ class TestFinancialAndOperationalFlows:
         assert active_booking.razorpay_payment_id == payment_id
 
 
+    def test_booking_payment_pending_until_gateway_capture(self, api_client, active_booking, authenticate_as):
+        """Integration: persisted booking -> gateway order -> captured payment -> Paid."""
+        from unittest.mock import patch
+        customer = CustomerProfile.objects.create(phone=active_booking.customer_phone, name=active_booking.customer_name)
+        authenticate_as('customer', customer)
+        order_id, payment_id = 'order_integrated_001', 'pay_integrated_001'
+        assert active_booking.payment_status != 'Paid'
+        with patch('razorpay.Client') as gateway:
+            gateway.return_value.order.create.return_value = {'id': order_id}
+            created = api_client.post('/api/payments/razorpay/create-order/', {
+                'booking_id': active_booking.booking_code,
+                'amount': str(active_booking.total_amount),
+            }, format='json')
+            assert created.status_code == 200
+            assert created.data['order_id'] == order_id
+            active_booking.refresh_from_db()
+            assert active_booking.razorpay_order_id == order_id
+            assert active_booking.payment_status != 'Paid'
+
+            gateway.return_value.payment.fetch.return_value = {
+                'status': 'captured', 'order_id': order_id, 'currency': 'INR',
+                'amount': int(active_booking.total_amount * 100),
+            }
+            secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+            signature = hmac.new(secret.encode(), f'{order_id}|{payment_id}'.encode(), hashlib.sha256).hexdigest()
+            verified = api_client.post('/api/payments/razorpay/verify/', {
+                'razorpay_order_id': order_id, 'razorpay_payment_id': payment_id,
+                'razorpay_signature': signature, 'booking_id': active_booking.booking_code,
+            }, format='json')
+            assert verified.status_code == 200
+            assert verified.data['payment_status'] == 'Paid'
+        active_booking.refresh_from_db()
+        assert active_booking.payment_status == 'Paid'
+        assert active_booking.razorpay_payment_id == payment_id
+
     def test_payment_order_rejects_other_customer(self, api_client, active_booking, authenticate_as):
         outsider = CustomerProfile.objects.create(phone="9876501234", name="Other Customer")
         authenticate_as('customer', outsider)
