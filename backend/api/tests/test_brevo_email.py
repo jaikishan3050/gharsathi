@@ -208,3 +208,37 @@ def test_email_only_new_customer_cannot_claim_existing_phone():
     victim.refresh_from_db()
     assert victim.email == ""
     assert victim.name == "Victim"
+
+
+@pytest.mark.django_db
+def test_linking_email_invalidates_other_pending_challenges():
+    customer = CustomerProfile.objects.create(phone="9876543088", name="Customer")
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", customer))
+    old = OTPVerification.objects.create(
+        phone=customer.phone, email="old@example.com", role="customer",
+        otp_code=email_otp_digest(customer.phone, "old@example.com", "111111"),
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    current = OTPVerification.objects.create(
+        phone=customer.phone, email="new@example.com", role="customer",
+        otp_code=email_otp_digest(customer.phone, "new@example.com", "222222"),
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    response = client.post("/api/auth/link-email/", {
+        "email": "new@example.com", "otp_code": "222222",
+    }, format="json")
+    assert response.status_code == 200
+    old.refresh_from_db()
+    current.refresh_from_db()
+    customer.refresh_from_db()
+    assert old.is_verified is True
+    assert current.is_verified is True
+    assert customer.email == "new@example.com"
+    assert customer.email_verified is True
+    replay = client.post("/api/auth/link-email/", {
+        "email": "old@example.com", "otp_code": "111111",
+    }, format="json")
+    assert replay.status_code == 400
+    customer.refresh_from_db()
+    assert customer.email == "new@example.com"
