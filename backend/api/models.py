@@ -2,6 +2,7 @@ import secrets
 import random
 from decimal import Decimal
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
@@ -339,7 +340,7 @@ class CustomerProfile(models.Model):
         ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(
-                models.functions.Lower('email'),
+                Lower('email'),
                 condition=~models.Q(email=''),
                 name='unique_customer_email_ci_when_present',
             ),
