@@ -428,3 +428,95 @@ def test_inactive_customer_cannot_request_or_redeem_email_link_code():
     customer.refresh_from_db()
     assert customer.email == ""
     assert customer.email_verified is False
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_new_customer_email_signup_login_and_replay_protection():
+    client = APIClient()
+    with patch("api.views.send_login_otp") as sender:
+        sent = client.post("/api/auth/signup-email/send-otp/", {
+            "email": "new-email-only@example.com",
+        }, format="json")
+    assert sent.status_code == 200
+    otp = sender.call_args.args[1]
+    assert CustomerProfile.objects.filter(email="new-email-only@example.com").count() == 0
+    bad = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": "new-email-only@example.com", "otp_code": "000000", "name": "Email Customer",
+    }, format="json")
+    assert bad.status_code == 400
+    confirmed = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": "new-email-only@example.com", "otp_code": otp, "name": "Email Customer",
+    }, format="json")
+    assert confirmed.status_code == 200
+    customer = CustomerProfile.objects.get(email="new-email-only@example.com")
+    assert customer.phone == ""
+    assert customer.email_verified is True
+    assert confirmed.data["user"]["id"] == customer.id
+    replay = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": customer.email, "otp_code": otp, "name": "Replay",
+    }, format="json")
+    assert replay.status_code in (400, 409)
+    existing_phone = CustomerProfile.objects.create(
+        phone="9876543311", email="phone-account@example.com", email_verified=True,
+    )
+    assert existing_phone.phone == "9876543311"
+    with patch("api.views.send_login_otp") as sender:
+        login_sent = client.post("/api/auth/login-email/send-otp/", {
+            "email": customer.email,
+        }, format="json")
+    assert login_sent.status_code == 429  # just issued a signup code; cooldown applies
+    OTPVerification.objects.filter(email=customer.email).update(
+        created_at=timezone.now() - timedelta(minutes=2),
+    )
+    with patch("api.views.send_login_otp") as sender:
+        login_sent = client.post("/api/auth/login-email/send-otp/", {
+            "email": customer.email,
+        }, format="json")
+    assert login_sent.status_code == 200
+    login_code = sender.call_args.args[1]
+    login = client.post("/api/auth/login-email/verify-otp/", {
+        "email": customer.email, "otp_code": login_code,
+    }, format="json")
+    assert login.status_code == 200
+    assert login.data["user"]["id"] == customer.id
+    second = client.post("/api/auth/login-email/verify-otp/", {
+        "email": customer.email, "otp_code": login_code,
+    }, format="json")
+    assert second.status_code == 400
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_signup_cannot_claim_existing_customer_phone():
+    existing = CustomerProfile.objects.create(
+        phone="9876543355", name="Existing Phone Customer",
+    )
+    client = APIClient()
+    with patch("api.views.send_login_otp") as sender:
+        sent = client.post("/api/auth/signup-email/send-otp/", {
+            "email": "separate@example.com", "phone_number": existing.phone,
+        }, format="json")
+    assert sent.status_code == 200
+    verified = client.post("/api/auth/signup-email/verify-otp/", {
+        "email": "separate@example.com", "otp_code": sender.call_args.args[1],
+        "phone_number": existing.phone, "name": "New Customer",
+    }, format="json")
+    assert verified.status_code == 200
+    newcomer = CustomerProfile.objects.get(email="separate@example.com")
+    assert newcomer.phone == ""
+    existing.refresh_from_db()
+    assert existing.email == ""
+    assert existing.name == "Existing Phone Customer"
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_signup_delivery_failure_leaves_no_pending_code():
+    from api.services.brevo import EmailDeliveryError
+    with patch("api.views.send_login_otp", side_effect=EmailDeliveryError()):
+        failed = APIClient().post("/api/auth/signup-email/send-otp/", {
+            "email": "delivery-failed-signup@example.com",
+        }, format="json")
+    assert failed.status_code == 503
+    assert not OTPVerification.objects.filter(email="delivery-failed-signup@example.com").exists()
