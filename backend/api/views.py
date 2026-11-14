@@ -643,8 +643,8 @@ class BookingViewSet(viewsets.ModelViewSet):
             # Fail closed: never mark a job started when its required email cannot be sent.
             if getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'email':
                 customer = CustomerProfile.objects.filter(phone=booking.customer_phone).first()
-                if not customer or not customer.email:
-                    return Response({'error': 'Customer email is unavailable for Happy Code delivery.'}, status=503)
+                if not customer or not customer.email or not customer.email_verified or customer.status != 'Active':
+                    return Response({'error': 'A verified active customer email is required for Happy Code delivery.'}, status=503)
                 try:
                     send_happy_code(customer.email, booking.booking_code, booking.service_pin)
                 except EmailDeliveryError:
