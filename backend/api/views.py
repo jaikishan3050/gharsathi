@@ -1340,6 +1340,7 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         if getattr(self.request.user, 'role', None) == 'customer':
             serializer.validated_data.pop('phone', None)
+            serializer.validated_data.pop('email', None)
             serializer.validated_data.pop('status', None)
         serializer.save()
 
