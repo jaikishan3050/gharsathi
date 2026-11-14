@@ -306,3 +306,31 @@ def test_admin_email_change_revokes_verification_and_pending_codes():
     assert customer.email == "changed-admin@example.com"
     assert customer.email_verified is False
     assert pending.is_verified is True
+
+
+@pytest.mark.django_db
+def test_admin_phone_change_revokes_email_verification():
+    from django.contrib.auth import get_user_model
+    customer = CustomerProfile.objects.create(
+        phone="9876543044", email="verified-phone@example.com",
+        email_verified=True, name="Customer",
+    )
+    pending = OTPVerification.objects.create(
+        phone=customer.phone, email=customer.email, role="customer",
+        otp_code="unused", expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    admin = get_user_model().objects.create_superuser(
+        username="phone-admin-test", email="phone-admin@example.com",
+        password="TestAdminPassword123!",
+    )
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("admin", admin))
+    response = client.patch(f"/api/customers/{customer.pk}/", {
+        "phone": "9876543055",
+    }, format="json")
+    assert response.status_code == 200
+    customer.refresh_from_db()
+    pending.refresh_from_db()
+    assert customer.phone == "9876543055"
+    assert customer.email_verified is False
+    assert pending.is_verified is True
