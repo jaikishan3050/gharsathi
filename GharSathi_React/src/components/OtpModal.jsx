@@ -85,6 +85,11 @@ export default function OtpModal({
       return;
     }
 
+    if (emailOtp && tab === 'signup') {
+      setErrorMsg('New account ke liye pehle mobile ownership verify karna zaroori hai. Email-only signup abhi available nahi hai.');
+      return;
+    }
+
     if (emailOtp && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setErrorMsg('Valid email address enter karein.');
       return;
@@ -314,7 +319,9 @@ export default function OtpModal({
                 }}
               >
                 <p className="auth-intro">
-                  Ghar Sathi par naya account banane ke liye details enter karein aur {emailOtp ? 'email' : 'mobile'} OTP verify karein.
+                  {emailOtp
+                    ? 'Security ke liye new registration mein mobile ownership verification zaroori hai. Email-only signup abhi available nahi hai; support se contact karein.'
+                    : 'Ghar Sathi par naya account banane ke liye details enter karein aur mobile OTP verify karein.'}
                 </p>
 
                 <div className="field-block">
@@ -399,7 +406,7 @@ export default function OtpModal({
                 )}
                 <button
                   type="submit"
-                  disabled={loading || cleanPhone.length !== 10}
+                  disabled={loading || cleanPhone.length !== 10 || emailOtp}
                   className="button button-gold button-wide"
                   style={{ marginTop: '16px' }}
                 >
