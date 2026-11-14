@@ -426,3 +426,5 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
 BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL', '').strip()
 CUSTOMER_OTP_CHANNEL = os.environ.get('CUSTOMER_OTP_CHANNEL', 'sms').lower()
+
+HAPPY_CODE_CHANNEL = os.environ.get('HAPPY_CODE_CHANNEL', 'screen').lower()
