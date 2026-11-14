@@ -134,3 +134,38 @@ def test_legacy_unverified_email_cannot_login():
     assert response.status_code == 409
     send.assert_not_called()
     assert not OTPVerification.objects.filter(phone="9876543044").exists()
+
+
+@pytest.mark.django_db
+@override_settings(CUSTOMER_OTP_CHANNEL="email")
+def test_email_otp_verification_rechecks_verified_status_and_cannot_edit_profile():
+    customer = CustomerProfile.objects.create(
+        phone="9876543033", email="linked2@example.com", email_verified=True,
+        name="Original", address="Original address",
+    )
+    client = APIClient()
+    with patch("api.views.send_login_otp") as send:
+        sent = client.post("/api/auth/send-otp/", {
+            "phone_number": customer.phone, "email": customer.email, "role": "customer"
+        }, format="json")
+    assert sent.status_code == 200
+    code = send.call_args.args[1]
+    customer.email_verified = False
+    customer.save(update_fields=["email_verified"])
+    denied = client.post("/api/auth/verify-otp/", {
+        "phone_number": customer.phone, "email": customer.email,
+        "otp_code": code, "role": "customer"
+    }, format="json")
+    assert denied.status_code == 409
+
+    customer.email_verified = True
+    customer.save(update_fields=["email_verified"])
+    verified = client.post("/api/auth/verify-otp/", {
+        "phone_number": customer.phone, "email": customer.email,
+        "otp_code": code, "role": "customer",
+        "name": "Attacker", "address": "Tampered address",
+    }, format="json")
+    assert verified.status_code == 200
+    customer.refresh_from_db()
+    assert customer.name == "Original"
+    assert customer.address == "Original address"
