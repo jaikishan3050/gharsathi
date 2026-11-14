@@ -531,8 +531,14 @@ class BookingViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         role = getattr(self.request.user, 'role', None)
         if role == 'customer':
-            phone = ''.join(filter(str.isdigit, str(self.request.user.phone)))[-10:]
-            qs = qs.filter(customer_phone__endswith=phone)
+            profile = self.request.user.profile
+            phone = ''.join(filter(str.isdigit, str(profile.phone)))[-10:]
+            # Legacy bookings had no customer FK; only phone-authenticated accounts
+            # may recover those bookings. Email-only accounts cannot claim by contact phone.
+            owner = Q(customer_id=profile.pk)
+            if len(phone) == 10:
+                owner |= Q(customer__isnull=True, customer_phone__endswith=phone)
+            qs = qs.filter(owner)
         elif role == 'technician':
             qs = qs.filter(Q(technician_id=self.request.user.profile.pk) | Q(technician__isnull=True, status='Pending'))
         phone = self.request.query_params.get('phone')
@@ -562,9 +568,15 @@ class BookingViewSet(viewsets.ModelViewSet):
         profile = self.request.user.profile
         # When a customer places a booking, it remains unassigned (technician=None, status='Pending')
         # and is automatically broadcasted in the queryset to all active and online technicians matching the service category.
+        contact_phone = profile.phone or str(serializer.validated_data.get('customer_phone') or '')
+        contact_phone = ''.join(filter(str.isdigit, contact_phone))[-10:]
+        if len(contact_phone) != 10 or contact_phone[0] not in '6789':
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'customer_phone': 'A valid 10-digit contact number is required.'})
         booking = serializer.save(
+            customer=profile,
             customer_name=profile.name,
-            customer_phone=profile.phone,
+            customer_phone=contact_phone,
             technician=None,
             technician_name='',
             technician_phone='',
@@ -642,7 +654,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 )
             # Fail closed: never mark a job started when its required email cannot be sent.
             if getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'email':
-                customer = CustomerProfile.objects.filter(phone=booking.customer_phone).first()
+                customer = booking.customer or CustomerProfile.objects.filter(phone=booking.customer_phone).first()
                 if not customer or not customer.email or not customer.email_verified or customer.status != 'Active':
                     return Response({'error': 'A verified active customer email is required for Happy Code delivery.'}, status=503)
                 try:
