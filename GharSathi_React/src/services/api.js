@@ -615,14 +615,14 @@ export const api = {
   },
 
   // Mobile OTP Authentication (Direct On-Screen with SMS Fallback)
-  sendOtp: async (phoneNumber, role = 'customer', purpose = 'login') => {
+  sendOtp: async (phoneNumber, role = 'customer', purpose = 'login', email = '') => {
     const cleanPhone = (phoneNumber || '').replace(/\D/g, '').slice(-10);
     const endpoint = role === 'technician' && purpose === 'registration'
       ? '/technicians/send-otp/'
       : '/auth/send-otp/';
     return await apiRequest(endpoint, {
       method: 'POST',
-      body: JSON.stringify({ phone_number: cleanPhone, role }),
+      body: JSON.stringify({ phone_number: cleanPhone, role, ...(email ? { email } : {}) }),
     });
   },
 
