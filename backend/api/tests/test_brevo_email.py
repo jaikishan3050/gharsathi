@@ -279,3 +279,30 @@ def test_sms_mode_rejects_email_digest_otp():
         "phone_number": customer.phone, "otp_code": "654321", "role": "customer",
     }, format="json")
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_admin_email_change_revokes_verification_and_pending_codes():
+    from django.contrib.auth import get_user_model
+    customer = CustomerProfile.objects.create(
+        phone="9876543077", email="old-admin@example.com",
+        email_verified=True, name="Customer",
+    )
+    pending = OTPVerification.objects.create(
+        phone=customer.phone, email="pending@example.com", role="customer",
+        otp_code="unused", expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    admin = get_user_model().objects.create_superuser(
+        username="email-admin-test", email="admin@example.com", password="TestAdminPassword123!"
+    )
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("admin", admin))
+    response = client.patch(f"/api/customers/{customer.pk}/", {
+        "email": "changed-admin@example.com",
+    }, format="json")
+    assert response.status_code == 200
+    customer.refresh_from_db()
+    pending.refresh_from_db()
+    assert customer.email == "changed-admin@example.com"
+    assert customer.email_verified is False
+    assert pending.is_verified is True
