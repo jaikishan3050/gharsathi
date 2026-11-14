@@ -25,7 +25,7 @@ describe('EmailLinkForm', () => {
   });
 
   it('shows delivery errors without advancing to verification', async () => {
-    linkCustomerEmail.mockRejectedValue(new Error('Email delivery unavailable.'));
+    linkCustomerEmail.mockRejectedValueOnce(new Error('Email delivery unavailable.'));
     render(<EmailLinkForm />);
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'test@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /Send Email Verification Code/i }));
