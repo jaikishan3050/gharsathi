@@ -621,6 +621,14 @@ export const api = {
     }, 15000, 0);
   },
 
+  sendEmailLoginOtp: async (email) => apiRequest('/auth/login-email/send-otp/', {
+    method: 'POST', body: JSON.stringify({ email }),
+  }, 15000, 0),
+  verifyEmailLoginOtp: async ({ email, otpCode }) =>
+    apiRequest('/auth/login-email/verify-otp/', {
+      method: 'POST', body: JSON.stringify({ email, otp_code: otpCode }),
+    }, 15000, 0),
+
   // Verified email-only signup never claims a mobile number.
   sendEmailSignupOtp: async (email) => apiRequest('/auth/signup-email/send-otp/', {
     method: 'POST', body: JSON.stringify({ email }),
