@@ -112,7 +112,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'scheduled_date', 'scheduled_time', 'base_price',
             'platform_fee', 'total_amount', 'payment_method', 'payment_status',
             'razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature',
-            'status', 'service_pin', 'notes', 'rating',
+            'status', 'notes', 'rating',
             'review_text', 'review_tags', 'rated_at',
             'created_at', 'completed_at',
             'service_details', 'technician_details'
@@ -124,7 +124,6 @@ class BookingSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'booking_code': {'required': False},
-            'service_pin': {'required': False},
         }
 
 
