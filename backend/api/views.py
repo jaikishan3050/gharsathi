@@ -1440,6 +1440,94 @@ class CustomerEmailLinkView(APIView):
         return Response({'success': True, 'message': 'Email linked successfully.'})
 
 
+class CustomerEmailLoginView(APIView):
+    """Authenticate a previously verified customer email, regardless of phone."""
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_send'
+
+    def post(self, request):
+        if getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') != 'email':
+            return Response({'error': 'Email login is disabled.'}, status=403)
+        email = str(request.data.get('email') or '').strip().lower()
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            return Response({'error': 'Valid email required.'}, status=400)
+        matches = CustomerProfile.objects.filter(
+            email__iexact=email, email_verified=True, status='Active',
+        )
+        if matches.count() != 1:
+            return Response({'error': 'No unique verified customer account for this email.'}, status=409)
+        recent = OTPVerification.objects.filter(email__iexact=email, role='customer')
+        if recent.filter(created_at__gte=timezone.now() - timedelta(seconds=60)).exists():
+            return Response({'error': 'Wait 60 seconds before requesting another code.'}, status=429)
+        if recent.filter(created_at__gte=timezone.now() - timedelta(hours=1)).count() >= 10:
+            return Response({'error': 'Too many requests.'}, status=429)
+        code = str(secrets.randbelow(900000) + 100000)
+        expires = getattr(settings, 'OTP_EXPIRATION_MINUTES', 5)
+        challenge = OTPVerification.objects.create(
+            phone='', email=email, role='customer',
+            otp_code=email_otp_digest('', email, code),
+            expires_at=timezone.now() + timedelta(minutes=expires),
+        )
+        try:
+            send_login_otp(email, code, expires)
+        except EmailDeliveryError:
+            challenge.delete()
+            return Response({'error': 'Email delivery unavailable.'}, status=503)
+        recent.filter(phone='', is_verified=False).exclude(pk=challenge.pk).update(is_verified=True)
+        return Response({'success': True, 'message': 'Login code sent to email.'})
+
+
+class CustomerEmailLoginVerifyView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_verify'
+
+    def post(self, request):
+        if getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') != 'email':
+            return Response({'error': 'Email login is disabled.'}, status=403)
+        email = str(request.data.get('email') or '').strip().lower()
+        code = str(request.data.get('otp_code') or '').strip()
+        if not code.isdigit() or len(code) != 6:
+            return Response({'error': 'Six-digit code required.'}, status=400)
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            return Response({'error': 'Valid email required.'}, status=400)
+        with transaction.atomic():
+            matches = CustomerProfile.objects.filter(email__iexact=email, email_verified=True, status='Active')
+            if matches.count() != 1:
+                return Response({'error': 'Verified active account required.'}, status=409)
+            customer = matches.first()
+            otp = (OTPVerification.objects.select_for_update()
+                   .filter(phone='', email__iexact=email, role='customer', is_verified=False)
+                   .order_by('-created_at').first())
+            if not otp or otp.is_expired():
+                return Response({'error': 'No active login code.'}, status=400)
+            if otp.attempts >= 5:
+                return Response({'error': 'Too many verification attempts.'}, status=429)
+            otp.attempts += 1
+            otp.save(update_fields=['attempts'])
+            if not hmac.compare_digest(otp.otp_code, email_otp_digest('', email, code)):
+                return Response({'error': 'Invalid verification code.'}, status=400)
+            otp.is_verified = True
+            otp.save(update_fields=['is_verified'])
+        now = timezone.now()
+        token = jwt.encode({
+            'id': customer.pk, 'phone': customer.phone, 'role': 'customer',
+            'iat': now, 'exp': now + timedelta(days=7),
+        }, settings.SECRET_KEY, algorithm='HS256')
+        user = CustomerProfileSerializer(customer).data
+        user['userType'] = 'customer'
+        return Response({
+            'success': True, 'status': 'success',
+            'message': 'Email verified successfully.', 'token': token,
+            'role': 'customer', 'user': user, 'technician': None,
+        })
+
+
 class CustomerEmailSignupView(APIView):
     """Email-only registration: verify inbox, never claim an unverified phone."""
     permission_classes = [AllowAny]
