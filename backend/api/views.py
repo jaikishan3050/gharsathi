@@ -1579,6 +1579,11 @@ class VerifyOTPView(APIView):
             existing_phone_owner = CustomerProfile.objects.filter(phone=clean_phone).exclude(email__iexact=submitted_email).exists()
             if existing_email_owner or existing_phone_owner:
                 return Response({'error': 'This account requires an existing-account verification or migration flow.'}, status=409)
+            if not CustomerProfile.objects.filter(
+                phone=clean_phone, email__iexact=submitted_email,
+                email_verified=True, status='Active',
+            ).exists():
+                return Response({'error': 'This email must be verified and linked before login.'}, status=409)
 
         if otp_record.role != role:
             return Response({'error': 'This OTP was requested for a different account type.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1641,7 +1646,7 @@ class VerifyOTPView(APIView):
                         'pincode': request.data.get('pincode', '801103'),
                     }
                 )
-                if not created:
+                if not created and not (role == 'customer' and getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') == 'email'):
                     updated = False
                     if request.data.get('name'):
                         customer.name = request.data.get('name')
