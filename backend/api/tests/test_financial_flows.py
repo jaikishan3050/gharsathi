@@ -705,3 +705,38 @@ def test_happy_code_email_requires_verified_customer(
         response = api_client.post(url, {}, format='json')
     assert response.status_code == 200
     send.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_email_only_customer_booking_uses_account_owner_not_contact_phone(
+    api_client, sample_service,
+):
+    old_owner = CustomerProfile.objects.create(
+        phone="9876543444", name="Legacy Customer",
+    )
+    newcomer = CustomerProfile.objects.create(
+        phone="", email="new-booker@example.com", email_verified=True,
+        name="Verified Email Customer",
+    )
+    legacy = Booking.objects.create(
+        service=sample_service, customer_name="Legacy Customer",
+        customer_phone=old_owner.phone, address="Old address", area="Patna",
+        base_price=Decimal("499.00"), total_amount=Decimal("499.00"),
+    )
+    api_client.force_authenticate(user=AuthenticatedPrincipal("customer", newcomer))
+    created = api_client.post("/api/bookings/", {
+        "service": sample_service.pk, "service_name": sample_service.name,
+        "customer_phone": old_owner.phone, "address": "New booking address",
+        "area": "Patna", "base_price": "499.00", "total_amount": "499.00",
+    }, format="json")
+    assert created.status_code == 201
+    booking = Booking.objects.get(pk=created.data["id"])
+    assert booking.customer_id == newcomer.pk
+    assert booking.customer_phone == old_owner.phone
+    visible = api_client.get("/api/bookings/")
+    assert visible.status_code == 200
+    ids = [b["id"] for b in visible.data.get("results", visible.data)]
+    assert booking.pk in ids
+    assert legacy.pk not in ids
+    forbidden = api_client.get(f"/api/bookings/{legacy.pk}/")
+    assert forbidden.status_code == 404
