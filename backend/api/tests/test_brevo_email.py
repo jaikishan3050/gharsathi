@@ -401,3 +401,30 @@ def test_resending_email_link_code_revokes_old_code_only_after_delivery():
     customer.refresh_from_db()
     assert customer.email == "second-resend@example.com"
     assert customer.email_verified is True
+
+
+@pytest.mark.django_db
+def test_inactive_customer_cannot_request_or_redeem_email_link_code():
+    customer = CustomerProfile.objects.create(
+        phone="9876543144", name="Suspended Customer", status="Inactive",
+    )
+    client = APIClient()
+    client.force_authenticate(user=AuthenticatedPrincipal("customer", customer))
+    with patch("api.views.send_login_otp") as deliver:
+        request = client.post("/api/auth/link-email/", {
+            "email": "inactive@example.com",
+        }, format="json")
+    assert request.status_code == 403
+    deliver.assert_not_called()
+    OTPVerification.objects.create(
+        phone=customer.phone, email="inactive@example.com", role="customer",
+        otp_code=email_otp_digest(customer.phone, "inactive@example.com", "456789"),
+        expires_at=timezone.now() + timedelta(minutes=5),
+    )
+    verify = client.post("/api/auth/link-email/", {
+        "email": "inactive@example.com", "otp_code": "456789",
+    }, format="json")
+    assert verify.status_code == 403
+    customer.refresh_from_db()
+    assert customer.email == ""
+    assert customer.email_verified is False
