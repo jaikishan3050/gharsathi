@@ -668,9 +668,15 @@ class BookingViewSet(viewsets.ModelViewSet):
             if booking.status != 'In Progress':
                 return Response({'error': 'Only an In Progress booking can be completed.'}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Limit online guessing even across worker restarts.
+            if booking.happy_code_attempts >= 5:
+                return Response({'error': 'Happy Code locked. Contact support.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
             # 4-Digit Happy Code Verification
             expected_pin = str(booking.service_pin or '').strip()
-            if not expected_pin or submitted_pin != expected_pin:
+            if not expected_pin or not hmac.compare_digest(submitted_pin, expected_pin):
+                booking.happy_code_attempts += 1
+                booking.save(update_fields=['happy_code_attempts'])
                 return Response(
                     {
                         'error': 'Invalid Happy Code. Ask the customer for the service verification code.'
