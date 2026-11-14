@@ -1344,6 +1344,62 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
+
+class CustomerEmailLinkView(APIView):
+    """Link email only from an existing authenticated customer session."""
+    permission_classes = [IsGharSathiCustomer]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'otp_verify'
+
+    def post(self, request):
+        customer = request.user.profile
+        email = str(request.data.get('email') or '').strip().lower()
+        code = str(request.data.get('otp_code') or '').strip()
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            return Response({'error': 'Valid email required.'}, status=400)
+        if CustomerProfile.objects.filter(email__iexact=email).exclude(pk=customer.pk).exists():
+            return Response({'error': 'Email is already linked to another account.'}, status=409)
+        if not code:
+            if OTPVerification.objects.filter(phone=customer.phone, created_at__gte=timezone.now() - timedelta(seconds=60)).exists():
+                return Response({'error': 'Wait 60 seconds before requesting another code.'}, status=429)
+            if OTPVerification.objects.filter(phone=customer.phone, created_at__gte=timezone.now() - timedelta(hours=1)).count() >= 10:
+                return Response({'error': 'Too many verification requests.'}, status=429)
+            generated = str(secrets.randbelow(900000) + 100000)
+            otp = OTPVerification.objects.create(
+                phone=customer.phone, email=email, role='customer',
+                otp_code=email_otp_digest(customer.phone, email, generated),
+                expires_at=timezone.now() + timedelta(minutes=5),
+            )
+            try:
+                send_login_otp(email, generated, 5)
+            except EmailDeliveryError:
+                otp.delete()
+                return Response({'error': 'Email delivery unavailable.'}, status=503)
+            return Response({'success': True, 'message': 'Email verification code sent.'})
+
+        with transaction.atomic():
+            otp = (OTPVerification.objects.select_for_update()
+                   .filter(phone=customer.phone, email__iexact=email, role='customer',
+                           is_verified=False).order_by('-created_at').first())
+            if not otp or otp.is_expired():
+                return Response({'error': 'No active email verification code.'}, status=400)
+            if otp.attempts >= 5:
+                return Response({'error': 'Too many verification attempts.'}, status=429)
+            otp.attempts += 1
+            otp.save(update_fields=['attempts'])
+            if not hmac.compare_digest(otp.otp_code, email_otp_digest(customer.phone, email, code)):
+                return Response({'error': 'Invalid verification code.'}, status=400)
+            if CustomerProfile.objects.filter(email__iexact=email).exclude(pk=customer.pk).exists():
+                return Response({'error': 'Email is already linked to another account.'}, status=409)
+            customer.email = email
+            customer.save(update_fields=['email'])
+            otp.is_verified = True
+            otp.save(update_fields=['is_verified'])
+        return Response({'success': True, 'message': 'Email linked successfully.'})
+
+
 class SendOTPView(APIView):
     """
     POST /api/auth/send-otp/
