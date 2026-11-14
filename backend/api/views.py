@@ -1189,6 +1189,17 @@ class RazorpayCreateOrderView(APIView):
             return Response({'error': 'Not authorized for this booking.'}, status=403)
         if amount_paise != int(booking.total_amount * 100):
             return Response({'error': 'Payment amount does not match booking.'}, status=400)
+        if booking.payment_status == 'Paid' or booking.razorpay_payment_id:
+            return Response({'error': 'This booking already has a recorded payment.'}, status=409)
+        # Reuse the existing order on retry. Replacing it would orphan a payment
+        # that was captured by Razorpay but not yet verified by our server.
+        if booking.razorpay_order_id:
+            return Response({
+                'order_id': booking.razorpay_order_id, 'amount': amount_paise,
+                'amount_in_rupees': str(amount), 'currency': 'INR',
+                'key_id': key_id, 'booking_id': booking.booking_code,
+                'platform_fee': float(FIXED_PLATFORM_FEE),
+            })
 
         try:
             import razorpay
