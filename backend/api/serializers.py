@@ -100,16 +100,18 @@ class TechnicianProfileSerializer(serializers.ModelSerializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     # The screen fallback must never disclose the Happy Code to technicians.
-    service_pin = serializers.SerializerMethodField()
+    service_pin = serializers.CharField(read_only=True)
 
-    def get_service_pin(self, obj):
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
         request = self.context.get('request')
-        if (request is not None
-                and getattr(request.user, 'role', None) == 'customer'
-                and getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'screen'
-                and obj.status == 'In Progress'):
-            return obj.service_pin
-        return ''
+        allowed = (request is not None
+                   and getattr(request.user, 'role', None) == 'customer'
+                   and getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'screen'
+                   and instance.status == 'In Progress')
+        if not allowed:
+            data.pop('service_pin', None)
+        return data
 
     service_details = ServiceSerializer(source='service', read_only=True)
     technician_details = TechnicianProfileSerializer(source='technician', read_only=True)
