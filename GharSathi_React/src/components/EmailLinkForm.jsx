@@ -5,8 +5,9 @@ import api from '../services/api.js';
  * Requires an existing authenticated customer session.
  * An email is never saved to the profile until its challenge is confirmed.
  */
-export default function EmailLinkForm({ currentEmail = '', onLinked }) {
+export default function EmailLinkForm({ currentEmail = '', emailVerified = false, onLinked }) {
   const [email, setEmail] = useState(currentEmail);
+  const [verifiedEmail, setVerifiedEmail] = useState(emailVerified ? currentEmail : '');
   const [code, setCode] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -25,6 +26,7 @@ export default function EmailLinkForm({ currentEmail = '', onLinked }) {
         setMessage('Email verified and linked successfully. You can now use Email OTP login.');
         setSent(false);
         setCode('');
+        setVerifiedEmail(normalized);
         onLinked?.(normalized);
       } else {
         setSent(true);
@@ -41,6 +43,9 @@ export default function EmailLinkForm({ currentEmail = '', onLinked }) {
     <section className="form-card narrow-form" aria-label="Verify and link email" style={{ marginTop: '20px' }}>
       <h3>Verify Email for OTP Login</h3>
       <p>Apne existing account ke liye email verify karein. Email OTP login tabhi available hoga.</p>
+      <p role="status">{verifiedEmail && verifiedEmail === email.trim().toLowerCase()
+        ? '✓ Email verified — Email OTP login enabled for this account.'
+        : 'Email not verified — Email OTP login unavailable until verification.'}</p>
       <form onSubmit={submit}>
         <div className="field-block">
           <label className="field-label" htmlFor="customer-link-email">Email address</label>
