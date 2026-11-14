@@ -1147,156 +1147,143 @@ class PurgeProductionDataView(APIView):
         })
 
 
-class RazorpayCreateOrderView(APIView):
-    """
-    Creates a Razorpay Order for online customer booking checkout.
-    Converts amount in INR to Paise. Uses Razorpay SDK or demo order fallback.
-    """
-    def post(self, request):
-        amount = request.data.get('amount')
-        booking_id = request.data.get('booking_id', '')
-        service_name = request.data.get('service_name', 'Ghar Sathi Service')
-        currency = request.data.get('currency', 'INR')
+def payment_booking_access_allowed(request, booking):
+    """Only the booking customer or an administrator can initiate/verify its payment."""
+    role = getattr(request.user, 'role', None)
+    if role == 'admin':
+        return True
+    if role != 'customer':
+        return False
+    phone = ''.join(filter(str.isdigit, str(getattr(request.user, 'phone', ''))))[-10:]
+    booking_phone = ''.join(filter(str.isdigit, str(booking.customer_phone)))[-10:]
+    return len(phone) == 10 and phone == booking_phone
 
-        if not amount:
-            return Response({'error': 'Amount is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+class RazorpayCreateOrderView(APIView):
+    """Create a real Razorpay order; never simulate payment orders on API failure."""
+
+    def post(self, request):
+        from decimal import Decimal, InvalidOperation
+
+        key_id = getattr(settings, 'RAZORPAY_KEY_ID', '')
+        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+        if not key_id or not key_secret:
+            return Response({'error': 'Payment gateway is not configured.'}, status=503)
 
         try:
-            amount_paise = int(round(float(amount) * 100))
-        except (ValueError, TypeError):
-            return Response({'error': 'Invalid amount'}, status=status.HTTP_400_BAD_REQUEST)
+            amount = Decimal(str(request.data.get('amount', '')))
+            if not amount.is_finite() or amount <= 0 or amount.as_tuple().exponent < -2:
+                raise InvalidOperation
+            amount_paise = int(amount * 100)
+        except (InvalidOperation, ValueError, TypeError):
+            return Response({'error': 'Invalid amount'}, status=400)
 
-        receipt = f"rcpt_{booking_id or int(timezone.now().timestamp())}"
-        order_data = None
-        key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
-        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8KkypuWGZd')
+        if request.data.get('currency', 'INR') != 'INR':
+            return Response({'error': 'Only INR is supported.'}, status=400)
 
-        # Try official Razorpay API client if live credentials supplied
+        booking_ref = request.data.get('booking_id', '')
+        booking = Booking.objects.filter(booking_code=booking_ref).first() if booking_ref else None
+        if not booking:
+            return Response({'error': 'A persisted booking is required for payment.'}, status=400)
+        if not payment_booking_access_allowed(request, booking):
+            return Response({'error': 'Not authorized for this booking.'}, status=403)
+        if amount_paise != int(booking.total_amount * 100):
+            return Response({'error': 'Payment amount does not match booking.'}, status=400)
+        if booking.payment_status == 'Paid' or booking.razorpay_payment_id:
+            return Response({'error': 'This booking already has a recorded payment.'}, status=409)
+        # Reuse the existing order on retry. Replacing it would orphan a payment
+        # that was captured by Razorpay but not yet verified by our server.
+        if booking.razorpay_order_id:
+            return Response({
+                'order_id': booking.razorpay_order_id, 'amount': amount_paise,
+                'amount_in_rupees': str(amount), 'currency': 'INR',
+                'key_id': key_id, 'booking_id': booking.booking_code,
+                'platform_fee': float(FIXED_PLATFORM_FEE),
+            })
+
         try:
             import razorpay
             client = razorpay.Client(auth=(key_id, key_secret))
             order_data = client.order.create({
-                'amount': amount_paise,
-                'currency': currency,
-                'receipt': receipt,
-                'payment_capture': 1,
-                'notes': {
-                    'booking_id': str(booking_id),
-                    'service': str(service_name),
-                    'platform': 'Ghar Sathi Home Services'
-                }
+                'amount': amount_paise, 'currency': 'INR',
+                'receipt': f"booking_{booking.pk}_{int(timezone.now().timestamp())}",
+                'notes': {'booking_id': str(booking.booking_code)},
             })
-        except Exception as e:
-            logger.warning(f"Razorpay live order creation fallback: {e}")
-            # Fallback to sandbox simulated order
-            rand_suffix = random.randint(100000, 999999)
-            order_data = {
-                'id': f"order_demo_{int(timezone.now().timestamp())}_{rand_suffix}",
-                'amount': amount_paise,
-                'currency': currency,
-                'receipt': receipt,
-                'status': 'created',
-            }
+        except Exception:
+            logger.exception('Razorpay order creation failed')
+            return Response({'error': 'Payment gateway unavailable. Please retry.'}, status=502)
 
+        booking.razorpay_order_id = order_data['id']
+        booking.save(update_fields=['razorpay_order_id'])
         return Response({
-            'order_id': order_data.get('id'),
-            'amount': amount_paise,
-            'amount_in_rupees': float(amount),
-            'currency': currency,
-            'key_id': key_id,
-            'booking_id': booking_id,
-            'service_name': service_name,
+            'order_id': order_data['id'], 'amount': amount_paise,
+            'amount_in_rupees': str(amount), 'currency': 'INR',
+            'key_id': key_id, 'booking_id': booking.booking_code,
             'platform_fee': float(FIXED_PLATFORM_FEE),
         })
 
 
 class RazorpayVerifyPaymentView(APIView):
-    """
-    Verifies Razorpay HMAC-SHA256 signature and updates Booking payment status to 'Paid'.
-    """
+    """Verify signature, order association and captured payment before marking paid."""
 
     def post(self, request):
         order_id = request.data.get('razorpay_order_id') or request.data.get('order_id')
         payment_id = request.data.get('razorpay_payment_id') or request.data.get('payment_id')
-        signature = request.data.get('razorpay_signature') or request.data.get('signature', '')
-        booking_ref = request.data.get('booking_id') or request.data.get('booking_code')
+        signature = request.data.get('razorpay_signature') or request.data.get('signature')
+        if not all((order_id, payment_id, signature)):
+            return Response({'error': 'Order, payment and signature are required.'}, status=400)
 
-        if not order_id or not payment_id:
-            return Response(
-                {'error': 'razorpay_order_id and razorpay_payment_id are required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        key_id = getattr(settings, 'RAZORPAY_KEY_ID', '')
+        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+        if not key_id or not key_secret:
+            return Response({'error': 'Payment gateway is not configured.'}, status=503)
 
-        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8KkypuWGZd')
+        expected_sig = hmac.new(
+            key_secret.encode('utf-8'), f"{order_id}|{payment_id}".encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected_sig, str(signature)):
+            return Response({'error': 'Invalid payment signature.'}, status=400)
 
-        # Compute expected HMAC-SHA256 signature
-        message = f"{order_id}|{payment_id}".encode('utf-8')
-        expected_sig = hmac.new(key_secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
-
-        is_valid = False
-        if signature and hmac.compare_digest(expected_sig, signature):
-            is_valid = True
-        elif signature and (signature.startswith('simulated_') or 'demo' in order_id or signature == 'demo_success_signature'):
-            # Sandbox test verification
-            is_valid = True
-        else:
-            # Also attempt razorpay library verification if possible
-            try:
-                import razorpay
-                key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
-                client = razorpay.Client(auth=(key_id, key_secret))
-                client.utility.verify_payment_signature({
-                    'razorpay_order_id': order_id,
-                    'razorpay_payment_id': payment_id,
-                    'razorpay_signature': signature
-                })
-                is_valid = True
-            except Exception:
-                pass
-
-            # Double check via live payment fetch API
-            if not is_valid and payment_id:
-                try:
-                    import razorpay
-                    key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
-                    client = razorpay.Client(auth=(key_id, key_secret))
-                    p = client.payment.fetch(payment_id)
-                    if p and p.get('status') in ['captured', 'authorized']:
-                        is_valid = True
-                except Exception:
-                    pass
-
-        if not is_valid:
-            return Response(
-                {'error': 'Invalid Razorpay payment signature verification failed.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Locate and update booking if reference provided
-        booking = None
-        if booking_ref:
-            if str(booking_ref).isdigit():
-                booking = Booking.objects.filter(pk=booking_ref).first()
-            if not booking:
-                booking = Booking.objects.filter(booking_code=booking_ref).first()
+        booking = Booking.objects.filter(razorpay_order_id=order_id).first()
         if not booking:
-            booking = Booking.objects.filter(razorpay_order_id=order_id).first()
+            return Response({'error': 'Payment order does not match a booking.'}, status=404)
+        if not payment_booking_access_allowed(request, booking):
+            return Response({'error': 'Not authorized for this booking.'}, status=403)
+        booking_ref = request.data.get('booking_id') or request.data.get('booking_code')
+        if booking_ref and str(booking_ref) not in (str(booking.pk), str(booking.booking_code)):
+            return Response({'error': 'Booking reference mismatch.'}, status=400)
+        if booking.razorpay_payment_id and booking.razorpay_payment_id != payment_id:
+            return Response({'error': 'Booking already has a different payment.'}, status=409)
+        if Booking.objects.filter(razorpay_payment_id=payment_id).exclude(pk=booking.pk).exists():
+            return Response({'error': 'Payment already belongs to another booking.'}, status=409)
 
-        if booking:
+        try:
+            import razorpay
+            client = razorpay.Client(auth=(key_id, key_secret))
+            payment = client.payment.fetch(payment_id)
+            if (payment.get('status') != 'captured'
+                    or payment.get('order_id') != order_id
+                    or payment.get('currency') != 'INR'
+                    or int(payment.get('amount', 0)) != int(booking.total_amount * 100)):
+                return Response({'error': 'Payment details do not match the booking.'}, status=400)
+        except Exception:
+            logger.exception('Razorpay payment fetch failed')
+            return Response({'error': 'Unable to verify captured payment.'}, status=502)
+
+        if booking.payment_status != 'Paid':
             booking.payment_status = 'Paid'
             booking.payment_method = 'Online / Razorpay UPI'
-            booking.razorpay_order_id = order_id
             booking.razorpay_payment_id = payment_id
-            booking.razorpay_signature = signature or expected_sig
-            booking.save()
+            booking.razorpay_signature = signature
+            booking.save(update_fields=[
+                'payment_status', 'payment_method', 'razorpay_payment_id', 'razorpay_signature'
+            ])
 
         return Response({
-            'success': True,
-            'message': 'Razorpay payment successfully verified and recorded.',
-            'payment_status': 'Paid',
-            'razorpay_order_id': order_id,
-            'razorpay_payment_id': payment_id,
-            'booking_code': booking.booking_code if booking else booking_ref,
+            'success': True, 'message': 'Payment verified and recorded.',
+            'payment_status': 'Paid', 'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id, 'booking_code': booking.booking_code,
         })
 
 

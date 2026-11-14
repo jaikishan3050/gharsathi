@@ -10,6 +10,7 @@ from api.models import (
     Service,
     SubService,
     TechnicianProfile,
+    CustomerProfile,
     Booking,
     WalletTransaction,
 )
@@ -296,7 +297,8 @@ class TestFinancialAndOperationalFlows:
         """
         Tests Razorpay payment verification with a valid HMAC-SHA256 signature.
         """
-        authenticate_as('technician', verified_technician)
+        customer = CustomerProfile.objects.create(phone=active_booking.customer_phone, name=active_booking.customer_name)
+        authenticate_as('customer', customer)
         order_id = "order_test_123456"
         payment_id = "pay_test_987654"
         key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'gharsathi_sandbox_secret_key_12345')
@@ -305,17 +307,27 @@ class TestFinancialAndOperationalFlows:
         msg = f"{order_id}|{payment_id}".encode("utf-8")
         valid_signature = hmac.new(key_secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
 
-        url = "/api/payments/razorpay/verify/"
-        response = api_client.post(
-            url,
-            {
-                "razorpay_order_id": order_id,
-                "razorpay_payment_id": payment_id,
-                "razorpay_signature": valid_signature,
-                "booking_id": active_booking.booking_code,
-            },
-            format="json",
-        )
+        active_booking.razorpay_order_id = order_id
+        active_booking.save(update_fields=["razorpay_order_id"])
+        from unittest.mock import patch
+        with patch("razorpay.Client") as gateway:
+            gateway.return_value.payment.fetch.return_value = {
+                "status": "captured",
+                "order_id": order_id,
+                "currency": "INR",
+                "amount": int(active_booking.total_amount * 100),
+            }
+            url = "/api/payments/razorpay/verify/"
+            response = api_client.post(
+                url,
+                {
+                    "razorpay_order_id": order_id,
+                    "razorpay_payment_id": payment_id,
+                    "razorpay_signature": valid_signature,
+                    "booking_id": active_booking.booking_code,
+                },
+                format="json",
+            )
 
         assert response.status_code == 200
         assert response.data["success"] is True
@@ -325,6 +337,104 @@ class TestFinancialAndOperationalFlows:
         assert active_booking.payment_status == "Paid"
         assert active_booking.razorpay_order_id == order_id
         assert active_booking.razorpay_payment_id == payment_id
+
+
+    def test_booking_payment_pending_until_gateway_capture(self, api_client, active_booking, authenticate_as):
+        """Integration: persisted booking -> gateway order -> captured payment -> Paid."""
+        from unittest.mock import patch
+        customer = CustomerProfile.objects.create(phone=active_booking.customer_phone, name=active_booking.customer_name)
+        authenticate_as('customer', customer)
+        order_id, payment_id = 'order_integrated_001', 'pay_integrated_001'
+        assert active_booking.payment_status != 'Paid'
+        with patch('razorpay.Client') as gateway:
+            gateway.return_value.order.create.return_value = {'id': order_id}
+            created = api_client.post('/api/payments/razorpay/create-order/', {
+                'booking_id': active_booking.booking_code,
+                'amount': str(active_booking.total_amount),
+            }, format='json')
+            assert created.status_code == 200
+            assert created.data['order_id'] == order_id
+            active_booking.refresh_from_db()
+            assert active_booking.razorpay_order_id == order_id
+            assert active_booking.payment_status != 'Paid'
+
+            gateway.return_value.payment.fetch.return_value = {
+                'status': 'captured', 'order_id': order_id, 'currency': 'INR',
+                'amount': int(active_booking.total_amount * 100),
+            }
+            secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+            signature = hmac.new(secret.encode(), f'{order_id}|{payment_id}'.encode(), hashlib.sha256).hexdigest()
+            verified = api_client.post('/api/payments/razorpay/verify/', {
+                'razorpay_order_id': order_id, 'razorpay_payment_id': payment_id,
+                'razorpay_signature': signature, 'booking_id': active_booking.booking_code,
+            }, format='json')
+            assert verified.status_code == 200
+            assert verified.data['payment_status'] == 'Paid'
+        active_booking.refresh_from_db()
+        assert active_booking.payment_status == 'Paid'
+        assert active_booking.razorpay_payment_id == payment_id
+
+    def test_payment_retry_reuses_existing_order(self, api_client, active_booking, authenticate_as):
+        from unittest.mock import patch
+        customer = CustomerProfile.objects.create(phone=active_booking.customer_phone, name=active_booking.customer_name)
+        authenticate_as('customer', customer)
+        active_booking.razorpay_order_id = 'order_existing_retry'
+        active_booking.save(update_fields=['razorpay_order_id'])
+        with patch('razorpay.Client') as gateway:
+            response = api_client.post('/api/payments/razorpay/create-order/', {
+                'booking_id': active_booking.booking_code,
+                'amount': str(active_booking.total_amount),
+            }, format='json')
+            assert response.status_code == 200
+            assert response.data['order_id'] == 'order_existing_retry'
+            gateway.assert_not_called()
+        active_booking.refresh_from_db()
+        assert active_booking.razorpay_order_id == 'order_existing_retry'
+
+    def test_paid_booking_rejects_new_payment_order(self, api_client, active_booking, authenticate_as):
+        customer = CustomerProfile.objects.create(phone=active_booking.customer_phone, name=active_booking.customer_name)
+        authenticate_as('customer', customer)
+        active_booking.payment_status = 'Paid'
+        active_booking.save(update_fields=['payment_status'])
+        response = api_client.post('/api/payments/razorpay/create-order/', {
+            'booking_id': active_booking.booking_code,
+            'amount': str(active_booking.total_amount),
+        }, format='json')
+        assert response.status_code == 409
+
+    def test_payment_order_rejects_other_customer(self, api_client, active_booking, authenticate_as):
+        outsider = CustomerProfile.objects.create(phone="9876501234", name="Other Customer")
+        authenticate_as('customer', outsider)
+        response = api_client.post('/api/payments/razorpay/create-order/', {
+            'booking_id': active_booking.booking_code,
+            'amount': str(active_booking.total_amount),
+        }, format='json')
+        assert response.status_code == 403
+        assert not active_booking.razorpay_order_id
+
+    def test_payment_order_rejects_technician(self, api_client, active_booking, verified_technician, authenticate_as):
+        authenticate_as('technician', verified_technician)
+        response = api_client.post('/api/payments/razorpay/create-order/', {
+            'booking_id': active_booking.booking_code,
+            'amount': str(active_booking.total_amount),
+        }, format='json')
+        assert response.status_code == 403
+
+    def test_payment_verification_rejects_other_customer(self, api_client, active_booking, authenticate_as):
+        outsider = CustomerProfile.objects.create(phone="9876501234", name="Other Customer")
+        authenticate_as('customer', outsider)
+        active_booking.razorpay_order_id = 'order_owned_by_customer'
+        active_booking.save(update_fields=['razorpay_order_id'])
+        order_id, payment_id = 'order_owned_by_customer', 'pay_other_customer'
+        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+        signature = hmac.new(key_secret.encode(), f'{order_id}|{payment_id}'.encode(), hashlib.sha256).hexdigest()
+        response = api_client.post('/api/payments/razorpay/verify/', {
+            'razorpay_order_id': order_id, 'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature, 'booking_id': active_booking.booking_code,
+        }, format='json')
+        assert response.status_code == 403
+        active_booking.refresh_from_db()
+        assert active_booking.payment_status != 'Paid'
 
     def test_razorpay_invalid_signature_rejected(self, api_client, active_booking, verified_technician, authenticate_as):
         """
@@ -344,7 +454,7 @@ class TestFinancialAndOperationalFlows:
         )
 
         assert response.status_code == 400
-        assert "failed" in response.data.get("error", "").lower()
+        assert "signature" in response.data.get("error", "").lower()
 
     def test_subservice_custom_commission_crud_and_deduction(self, api_client, verified_technician, sample_service, admin_user, authenticate_as):
         """
