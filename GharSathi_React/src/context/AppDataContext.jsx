@@ -848,7 +848,7 @@ export function AppDataProvider({ children }) {
       date: input.date,
       time: input.time,
       payment: input.payment || 'Cash on Service',
-      paymentStatus: input.paymentStatus || (input.payment?.includes('Online') || input.payment?.includes('Razorpay') ? 'Paid' : 'Pending'),
+      paymentStatus: 'Pending', // Only verified backend payment confirmation may mark a booking Paid.
       razorpayOrderId: input.razorpayOrderId || input.razorpay_order_id || '',
       razorpayPaymentId: input.razorpayPaymentId || input.razorpay_payment_id || '',
       razorpaySignature: input.razorpaySignature || input.razorpay_signature || '',
