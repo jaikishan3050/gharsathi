@@ -580,3 +580,19 @@ class TestFinancialAndOperationalFlows:
         assert Decimal(str(res_inject.data["wallet_balance"])) == Decimal("0.00")
 
 
+
+
+@pytest.mark.django_db
+def test_happy_code_lockout_after_five_wrong_attempts(api_client, active_booking, verified_technician, authenticate_as):
+    authenticate_as('technician', verified_technician)
+    url = f"/api/bookings/{active_booking.pk}/complete/"
+    for _ in range(5):
+        response = api_client.post(url, {"service_pin": "0000"}, format="json")
+        assert response.status_code == 400
+    active_booking.refresh_from_db()
+    assert active_booking.happy_code_attempts == 5
+    response = api_client.post(url, {"service_pin": "4829"}, format="json")
+    assert response.status_code == 429
+    active_booking.refresh_from_db()
+    assert active_booking.status == 'In Progress'
+    assert not WalletTransaction.objects.filter(booking=active_booking, txn_type='DEBIT').exists()
