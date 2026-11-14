@@ -687,6 +687,8 @@ def test_happy_code_email_requires_verified_customer(
         email='unverified-happy@example.com',
         email_verified=False,
     )
+    active_booking.status = 'Accepted'
+    active_booking.save(update_fields=['status'])
     authenticate_as('technician', verified_technician)
     url = f'/api/bookings/{active_booking.pk}/start/'
     with patch('api.views.send_happy_code') as send:
