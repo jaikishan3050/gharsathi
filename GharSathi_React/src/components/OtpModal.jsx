@@ -275,7 +275,7 @@ export default function OtpModal({
                   Apna mobile number {emailOtp ? 'aur email' : ''} enter karein. 6-digit OTP {emailOtp ? 'email' : 'SMS'} se milega.
                 </p>
 
-                {!emailOtp && <div className="field-block">
+                <div className="field-block">
                   <label className="field-label">
                     Mobile Number <span className="req">*</span>
                   </label>
@@ -338,7 +338,7 @@ export default function OtpModal({
                   />
                 </div>
 
-                <div className="field-block">
+                {!emailOtp && <div className="field-block">
                   <label className="field-label">
                     Mobile Number <span className="req">*</span>
                   </label>
@@ -354,7 +354,7 @@ export default function OtpModal({
                       className="phone-styled-input"
                     />
                   </div>
-                </div>
+                </div>}
 
                 <div className="field-grid-2col">
                   <div className="field-block">
