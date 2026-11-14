@@ -726,10 +726,11 @@ def test_email_only_customer_booking_uses_account_owner_not_contact_phone(
     api_client.force_authenticate(user=AuthenticatedPrincipal("customer", newcomer))
     created = api_client.post("/api/bookings/", {
         "service": sample_service.pk, "service_name": sample_service.name,
+        "customer_name": newcomer.name,
         "customer_phone": old_owner.phone, "address": "New booking address",
         "area": "Patna", "base_price": "499.00", "total_amount": "499.00",
     }, format="json")
-    assert created.status_code == 201
+    assert created.status_code == 201, created.data
     booking = Booking.objects.get(pk=created.data["id"])
     assert booking.customer_id == newcomer.pk
     assert booking.customer_phone == old_owner.phone
