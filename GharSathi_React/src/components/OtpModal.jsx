@@ -80,7 +80,7 @@ export default function OtpModal({
     setErrorMsg('');
     setStatusMsg('');
 
-    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+    if (!emailOtp && !/^[6-9]\d{9}$/.test(cleanPhone)) {
       setErrorMsg('Kripya valid 10-digit Indian mobile number (starting with 6-9) daalein.');
       return;
     }
