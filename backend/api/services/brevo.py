@@ -44,7 +44,11 @@ def send_transactional_email(*, recipient, subject, body):
         with urlopen(req, timeout=10) as response:
             if response.status not in (200, 201, 202):
                 raise EmailDeliveryError("Email provider rejected the request.")
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+    except HTTPError as exc:
+        # Log status only: never log Brevo response bodies, credentials or OTPs.
+        logger.warning("Transactional email provider HTTP status: %s", exc.code)
+        raise EmailDeliveryError("Email delivery is temporarily unavailable.") from exc
+    except (URLError, TimeoutError, OSError) as exc:
         logger.warning("Transactional email delivery failed: %s", type(exc).__name__)
         raise EmailDeliveryError("Email delivery is temporarily unavailable.") from exc
 
