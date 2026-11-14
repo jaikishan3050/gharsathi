@@ -1395,7 +1395,8 @@ class CustomerEmailLinkView(APIView):
             if CustomerProfile.objects.filter(email__iexact=email).exclude(pk=customer.pk).exists():
                 return Response({'error': 'Email is already linked to another account.'}, status=409)
             customer.email = email
-            customer.save(update_fields=['email'])
+            customer.email_verified = True
+            customer.save(update_fields=['email', 'email_verified'])
             otp.is_verified = True
             otp.save(update_fields=['is_verified'])
         return Response({'success': True, 'message': 'Email linked successfully.'})
@@ -1464,7 +1465,7 @@ class SendOTPView(APIView):
             # Email verification alone cannot establish ownership of an arbitrary phone.
             # Require a pre-existing, already-linked phone/email pair; onboarding needs
             # a separately authenticated email-linking or phone-verification flow.
-            if not CustomerProfile.objects.filter(phone=clean_phone, email__iexact=email, status='Active').exists():
+            if not CustomerProfile.objects.filter(phone=clean_phone, email__iexact=email, email_verified=True, status='Active').exists():
                 return Response({'error': 'Email login is available only for existing verified email-linked accounts.'}, status=409)
 
         # Generate secure 6-digit random numeric OTP
