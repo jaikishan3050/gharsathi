@@ -97,7 +97,11 @@ class BookingSerializer(serializers.ModelSerializer):
             'created_at', 'completed_at',
             'service_details', 'technician_details'
         ]
-        read_only_fields = ['invoice_number', 'platform_fee', 'created_at', 'completed_at']
+        read_only_fields = [
+            'invoice_number', 'platform_fee', 'created_at', 'completed_at',
+            'payment_status', 'razorpay_order_id', 'razorpay_payment_id',
+            'razorpay_signature',
+        ]
         extra_kwargs = {
             'booking_code': {'required': False},
             'service_pin': {'required': False},
