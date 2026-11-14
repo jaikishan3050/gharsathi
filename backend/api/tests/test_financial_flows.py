@@ -374,6 +374,34 @@ class TestFinancialAndOperationalFlows:
         assert active_booking.payment_status == 'Paid'
         assert active_booking.razorpay_payment_id == payment_id
 
+    def test_payment_retry_reuses_existing_order(self, api_client, active_booking, authenticate_as):
+        from unittest.mock import patch
+        customer = CustomerProfile.objects.create(phone=active_booking.customer_phone, name=active_booking.customer_name)
+        authenticate_as('customer', customer)
+        active_booking.razorpay_order_id = 'order_existing_retry'
+        active_booking.save(update_fields=['razorpay_order_id'])
+        with patch('razorpay.Client') as gateway:
+            response = api_client.post('/api/payments/razorpay/create-order/', {
+                'booking_id': active_booking.booking_code,
+                'amount': str(active_booking.total_amount),
+            }, format='json')
+            assert response.status_code == 200
+            assert response.data['order_id'] == 'order_existing_retry'
+            gateway.assert_not_called()
+        active_booking.refresh_from_db()
+        assert active_booking.razorpay_order_id == 'order_existing_retry'
+
+    def test_paid_booking_rejects_new_payment_order(self, api_client, active_booking, authenticate_as):
+        customer = CustomerProfile.objects.create(phone=active_booking.customer_phone, name=active_booking.customer_name)
+        authenticate_as('customer', customer)
+        active_booking.payment_status = 'Paid'
+        active_booking.save(update_fields=['payment_status'])
+        response = api_client.post('/api/payments/razorpay/create-order/', {
+            'booking_id': active_booking.booking_code,
+            'amount': str(active_booking.total_amount),
+        }, format='json')
+        assert response.status_code == 409
+
     def test_payment_order_rejects_other_customer(self, api_client, active_booking, authenticate_as):
         outsider = CustomerProfile.objects.create(phone="9876501234", name="Other Customer")
         authenticate_as('customer', outsider)
