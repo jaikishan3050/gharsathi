@@ -29,7 +29,7 @@ export const API_BASE_URL = getApiBaseUrl();
 export async function apiRequest(endpoint, options = {}, timeoutMs = 15000, retries = 1) {
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
+  const publicAuthRequest = /^\/auth\/(login|send-otp|verify-otp|signup-email\/send-otp|signup-email\/verify-otp|forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(forgot-password|reset-password-otp)\//.test(`${path}/`)
     || /^\/technicians\/(send-otp|verify-otp)\//.test(`${path}/`)
     || /^\/admin\/password-reset\/(request|confirm)\//.test(`${path}/`);
@@ -620,6 +620,17 @@ export const api = {
       body: JSON.stringify({ email, ...(otpCode ? { otp_code: otpCode } : {}) }),
     }, 15000, 0);
   },
+
+  // Verified email-only signup never claims a mobile number.
+  sendEmailSignupOtp: async (email) => apiRequest('/auth/signup-email/send-otp/', {
+    method: 'POST', body: JSON.stringify({ email }),
+  }, 15000, 0),
+  verifyEmailSignupOtp: async ({ email, otpCode, name, area, address, pincode }) =>
+    apiRequest('/auth/signup-email/verify-otp/', {
+      method: 'POST', body: JSON.stringify({
+        email, otp_code: otpCode, name, area, address, pincode,
+      }),
+    }, 15000, 0),
 
   // Mobile OTP Authentication (Direct On-Screen with SMS Fallback)
   sendOtp: async (phoneNumber, role = 'customer', purpose = 'login', email = '') => {
