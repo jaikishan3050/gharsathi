@@ -159,7 +159,6 @@ export function normalizeTechnicianFromDjango(t) {
     name: t.name,
     phone: t.phone,
     email: t.email,
-    password: 'password123',
     skills: t.trade || '',
     area: t.area,
     address: t.address,
@@ -391,10 +390,13 @@ export const api = {
   },
 
   registerTechnician: async (techData) => {
+    if (!techData.password || techData.password.length < 12) {
+      throw new Error('Technician password must be at least 12 characters.');
+    }
     const payload = {
       name: techData.name,
       phone: techData.phone.replace(/\D/g, '').slice(-10),
-      password: techData.password || 'password123',
+      password: techData.password,
       email: techData.email || '',
       trade: Array.isArray(techData.skills) ? techData.skills.join(', ') : techData.skills || '',
       area: techData.area || 'Patna to Danapur',

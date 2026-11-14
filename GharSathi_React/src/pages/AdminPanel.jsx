@@ -104,7 +104,7 @@ export default function AdminPanel() {
   const [techForm, setTechForm] = useState({
     name: '',
     phone: '',
-    password: 'password123',
+    password: '',
     email: '',
     aadhaar: '',
     area: areas[0],
@@ -256,13 +256,17 @@ export default function AdminPanel() {
       setNotice('Is mobile number se technician pehle se listed hai.');
       return;
     }
+    if (!techForm.password || techForm.password.length < 12) {
+      setNotice('Technician password kam se kam 12 characters ka hona chahiye.');
+      return;
+    }
     const record = await addTechnician(techForm);
     if (!record) return;
     setNotice(`${record.name} add ho gaye. Verification pending hai.`);
     setTechForm({
       name: '',
       phone: '',
-      password: 'password123',
+      password: '',
       email: '',
       aadhaar: '',
       area: areas[0],
