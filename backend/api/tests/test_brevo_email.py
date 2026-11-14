@@ -6,6 +6,7 @@ from django.test import override_settings
 from rest_framework.test import APIClient
 from api.models import OTPVerification, CustomerProfile
 from api.views import email_otp_digest
+from api.authentication import AuthenticatedPrincipal
 
 
 @pytest.mark.django_db
