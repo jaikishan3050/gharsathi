@@ -1373,6 +1373,7 @@ export default function CustomerPanel() {
             </form>
             <EmailLinkForm key={currentCustomer.id || currentCustomer.customer_id || currentCustomer.phone}
               currentEmail={currentCustomer.email || ''}
+              emailVerified={currentCustomer.email_verified === true}
               onLinked={() => setProfileNotice('Email verified! Profile reload karke updated email dekh sakte hain.')} />
             </>
           )}
