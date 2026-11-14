@@ -338,6 +338,41 @@ class TestFinancialAndOperationalFlows:
         assert active_booking.razorpay_order_id == order_id
         assert active_booking.razorpay_payment_id == payment_id
 
+
+    def test_payment_order_rejects_other_customer(self, api_client, active_booking, authenticate_as):
+        outsider = CustomerProfile.objects.create(phone="9876501234", name="Other Customer")
+        authenticate_as('customer', outsider)
+        response = api_client.post('/api/payments/razorpay/create-order/', {
+            'booking_id': active_booking.booking_code,
+            'amount': str(active_booking.total_amount),
+        }, format='json')
+        assert response.status_code == 403
+        assert not active_booking.razorpay_order_id
+
+    def test_payment_order_rejects_technician(self, api_client, active_booking, verified_technician, authenticate_as):
+        authenticate_as('technician', verified_technician)
+        response = api_client.post('/api/payments/razorpay/create-order/', {
+            'booking_id': active_booking.booking_code,
+            'amount': str(active_booking.total_amount),
+        }, format='json')
+        assert response.status_code == 403
+
+    def test_payment_verification_rejects_other_customer(self, api_client, active_booking, authenticate_as):
+        outsider = CustomerProfile.objects.create(phone="9876501234", name="Other Customer")
+        authenticate_as('customer', outsider)
+        active_booking.razorpay_order_id = 'order_owned_by_customer'
+        active_booking.save(update_fields=['razorpay_order_id'])
+        order_id, payment_id = 'order_owned_by_customer', 'pay_other_customer'
+        key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+        signature = hmac.new(key_secret.encode(), f'{order_id}|{payment_id}'.encode(), hashlib.sha256).hexdigest()
+        response = api_client.post('/api/payments/razorpay/verify/', {
+            'razorpay_order_id': order_id, 'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature, 'booking_id': active_booking.booking_code,
+        }, format='json')
+        assert response.status_code == 403
+        active_booking.refresh_from_db()
+        assert active_booking.payment_status != 'Paid'
+
     def test_razorpay_invalid_signature_rejected(self, api_client, active_booking, verified_technician, authenticate_as):
         """
         Submitting a tampered/invalid signature must return 400 Bad Request.
