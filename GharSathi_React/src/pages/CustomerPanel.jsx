@@ -21,6 +21,7 @@ import LocationPickerMap from '../components/LocationPickerMap.jsx';
 import BookingMiniMap from '../components/BookingMiniMap.jsx';
 import { prepareCheckout, confirmCheckout } from '../services/checkout.js';
 import OtpModal from '../components/OtpModal.jsx';
+import EmailLinkForm from '../components/EmailLinkForm.jsx';
 
 const items = [
   { id: 'home', icon: '⌂', label: 'Home' },
@@ -1302,6 +1303,7 @@ export default function CustomerPanel() {
               </button>
             </div>
           ) : (
+            <>
             <form className="form-card narrow-form" onSubmit={saveProfile}>
               <div className="profile-avatar">
                 {currentCustomer.name.charAt(0).toUpperCase()}
@@ -1369,6 +1371,10 @@ export default function CustomerPanel() {
 
               {profileNotice && <p className="success-text">{profileNotice}</p>}
             </form>
+            <EmailLinkForm key={currentCustomer.id || currentCustomer.customer_id || currentCustomer.phone}
+              currentEmail={currentCustomer.email || ''}
+              onLinked={() => setProfileNotice('Email verified! Profile reload karke updated email dekh sakte hain.')} />
+            </>
           )}
         </>
       )}
