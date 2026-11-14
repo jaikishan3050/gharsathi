@@ -36,6 +36,7 @@ for candidate_env in [BASE_DIR / '.env', BASE_DIR.parent / '.env']:
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
+DEPLOYMENT_COMMIT = os.environ.get('RENDER_GIT_COMMIT', os.environ.get('GITHUB_SHA', '')).strip()
 SECRET_KEY = os.environ.get('SECRET_KEY', '').strip()
 if not SECRET_KEY and DEBUG:
     import secrets as secret_generator
@@ -370,8 +371,8 @@ if not DEBUG:
 
 
 # Razorpay Production Gateway Settings
-RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
-RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8KkypuWGZd')
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '').strip()
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '').strip()
 
 
 # SMS OTP Gateway Settings (Fast2SMS / MSG91 / Twilio)

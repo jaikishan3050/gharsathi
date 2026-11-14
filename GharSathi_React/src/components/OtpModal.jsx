@@ -108,7 +108,7 @@ export default function OtpModal({
       const generatedOtp = String(res?.debug_otp || res?.otp || '');
       setPopupOtp(generatedOtp);
 
-      setStatusMsg(isResend ? 'Naya OTP website popup mein dikhaya gaya hai.' : 'OTP website popup mein dikhaya gaya hai.');
+      setStatusMsg(isResend ? 'Naya OTP aapke mobile par SMS se bheja gaya hai.' : 'OTP aapke mobile par SMS se bheja gaya hai.');
 
       // Auto focus first OTP input after switching
       setTimeout(() => {
@@ -201,7 +201,7 @@ export default function OtpModal({
         <div className="modal-header">
           <div>
             <p className="eyebrow eyebrow-gold">
-              {role.toUpperCase()} AUTHENTICATION · WEBSITE OTP
+              {role.toUpperCase()} AUTHENTICATION · SMS OTP
             </p>
             <h3>
               {step === 'phone'
@@ -257,7 +257,7 @@ export default function OtpModal({
                 }}
               >
                 <p className="auth-intro">
-                  Apna 10-digit mobile number enter karein. 6-digit OTP isi website par popup mein dikh jayega.
+                  Apna 10-digit mobile number enter karein. 6-digit OTP SMS se milega.
                 </p>
 
                 <div className="field-block">
@@ -277,7 +277,7 @@ export default function OtpModal({
                       autoFocus
                     />
                   </div>
-                  <small className="field-hint">10-digit mobile number enter karein; OTP website par dikhaya jayega</small>
+                  <small className="field-hint">10-digit mobile number enter karein; OTP SMS se milega</small>
                 </div>
 
                 <button
@@ -286,7 +286,7 @@ export default function OtpModal({
                   className="button button-gold button-wide"
                   style={{ marginTop: '20px' }}
                 >
-                  {loading ? 'OTP bana rahe hain…' : 'Website par OTP dikhayein'}
+                  {loading ? 'OTP bana rahe hain…' : 'Send OTP by SMS'}
                 </button>
 
               </form>
@@ -393,8 +393,8 @@ export default function OtpModal({
             <div className="otp-verification-banner">
               <span className="otp-shield-icon">🛡️</span>
               <div className="otp-header-info">
-                <strong>OTP website popup mein dikhaya gaya hai</strong>
-                <p>6-digit code enter karein ya neeche se auto-fill karein.</p>
+                <strong>OTP SMS se bheja gaya hai</strong>
+                <p>Apne mobile par mila 6-digit code enter karein.</p>
               </div>
             </div>
 

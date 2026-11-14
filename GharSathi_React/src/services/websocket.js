@@ -41,6 +41,8 @@ class JobWebSocketService {
 
   connect(area = null) {
     if (typeof window === 'undefined') return;
+    const token = sessionStorage.getItem('gharsathi_auth_token_tab');
+    if (!token) return;
 
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       if (area && area !== this.currentArea) {
@@ -60,24 +62,18 @@ class JobWebSocketService {
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
-        this.status = 'connected';
-        this.reconnectAttempts = 0;
-        console.log(`[GharSathi WS] Connected to Live Dispatch at ${wsUrl}`);
-
-        if (this.currentArea) {
-          this.setArea(this.currentArea);
-        }
-
-        this.notifySubscribers({
-          type: 'status_change',
-          status: 'connected',
-          message: 'Real-time live job dispatch connected',
-        });
+        // Send credentials in the first frame, never in a URL or log.
+        this.socket.send(JSON.stringify({ action: 'authenticate', token }));
       };
 
       this.socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          if (data.type === 'authenticated') {
+            this.status = 'connected';
+            this.reconnectAttempts = 0;
+            this.notifySubscribers({ type: 'status_change', status: 'connected' });
+          }
           this.notifySubscribers(data);
         } catch (err) {
           console.warn('[GharSathi WS] Received non-JSON message:', event.data);
@@ -88,7 +84,7 @@ class JobWebSocketService {
         this.status = 'disconnected';
         this.notifySubscribers({ type: 'status_change', status: 'disconnected' });
 
-        if (!this.isExplicitDisconnect) {
+        if (!this.isExplicitDisconnect && event.code !== 4401) {
           this.scheduleReconnect();
         }
       };
@@ -173,7 +169,7 @@ class JobWebSocketService {
   }
 
   isConnected() {
-    return this.socket && this.socket.readyState === WebSocket.OPEN;
+    return this.status === 'connected' && this.socket && this.socket.readyState === WebSocket.OPEN;
   }
 }
 

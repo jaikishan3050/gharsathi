@@ -37,6 +37,7 @@ from .models import (
     CustomerProfile,
     OTPVerification,
 )
+from .services.sms import deliver_otp
 from .serializers import (
     ServiceSerializer,
     SubServiceSerializer,
@@ -50,6 +51,7 @@ from .serializers import (
 from .seed_data import purge_database, ensure_production_superuser
 from .authentication import (
     IsGharSathiAdmin,
+    credential_version,
     IsGharSathiAuthenticated,
     IsGharSathiCustomer,
     IsGharSathiAdminOrCustomer,
@@ -380,8 +382,8 @@ class TechnicianProfileViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            key_id = getattr(settings, 'RAZORPAY_KEY_ID', 'rzp_live_Tr00Y2gS1bC4Rv')
-            key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', 'ETgvqsAaKu3tQi8KkypuWGZd')
+            key_id = getattr(settings, 'RAZORPAY_KEY_ID', '')
+            key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
 
             is_verified = False
 
@@ -1324,7 +1326,7 @@ class SendOTPView(APIView):
     POST /api/auth/send-otp/
     Accepts: { "phone_number": "9876543210", "role": "customer" }
     Generates secure 6-digit numeric OTP, saves to DB with 5-minute expiry,
-    creates a website-visible OTP and returns it for the on-screen verification popup.
+    sends it through the configured SMS provider; codes are returned only in explicit development mode.
     """
     permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
@@ -1370,13 +1372,16 @@ class SendOTPView(APIView):
         if recent_requests >= 10:
             return Response({'error': 'Too many OTP requests. Please try again later.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
+        if OTPVerification.objects.filter(phone=clean_phone, created_at__gte=timezone.now()-timedelta(seconds=60)).exists():
+            return Response({'error': 'Wait 60 seconds before requesting another code.'}, status=429)
+
         # Generate secure 6-digit random numeric OTP
         otp_code = str(secrets.randbelow(900000) + 100000)
         expiry_minutes = getattr(settings, 'OTP_EXPIRATION_MINUTES', 5)
         expires_at = timezone.now() + timedelta(minutes=expiry_minutes)
 
         # Invalidate old unverified OTPs for this phone
-        OTPVerification.objects.filter(phone=clean_phone, is_verified=False).delete()
+        OTPVerification.objects.filter(phone=clean_phone, is_verified=False).update(is_verified=True)
 
         # Create new OTP verification record
         otp_record = OTPVerification.objects.create(
@@ -1386,18 +1391,15 @@ class SendOTPView(APIView):
             expires_at=expires_at,
         )
 
-        resp_data = {
-            'status': 'success',
-            'success': True,
-            'message': 'OTP website par popup mein dikhaya gaya hai.',
-            'phone': clean_phone,
-            'debug_otp': otp_code,
-            'otp': otp_code,
+        delivery = deliver_otp(clean_phone, otp_code)
+        if not delivery['success']:
+            otp_record.delete()
+            return Response({'error': delivery['error']}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({
+            **delivery, 'status': 'success', 'phone': clean_phone,
             'expires_in_seconds': expiry_minutes * 60,
-            'provider': 'website_popup',
-        }
+        }, status=status.HTTP_200_OK)
 
-        return Response(resp_data, status=status.HTTP_200_OK)
 
 
 class VerifyOTPView(APIView):
@@ -1436,9 +1438,9 @@ class VerifyOTPView(APIView):
             registration_password = str(request.data.get('password') or '')
             registration_email = str(request.data.get('email') or '').strip()
             aadhaar_digits = ''.join(filter(str.isdigit, str(request.data.get('aadhaar') or '')))
-            if not registration_name or len(registration_password) < 4 or '@' not in registration_email:
+            if not registration_name or len(registration_password) < 12 or '@' not in registration_email:
                 return Response(
-                    {'error': 'Name, valid email, and a password of at least 4 characters are required.'},
+                    {'error': 'Name, valid email, and a password of at least 12 characters are required.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             if len(aadhaar_digits) != 12:
@@ -1548,6 +1550,7 @@ class VerifyOTPView(APIView):
             'id': tech.id if role == 'technician' else customer.id,
             'phone': clean_phone,
             'role': role,
+            **({'credential_version': credential_version(tech)} if role == 'technician' else {}),
             'exp': timezone.now() + timedelta(days=7),
             'iat': timezone.now(),
         }
@@ -1655,6 +1658,7 @@ class LoginView(APIView):
                 'partner_id': tech.partner_id,
                 'phone': tech.phone,
                 'role': 'technician',
+                'credential_version': credential_version(tech),
                 'name': tech.name,
                 'exp': timezone.now() + timedelta(days=7),
                 'iat': timezone.now(),
@@ -1680,98 +1684,22 @@ class LoginView(APIView):
 
 
 class AuthMeView(APIView):
-    """
-    GET /api/auth/me/
-    Accepts Authorization: Bearer <token> or ?token=...
-    Decodes token, retrieves profile from DB, and returns user data for session persistence.
-    """
-    permission_classes = [AllowAny]
+    """Use the same Bearer JWT validation and revocation rules as every protected API."""
+    permission_classes = [IsGharSathiAuthenticated]
 
     def get(self, request):
-        auth_header = request.headers.get('Authorization', '')
-        token = ''
-        if auth_header.startswith('Bearer '):
-            token = auth_header[7:].strip()
-        elif auth_header:
-            token = auth_header.strip()
-        else:
-            token = request.query_params.get('token', '').strip()
-
-        if not token:
-            return Response({'error': 'Authentication token is required.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-        except jwt.ExpiredSignatureError:
-            return Response({'error': 'Session expired. Please log in again.'}, status=status.HTTP_401_UNAUTHORIZED)
-        except jwt.InvalidTokenError:
-            return Response({'error': 'Invalid authentication token.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        role = decoded.get('role', 'technician')
-        if role not in ('admin', 'customer', 'technician'):
-            return Response({'error': 'Unsupported authentication role.'}, status=status.HTTP_401_UNAUTHORIZED)
-        phone = decoded.get('phone')
-        tech_id = decoded.get('id')
-
-        # Technician
-        if role == 'technician':
-            tech = None
-            if tech_id:
-                tech = TechnicianProfile.objects.filter(pk=tech_id).first()
-            if not tech and phone:
-                clean_phone = ''.join(filter(str.isdigit, str(phone)))[-10:]
-                tech = TechnicianProfile.objects.filter(phone__endswith=clean_phone).first()
-
-            if tech:
-                tech_data = TechnicianProfileSerializer(tech).data
-                tech_data['userType'] = 'technician'
-                return Response({
-                    'success': True,
-                    'role': 'technician',
-                    'technician': tech_data,
-                    'user': tech_data,
-                })
-
-        # Admin
+        role = request.user.role
+        profile = request.user.profile
         if role == 'admin':
-            from django.contrib.auth.models import User
-            user_id = decoded.get('user_id')
-            user = User.objects.filter(pk=user_id, is_active=True, is_staff=True).first() if user_id else None
-            if user:
-                return Response({
-                    'success': True,
-                    'role': 'admin',
-                    'user': {
-                        'id': user.id,
-                        'username': user.username,
-                        'email': user.email,
-                        'is_staff': user.is_staff,
-                    }
-                })
-
-        # Customer
-        if role == 'customer':
-            customer = None
-            cus_id = decoded.get('id')
-            email = decoded.get('email')
-            if cus_id:
-                customer = CustomerProfile.objects.filter(pk=cus_id).first()
-            if not customer and email:
-                customer = CustomerProfile.objects.filter(email__iexact=email).first()
-            if not customer and phone:
-                clean_phone = ''.join(filter(str.isdigit, str(phone)))[-10:]
-                customer = CustomerProfile.objects.filter(phone__endswith=clean_phone).first()
-
-            if customer:
-                cus_data = CustomerProfileSerializer(customer).data
-                cus_data['userType'] = 'customer'
-                return Response({
-                    'success': True,
-                    'role': 'customer',
-                    'user': cus_data,
-                })
-
-        return Response({'error': 'User profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+            data = {'id': profile.pk, 'username': profile.username,
+                    'email': profile.email, 'is_staff': profile.is_staff}
+        elif role == 'technician':
+            data = dict(TechnicianProfileSerializer(profile).data)
+        else:
+            data = dict(CustomerProfileSerializer(profile).data)
+        data['userType'] = role
+        return Response({'success': True, 'role': role, 'user': data,
+                         **({'technician': data} if role == 'technician' else {})})
 
 
 def normalize_phone_number(phone_input):
@@ -1801,7 +1729,7 @@ class TechnicianForgotPasswordView(APIView):
     POST /api/technicians/forgot-password/
     Accepts: { "phone": "9876500001" }
     Normalizes phone number, generates 6-digit OTP, saves to TechnicianProfile with 5-minute expiry,
-    and returns OTP for the website popup.
+    and sends it through the configured SMS provider.
     """
 
     def post(self, request):
@@ -1829,6 +1757,10 @@ class TechnicianForgotPasswordView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        recent = OTPVerification.objects.filter(phone=clean_phone, created_at__gte=timezone.now()-timedelta(hours=1))
+        if recent.count() >= 10 or recent.filter(created_at__gte=timezone.now()-timedelta(seconds=60)).exists():
+            return Response({'error': 'Too many OTP requests. Please try again later.'}, status=429)
+
         # Generate a cryptographically secure 6-digit numeric OTP
         otp_code = str(secrets.randbelow(900000) + 100000)
         expiry_minutes = getattr(settings, 'OTP_EXPIRATION_MINUTES', 5)
@@ -1841,7 +1773,7 @@ class TechnicianForgotPasswordView(APIView):
         tech.save(update_fields=['otp_code', 'otp_expires_at', 'otp_attempts', 'updated_at'])
 
         # Invalidate previous unverified OTPs and save unified record
-        OTPVerification.objects.filter(phone=clean_phone, is_verified=False).delete()
+        OTPVerification.objects.filter(phone=clean_phone, is_verified=False).update(is_verified=True)
         OTPVerification.objects.create(
             phone=clean_phone,
             otp_code=otp_code,
@@ -1849,18 +1781,18 @@ class TechnicianForgotPasswordView(APIView):
             expires_at=expires_at,
         )
 
-        resp_data = {
-            'status': 'success',
-            'success': True,
-            'message': 'Password reset OTP website popup mein dikhaya gaya hai.',
-            'phone': clean_phone,
+        delivery = deliver_otp(clean_phone, otp_code)
+        if not delivery['success']:
+            tech.otp_code = ''
+            tech.otp_expires_at = None
+            tech.save(update_fields=['otp_code', 'otp_expires_at', 'updated_at'])
+            OTPVerification.objects.filter(phone=clean_phone, is_verified=False).delete()
+            return Response({'error': delivery['error']}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response({
+            **delivery, 'status': 'success', 'phone': clean_phone,
             'expires_in_seconds': expiry_minutes * 60,
-            'provider': 'website_popup',
-            'debug_otp': otp_code,
-            'otp': otp_code,
-        }
+        }, status=status.HTTP_200_OK)
 
-        return Response(resp_data, status=status.HTTP_200_OK)
 
 
 class TechnicianResetPasswordView(APIView):
@@ -1885,9 +1817,9 @@ class TechnicianResetPasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if len(new_password) < 4:
+        if len(new_password) < 12:
             return Response(
-                {'error': 'Naya password kam se kam 4 characters ka hona chahiye.'},
+                {'error': 'Naya password kam se kam 12 characters ka hona chahiye.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1932,7 +1864,7 @@ class TechnicianResetPasswordView(APIView):
         # 2. Fallback check against OTPVerification table
         if not otp_matched:
             otp_record = (
-                OTPVerification.objects.filter(phone=clean_phone, is_verified=False)
+                OTPVerification.objects.filter(phone=clean_phone, role='technician', is_verified=False)
                 .order_by('-created_at')
                 .first()
             )

@@ -550,6 +550,7 @@ class TestFinancialAndOperationalFlows:
             {
                 "name": "Amit Kumar",
                 "phone": "9800000002",
+                "password": "local-fixture-password",
                 "trade": "AC Repair",
                 "area": "Danapur",
             },
@@ -567,6 +568,7 @@ class TestFinancialAndOperationalFlows:
             {
                 "name": "Injection Test",
                 "phone": "9800000003",
+                "password": "local-fixture-password",
                 "trade": "Plumbing",
                 "wallet_balance": 600.00,
             },
