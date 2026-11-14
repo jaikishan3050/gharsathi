@@ -29,6 +29,9 @@ must serve that file and the HTML entry without caching. Backend `/` runs a real
 database probe and exposes the provider-supplied `RENDER_GIT_COMMIT`, never a
 hardcoded deployment claim. Render's automatic deploy should be monitored after
 a main push; do not trigger a second deployment while one is already running.
+Container builds must pass the reviewed full revision as the `BUILD_COMMIT`
+build argument. Compose forwards `GITHUB_SHA` in CI. A container built without a
+revision is marked `unknown`/dirty and cannot pass deployment verification.
 
 Configure existing server secrets in Render's Environment page; never put them
 in code, PR descriptions, command arguments or chat:

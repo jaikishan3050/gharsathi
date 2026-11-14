@@ -6,8 +6,18 @@ function buildInfo() {
   return {
     name: 'build-info',
     generateBundle() {
-      const commit = process.env.GITHUB_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-      const dirty = Boolean(execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim());
+      let commit = process.env.BUILD_COMMIT || process.env.GITHUB_SHA || '';
+      let dirty = true;
+      const gitOptions = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] };
+      try {
+        commit ||= execFileSync('git', ['rev-parse', 'HEAD'], gitOptions).trim();
+        dirty = Boolean(execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], gitOptions).trim());
+      } catch {
+        // Container build contexts omit .git. Only a supplied full revision can
+        // identify that artifact; unknown builds remain explicitly unverified.
+        dirty = !/^[a-f0-9]{40}$/.test(commit);
+      }
+      commit ||= 'unknown';
       this.emitFile({ type: 'asset', fileName: 'build-info.json', source: JSON.stringify({
         commit, dirty, built_at: new Date().toISOString(),
       }) });

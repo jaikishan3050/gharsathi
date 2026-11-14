@@ -3,6 +3,8 @@
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+ARG BUILD_COMMIT=unknown
+ENV BUILD_COMMIT=$BUILD_COMMIT
 
 # Copy dependency manifests
 COPY package*.json ./

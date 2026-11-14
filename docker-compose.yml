@@ -44,6 +44,8 @@ services:
     build:
       context: ./GharSathi_React
       dockerfile: Dockerfile
+      args:
+        BUILD_COMMIT: ${GITHUB_SHA:-unknown}
     container_name: gharsathi_frontend
     restart: unless-stopped
     ports:
