@@ -305,17 +305,27 @@ class TestFinancialAndOperationalFlows:
         msg = f"{order_id}|{payment_id}".encode("utf-8")
         valid_signature = hmac.new(key_secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
 
-        url = "/api/payments/razorpay/verify/"
-        response = api_client.post(
-            url,
-            {
-                "razorpay_order_id": order_id,
-                "razorpay_payment_id": payment_id,
-                "razorpay_signature": valid_signature,
-                "booking_id": active_booking.booking_code,
-            },
-            format="json",
-        )
+        active_booking.razorpay_order_id = order_id
+        active_booking.save(update_fields=["razorpay_order_id"])
+        from unittest.mock import patch
+        with patch("razorpay.Client") as gateway:
+            gateway.return_value.payment.fetch.return_value = {
+                "status": "captured",
+                "order_id": order_id,
+                "currency": "INR",
+                "amount": int(active_booking.total_amount * 100),
+            }
+            url = "/api/payments/razorpay/verify/"
+            response = api_client.post(
+                url,
+                {
+                    "razorpay_order_id": order_id,
+                    "razorpay_payment_id": payment_id,
+                    "razorpay_signature": valid_signature,
+                    "booking_id": active_booking.booking_code,
+                },
+                format="json",
+            )
 
         assert response.status_code == 200
         assert response.data["success"] is True
@@ -344,7 +354,7 @@ class TestFinancialAndOperationalFlows:
         )
 
         assert response.status_code == 400
-        assert "failed" in response.data.get("error", "").lower()
+        assert "signature" in response.data.get("error", "").lower()
 
     def test_subservice_custom_commission_crud_and_deduction(self, api_client, verified_technician, sample_service, admin_user, authenticate_as):
         """
