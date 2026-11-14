@@ -141,6 +141,7 @@ class Booking(models.Model):
 
     booking_code = models.CharField(max_length=30, unique=True, db_index=True)
     invoice_number = models.CharField(max_length=40, unique=True, blank=True)
+    customer = models.ForeignKey('CustomerProfile', on_delete=models.SET_NULL, null=True, blank=True, related_name='bookings')
     customer_name = models.CharField(max_length=120)
     customer_phone = models.CharField(max_length=15)
     address = models.TextField()
