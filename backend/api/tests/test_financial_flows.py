@@ -670,7 +670,7 @@ def test_screen_happy_code_visible_only_to_customer_when_job_started(active_book
     customer_request = SimpleNamespace(user=SimpleNamespace(role='customer'))
     technician_request = SimpleNamespace(user=SimpleNamespace(role='technician'))
     assert BookingSerializer(active_booking, context={'request': customer_request}).data['service_pin'] == '4829'
-    assert BookingSerializer(active_booking, context={'request': technician_request}).data['service_pin'] == ''
-    assert BookingSerializer(active_booking).data['service_pin'] == ''
+    assert 'service_pin' not in BookingSerializer(active_booking, context={'request': technician_request}).data
+    assert 'service_pin' not in BookingSerializer(active_booking).data
     settings.HAPPY_CODE_CHANNEL = 'email'
-    assert BookingSerializer(active_booking, context={'request': customer_request}).data['service_pin'] == ''
+    assert 'service_pin' not in BookingSerializer(active_booking, context={'request': customer_request}).data
