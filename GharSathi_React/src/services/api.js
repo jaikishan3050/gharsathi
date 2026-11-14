@@ -113,6 +113,7 @@ export function normalizeBookingFromDjango(b) {
     id: b.booking_code || `GS-${b.id}`,
     pk: b.id,
     customerName: b.customer_name,
+    customerPk: b.customer || null,
     phone: b.customer_phone,
     address: b.address,
     area: b.area,
