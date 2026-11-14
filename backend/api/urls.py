@@ -16,6 +16,8 @@ from .views import (
     RazorpayVerifyPaymentView,
     CustomerProfileViewSet,
     CustomerEmailLinkView,
+    CustomerEmailSignupView,
+    CustomerEmailSignupVerifyView,
     SendOTPView,
     VerifyOTPView,
     LoginView,
@@ -49,6 +51,8 @@ urlpatterns = [
 
     # General Auth Endpoints
     path('auth/link-email/', CustomerEmailLinkView.as_view(), name='auth-link-email'),
+    path('auth/signup-email/send-otp/', CustomerEmailSignupView.as_view(), name='auth-signup-email-send'),
+    path('auth/signup-email/verify-otp/', CustomerEmailSignupVerifyView.as_view(), name='auth-signup-email-verify'),
     path('auth/send-otp/', SendOTPView.as_view(), name='auth-send-otp'),
     path('auth/verify-otp/', VerifyOTPView.as_view(), name='auth-verify-otp'),
     path('auth/login/', LoginView.as_view(), name='auth-login'),
