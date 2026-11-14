@@ -325,6 +325,7 @@ class CustomerProfile(models.Model):
     customer_id = models.CharField(max_length=30, unique=True, db_index=True)
     phone = models.CharField(max_length=20, blank=True, default='', db_index=True)
     email = models.EmailField(blank=True, default='', db_index=True)
+    email_verified = models.BooleanField(default=False, editable=False)
     name = models.CharField(max_length=120, blank=True, default='')
     address = models.TextField(blank=True, default='')
     area = models.CharField(max_length=100, default='Patna to Danapur')
