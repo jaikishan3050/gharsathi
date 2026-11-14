@@ -158,9 +158,9 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerProfile
         fields = [
-            'id', 'customer_id', 'phone', 'email', 'name', 'address',
+            'id', 'customer_id', 'phone', 'email', 'email_verified', 'name', 'address',
             'area', 'pincode', 'status', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['customer_id', 'created_at', 'updated_at']
+        read_only_fields = ['customer_id', 'email_verified', 'created_at', 'updated_at']
 
 
