@@ -1147,6 +1147,18 @@ class PurgeProductionDataView(APIView):
         })
 
 
+def payment_booking_access_allowed(request, booking):
+    """Only the booking customer or an administrator can initiate/verify its payment."""
+    role = getattr(request.user, 'role', None)
+    if role == 'admin':
+        return True
+    if role != 'customer':
+        return False
+    phone = ''.join(filter(str.isdigit, str(getattr(request.user, 'phone', ''))))[-10:]
+    booking_phone = ''.join(filter(str.isdigit, str(booking.customer_phone)))[-10:]
+    return len(phone) == 10 and phone == booking_phone
+
+
 class RazorpayCreateOrderView(APIView):
     """Create a real Razorpay order; never simulate payment orders on API failure."""
 
@@ -1173,6 +1185,8 @@ class RazorpayCreateOrderView(APIView):
         booking = Booking.objects.filter(booking_code=booking_ref).first() if booking_ref else None
         if not booking:
             return Response({'error': 'A persisted booking is required for payment.'}, status=400)
+        if not payment_booking_access_allowed(request, booking):
+            return Response({'error': 'Not authorized for this booking.'}, status=403)
         if amount_paise != int(booking.total_amount * 100):
             return Response({'error': 'Payment amount does not match booking.'}, status=400)
 
@@ -1223,6 +1237,8 @@ class RazorpayVerifyPaymentView(APIView):
         booking = Booking.objects.filter(razorpay_order_id=order_id).first()
         if not booking:
             return Response({'error': 'Payment order does not match a booking.'}, status=404)
+        if not payment_booking_access_allowed(request, booking):
+            return Response({'error': 'Not authorized for this booking.'}, status=403)
         booking_ref = request.data.get('booking_id') or request.data.get('booking_code')
         if booking_ref and str(booking_ref) not in (str(booking.pk), str(booking.booking_code)):
             return Response({'error': 'Booking reference mismatch.'}, status=400)
