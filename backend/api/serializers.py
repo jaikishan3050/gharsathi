@@ -1,5 +1,6 @@
 from decimal import Decimal
 from rest_framework import serializers
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from .models import Service, SubService, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal, CustomerProfile, OTPVerification
@@ -98,6 +99,18 @@ class TechnicianProfileSerializer(serializers.ModelSerializer):
 
 
 class BookingSerializer(serializers.ModelSerializer):
+    # The screen fallback must never disclose the Happy Code to technicians.
+    service_pin = serializers.SerializerMethodField()
+
+    def get_service_pin(self, obj):
+        request = self.context.get('request')
+        if (request is not None
+                and getattr(request.user, 'role', None) == 'customer'
+                and getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'screen'
+                and obj.status == 'In Progress'):
+            return obj.service_pin
+        return ''
+
     service_details = ServiceSerializer(source='service', read_only=True)
     technician_details = TechnicianProfileSerializer(source='technician', read_only=True)
 
@@ -112,7 +125,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'scheduled_date', 'scheduled_time', 'base_price',
             'platform_fee', 'total_amount', 'payment_method', 'payment_status',
             'razorpay_order_id', 'razorpay_payment_id', 'razorpay_signature',
-            'status', 'notes', 'rating',
+            'status', 'service_pin', 'notes', 'rating',
             'review_text', 'review_tags', 'rated_at',
             'created_at', 'completed_at',
             'service_details', 'technician_details'
