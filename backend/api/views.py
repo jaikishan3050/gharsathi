@@ -13,6 +13,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
+from django.utils.crypto import salted_hmac
+from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
@@ -61,6 +63,11 @@ from .authentication import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def email_otp_digest(phone, email, code):
+    return salted_hmac('gharsathi.email.otp.v1', f'{phone}:{email}:{code}', algorithm='sha256').hexdigest()
+
 
 FIXED_PLATFORM_FEE = Decimal('149.00')
 MIN_WALLET_BALANCE = Decimal('150.00')
@@ -1391,6 +1398,18 @@ class SendOTPView(APIView):
         if OTPVerification.objects.filter(phone=clean_phone, created_at__gte=timezone.now()-timedelta(seconds=60)).exists():
             return Response({'error': 'Wait 60 seconds before requesting another code.'}, status=429)
 
+        if role == 'customer' and getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') == 'email':
+            email = str(request.data.get('email') or '').strip().lower()
+            try:
+                validate_email(email)
+            except DjangoValidationError:
+                return Response({'error': 'Valid email is required for email OTP.'}, status=400)
+            # Email verification alone cannot establish ownership of an arbitrary phone.
+            # Require a pre-existing, already-linked phone/email pair; onboarding needs
+            # a separately authenticated email-linking or phone-verification flow.
+            if not CustomerProfile.objects.filter(phone=clean_phone, email__iexact=email, status='Active').exists():
+                return Response({'error': 'Email login is available only for existing verified email-linked accounts.'}, status=409)
+
         # Generate secure 6-digit random numeric OTP
         otp_code = str(secrets.randbelow(900000) + 100000)
         expiry_minutes = getattr(settings, 'OTP_EXPIRATION_MINUTES', 5)
@@ -1402,7 +1421,7 @@ class SendOTPView(APIView):
         # Create new OTP verification record
         otp_record = OTPVerification.objects.create(
             phone=clean_phone,
-            otp_code=otp_code,
+            otp_code=(email_otp_digest(clean_phone, email, otp_code) if role == 'customer' and getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') == 'email' else otp_code),
             role=role,
             expires_at=expires_at,
         )
@@ -1521,9 +1540,12 @@ class VerifyOTPView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if otp_record.otp_code != otp_input:
+        expected_otp = (email_otp_digest(clean_phone, otp_record.email, otp_input)
+                        if role == 'customer' and getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') == 'email'
+                        else otp_input)
+        if not hmac.compare_digest(otp_record.otp_code, expected_otp):
             return Response(
-                {'error': 'Invalid OTP code. Please enter the correct 6-digit code received via SMS.'},
+                {'error': 'Invalid OTP code. Please enter the correct 6-digit verification code.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
