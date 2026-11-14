@@ -13,6 +13,8 @@ export default function OtpModal({
   const [tab, setTab] = useState(defaultMode); // 'login' | 'signup'
   const [step, setStep] = useState('phone'); // 'phone' | 'otp'
   const [phone, setPhone] = useState(initialPhone || '');
+  const [email, setEmail] = useState('');
+  const emailOtp = role === 'customer' && import.meta.env.VITE_CUSTOMER_OTP_CHANNEL === 'email';
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -37,6 +39,7 @@ export default function OtpModal({
       setTab(defaultMode);
       setStep(initialPhone ? 'phone' : 'phone');
       setPhone(initialPhone || '');
+      setEmail('');
       setOtpDigits(['', '', '', '', '', '']);
       setErrorMsg('');
       setStatusMsg('');
@@ -82,6 +85,11 @@ export default function OtpModal({
       return;
     }
 
+    if (emailOtp && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setErrorMsg('Valid email address enter karein.');
+      return;
+    }
+
     if (tab === 'signup') {
       if (!signupData.name.trim()) {
         setErrorMsg('Apna poora naam enter karein.');
@@ -99,16 +107,16 @@ export default function OtpModal({
 
     setLoading(true);
     try {
-      const res = await api.sendOtp(cleanPhone, role);
+      const res = await api.sendOtp(cleanPhone, role, 'login', emailOtp ? email.trim().toLowerCase() : '');
       setLoading(false);
       setStep('otp');
       setCountdown(60);
       setCanResend(false);
       setOtpDigits(['', '', '', '', '', '']);
       const generatedOtp = String(res?.debug_otp || res?.otp || '');
-      setPopupOtp(generatedOtp);
+      setPopupOtp(emailOtp ? '' : generatedOtp);
 
-      setStatusMsg(isResend ? 'Naya OTP aapke mobile par SMS se bheja gaya hai.' : 'OTP aapke mobile par SMS se bheja gaya hai.');
+      setStatusMsg(emailOtp ? 'OTP aapke email par bheja gaya hai.' : (isResend ? 'Naya OTP aapke mobile par SMS se bheja gaya hai.' : 'OTP aapke mobile par SMS se bheja gaya hai.'));
 
       // Auto focus first OTP input after switching
       setTimeout(() => {
@@ -168,6 +176,7 @@ export default function OtpModal({
     try {
       const res = await api.verifyOtp({
         phoneNumber: cleanPhone,
+        email: emailOtp ? email.trim().toLowerCase() : '',
         otpCode: fullOtp,
         role,
         name: signupData.name,
@@ -201,12 +210,12 @@ export default function OtpModal({
         <div className="modal-header">
           <div>
             <p className="eyebrow eyebrow-gold">
-              {role.toUpperCase()} AUTHENTICATION · SMS OTP
+              {role.toUpperCase()} AUTHENTICATION · {emailOtp ? 'EMAIL' : 'SMS'} OTP
             </p>
             <h3>
               {step === 'phone'
                 ? tab === 'login'
-                  ? 'Login with Mobile OTP'
+                  ? emailOtp ? 'Login with Email OTP' : 'Login with Mobile OTP'
                   : 'New Customer Registration'
                 : 'Enter 6-Digit Verification Code'}
             </h3>
@@ -257,7 +266,7 @@ export default function OtpModal({
                 }}
               >
                 <p className="auth-intro">
-                  Apna 10-digit mobile number enter karein. 6-digit OTP SMS se milega.
+                  Apna mobile number {emailOtp ? 'aur email' : ''} enter karein. 6-digit OTP {emailOtp ? 'email' : 'SMS'} se milega.
                 </p>
 
                 <div className="field-block">
@@ -277,16 +286,23 @@ export default function OtpModal({
                       autoFocus
                     />
                   </div>
-                  <small className="field-hint">10-digit mobile number enter karein; OTP SMS se milega</small>
+                  <small className="field-hint">10-digit mobile number enter karein; OTP {emailOtp ? 'email' : 'SMS'} se milega</small>
                 </div>
 
+                {emailOtp && (
+                  <div className="field-block">
+                    <label className="field-label">Email Address <span className="req">*</span></label>
+                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com" className="modal-form-input" autoComplete="email" />
+                  </div>
+                )}
                 <button
                   type="submit"
                   disabled={loading || cleanPhone.length !== 10}
                   className="button button-gold button-wide"
                   style={{ marginTop: '20px' }}
                 >
-                  {loading ? 'OTP bana rahe hain…' : 'Send OTP by SMS'}
+                  {loading ? 'OTP bana rahe hain…' : 'Send OTP by {emailOtp ? 'Email' : 'SMS'}'}
                 </button>
 
               </form>
@@ -298,7 +314,7 @@ export default function OtpModal({
                 }}
               >
                 <p className="auth-intro">
-                  Ghar Sathi par naya account banane ke liye details enter karein aur mobile OTP verify karein.
+                  Ghar Sathi par naya account banane ke liye details enter karein aur {emailOtp ? 'email' : 'mobile'} OTP verify karein.
                 </p>
 
                 <div className="field-block">
@@ -374,13 +390,20 @@ export default function OtpModal({
                   />
                 </div>
 
+                {emailOtp && (
+                  <div className="field-block">
+                    <label className="field-label">Email Address <span className="req">*</span></label>
+                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com" className="modal-form-input" autoComplete="email" />
+                  </div>
+                )}
                 <button
                   type="submit"
                   disabled={loading || cleanPhone.length !== 10}
                   className="button button-gold button-wide"
                   style={{ marginTop: '16px' }}
                 >
-                  {loading ? 'Sending OTP…' : 'Verify Mobile with OTP 📲'}
+                  {loading ? 'Sending OTP…' : 'Verify {emailOtp ? 'Email' : 'Mobile'} with OTP'}
                 </button>
               </form>
             )}
@@ -393,8 +416,8 @@ export default function OtpModal({
             <div className="otp-verification-banner">
               <span className="otp-shield-icon">🛡️</span>
               <div className="otp-header-info">
-                <strong>OTP SMS se bheja gaya hai</strong>
-                <p>Apne mobile par mila 6-digit code enter karein.</p>
+                <strong>OTP {emailOtp ? 'email' : 'SMS'} se bheja gaya hai</strong>
+                <p>Apne {emailOtp ? 'email' : 'mobile'} par mila 6-digit code enter karein.</p>
               </div>
             </div>
 
@@ -453,7 +476,7 @@ export default function OtpModal({
                       onClick={() => handleSendOtp(true)}
                       className="resend-action-link"
                     >
-                      {loading ? 'Regenerating…' : 'Naya OTP dikhayein 🔄'}
+                      {loading ? 'Regenerating…' : 'Resend OTP 🔄'}
                     </button>
                   </div>
                 )}
