@@ -1369,6 +1369,8 @@ class CustomerEmailLinkView(APIView):
 
     def post(self, request):
         customer = request.user.profile
+        if customer.status != 'Active':
+            return Response({'error': 'Only active customers can link or verify an email.'}, status=403)
         email = str(request.data.get('email') or '').strip().lower()
         code = str(request.data.get('otp_code') or '').strip()
         try:
