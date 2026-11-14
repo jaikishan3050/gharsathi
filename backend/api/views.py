@@ -38,6 +38,7 @@ from .models import (
     OTPVerification,
 )
 from .services.sms import deliver_otp
+from .services.brevo import send_login_otp, send_happy_code, EmailDeliveryError
 from .serializers import (
     ServiceSerializer,
     SubServiceSerializer,
@@ -635,6 +636,14 @@ class BookingViewSet(viewsets.ModelViewSet):
             booking.status = 'In Progress'
             booking.save(update_fields=['status'])
 
+        if getattr(settings, 'HAPPY_CODE_CHANNEL', 'screen') == 'email':
+            customer = CustomerProfile.objects.filter(phone=booking.customer_phone).first()
+            if not customer or not customer.email:
+                return Response({'error': 'Customer email is unavailable for Happy Code delivery.'}, status=503)
+            try:
+                send_happy_code(customer.email, booking.booking_code, booking.service_pin)
+            except EmailDeliveryError:
+                return Response({'error': 'Happy Code email could not be delivered. Contact support.'}, status=503)
         broadcast_booking_event(booking, event_type='JOB_STARTED')
 
         return Response({
@@ -1391,7 +1400,21 @@ class SendOTPView(APIView):
             expires_at=expires_at,
         )
 
-        delivery = deliver_otp(clean_phone, otp_code)
+        if role == 'customer' and getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') == 'email':
+            email = str(request.data.get('email') or '').strip().lower()
+            if not email or '@' not in email:
+                otp_record.delete()
+                return Response({'error': 'Email is required for email OTP.'}, status=400)
+            otp_record.email = email
+            otp_record.save(update_fields=['email'])
+            try:
+                send_login_otp(email, otp_code, expiry_minutes)
+                delivery = {'success': True, 'message': 'Verification code sent to email.'}
+            except EmailDeliveryError:
+                otp_record.delete()
+                return Response({'error': 'Email delivery unavailable. Please retry.'}, status=503)
+        else:
+            delivery = deliver_otp(clean_phone, otp_code)
         if not delivery['success']:
             otp_record.delete()
             return Response({'error': delivery['error']}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -1463,6 +1486,15 @@ class VerifyOTPView(APIView):
                 {'error': 'No active OTP request found for this phone number. Please request a new OTP.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        if role == 'customer' and getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') == 'email':
+            submitted_email = str(request.data.get('email') or '').strip().lower()
+            if not submitted_email or submitted_email != otp_record.email:
+                return Response({'error': 'Email does not match OTP request.'}, status=400)
+            existing_email_owner = CustomerProfile.objects.filter(email__iexact=submitted_email).exclude(phone=clean_phone).exists()
+            existing_phone_owner = CustomerProfile.objects.filter(phone=clean_phone).exclude(email__iexact=submitted_email).exists()
+            if existing_email_owner or existing_phone_owner:
+                return Response({'error': 'This account requires an existing-account verification or migration flow.'}, status=409)
 
         if otp_record.role != role:
             return Response({'error': 'This OTP was requested for a different account type.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1539,6 +1571,9 @@ class VerifyOTPView(APIView):
                     if updated:
                         customer.save()
 
+                if role == 'customer' and getattr(settings, 'CUSTOMER_OTP_CHANNEL', 'sms') == 'email':
+                    customer.email = submitted_email
+                    customer.save(update_fields=['email'])
                 user_profile_data = CustomerProfileSerializer(customer).data
                 user_profile_data['userType'] = 'customer'
 
