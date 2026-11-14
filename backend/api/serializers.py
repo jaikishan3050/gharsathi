@@ -1,5 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from .models import Service, SubService, TechnicianProfile, Booking, WalletTransaction, Complaint, AdminWithdrawal, CustomerProfile, OTPVerification
 
 
@@ -66,14 +68,32 @@ class TechnicianProfileSerializer(serializers.ModelSerializer):
             'password': {'write_only': True, 'required': False}
         }
 
+    def validate_password(self, value):
+        if len(value) < 12:
+            raise serializers.ValidationError('Password must contain at least 12 characters.')
+        try:
+            validate_password(value)
+        except ValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
+        return value
+
     def create(self, validated_data):
         # Explicitly ensure newly registered technicians start with 0.00 wallet balance
         validated_data['wallet_balance'] = Decimal('0.00')
         raw_password = validated_data.pop('password', None)
+        if not raw_password:
+            raise serializers.ValidationError({'password': 'A password is required.'})
         instance = super().create(validated_data)
         if raw_password:
             instance.set_password(raw_password)
             instance.save(update_fields=['password'])
+        return instance
+
+    def update(self, instance, validated_data):
+        raw_password = validated_data.pop('password', None)
+        instance = super().update(instance, validated_data)
+        if raw_password:
+            instance.set_password(raw_password)
         return instance
 
 

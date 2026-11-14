@@ -9,7 +9,7 @@ services:
     plan: starter
     rootDir: backend
     autoDeploy: true
-    healthCheckPath: /api/services/
+    healthCheckPath: /
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
@@ -59,9 +59,13 @@ services:
       - key: ADMIN_BOOTSTRAP_PASSWORD
         sync: false
       - key: SMS_PROVIDER
-        value: "website_popup"
+        value: "fast2sms"
+      - key: OTP_EXPOSE_DEBUG_CODE
+        value: "False"
+      - key: FAST2SMS_API_KEY
+        sync: false
       - key: FRONTEND_BASE_URL
-        value: "https://gharsathi-in.web.app"
+        value: "https://bookgharsathi.in"
       - key: EMAIL_BACKEND
         value: "django.core.mail.backends.smtp.EmailBackend"
       - key: EMAIL_HOST

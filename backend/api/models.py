@@ -63,7 +63,7 @@ class TechnicianProfile(models.Model):
     partner_id = models.CharField(max_length=30, unique=True, db_index=True)
     name = models.CharField(max_length=120)
     phone = models.CharField(max_length=15, unique=True)
-    password = models.CharField(max_length=128, default='password123')
+    password = models.CharField(max_length=128, default='')
     email = models.EmailField(blank=True, default='')
     trade = models.CharField(max_length=255, blank=True, default='')  # Skills string
     area = models.CharField(max_length=100, default='Patna to Danapur')

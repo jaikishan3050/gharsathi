@@ -19,7 +19,7 @@ import {
 import api from '../services/api.js';
 import LocationPickerMap from '../components/LocationPickerMap.jsx';
 import BookingMiniMap from '../components/BookingMiniMap.jsx';
-import RazorpaySandboxModal from '../components/RazorpaySandboxModal.jsx';
+import { prepareCheckout, confirmCheckout } from '../services/checkout.js';
 import OtpModal from '../components/OtpModal.jsx';
 
 const items = [
@@ -41,6 +41,7 @@ export default function CustomerPanel() {
     setCustomerSession,
     logoutCustomer,
     createBooking,
+    syncFromDjango,
     addComplaint,
     rateTechnician,
     markNotificationRead,
@@ -71,10 +72,7 @@ export default function CustomerPanel() {
 
   const [authError, setAuthError] = useState('');
 
-  // Razorpay Sandbox Checkout Modal States
-  const [razorpayModalOpen, setRazorpayModalOpen] = useState(false);
-  const [razorpayOrderData, setRazorpayOrderData] = useState(null);
-  const [pendingBookingPayload, setPendingBookingPayload] = useState(null);
+  const [bookingBusy, setBookingBusy] = useState(false);
 
   // Booking Form State
   const [form, setForm] = useState({
@@ -245,6 +243,7 @@ export default function CustomerPanel() {
   // Submit Booking - STRICT CHECK: Only Logged-In Customers Can Submit
   const submitBooking = async (event) => {
     event.preventDefault();
+    if (bookingBusy) return;
 
     if (!currentCustomer) {
       setAuthModalOpen(true);
@@ -286,110 +285,60 @@ export default function CustomerPanel() {
       },
     };
 
+    setBookingBusy(true);
     if (isOnline) {
+      let savedBooking;
       try {
-        const orderRes = await api.createRazorpayOrder({
-          amount: price,
-          bookingId: `GS-TMP-${Date.now().toString().slice(-6)}`,
-          serviceName: currentSubcategory?.name || service.name,
-        });
-
-        setRazorpayOrderData(orderRes);
-        setPendingBookingPayload(bookingPayload);
-
-        // Official Razorpay Checkout Modal (Opens real UPI, Cards & Netbanking directly to your bank account)
-        const isRealRazorpayKey = orderRes.key_id && orderRes.key_id.startsWith('rzp_') && !orderRes.key_id.includes('gharsathi_demo');
-        if (isRealRazorpayKey && typeof window !== 'undefined' && window.Razorpay) {
-          const options = {
-            key: orderRes.key_id,
-            amount: orderRes.amount,
-            currency: orderRes.currency || 'INR',
-            name: 'Ghar Sathi Home Services',
-            description: currentSubcategory?.name || service.name,
-            image: '/images/gharsathi-logo.png',
-            order_id: orderRes.order_id,
-            handler: function (response) {
-              handleRazorpaySuccess(response);
-            },
-            prefill: {
-              name: form.name || currentCustomer?.name || '',
-              contact: form.phone || currentCustomer?.phone || '',
-            },
-            notes: {
-              service: currentSubcategory?.name || service.name,
-              area: form.area,
-            },
-            theme: {
-              color: '#0b3d2e',
-            },
-            modal: {
-              ondismiss: function () {
-                handleRazorpayFailure({ error: { description: 'Payment window was closed.' } });
-              },
-            },
-          };
-          const rzp = new window.Razorpay(options);
-          rzp.on('payment.failed', function (resp) {
-            handleRazorpayFailure(resp);
-          });
-          rzp.open();
-          return;
+        if (typeof window.Razorpay !== 'function') {
+          throw new Error('Secure payment checkout is unavailable. Please reload or choose Cash on Service.');
         }
-
-        // Sandbox simulator fallback when demo keys are active
-        setRazorpayModalOpen(true);
+        const { booking, order } = await prepareCheckout(bookingPayload, createBooking);
+        savedBooking = booking;
+        const checkout = new window.Razorpay({
+          key: order.key_id, amount: order.amount, currency: order.currency || 'INR',
+          name: 'Ghar Sathi Home Services', description: booking.serviceName,
+          order_id: order.order_id,
+          prefill: { name: currentCustomer.name || '', contact: currentCustomer.phone || '' },
+          theme: { color: '#0b3d2e' },
+          handler: async (response) => {
+            try {
+              await confirmCheckout(booking, response);
+              await syncFromDjango(false);
+              setBookingNotice(`Payment verified for booking ${booking.id}.`);
+            } catch (err) {
+              setBookingNotice(`Payment confirmation pending for ${booking.id}. ${err.message} Do not pay again; contact support if debited.`);
+            } finally {
+              setBookingBusy(false);
+              setActive('bookings');
+            }
+          },
+          modal: { ondismiss: () => {
+            setBookingBusy(false);
+            setBookingNotice(`Payment incomplete. Saved booking ${booking.id} remains Pending.`);
+            setActive('bookings');
+          } },
+        });
+        checkout.on('payment.failed', () => {
+          setBookingBusy(false);
+          setBookingNotice(`Payment failed. Saved booking ${booking.id} remains Pending.`);
+        });
+        checkout.open();
       } catch (err) {
-        console.error('Error creating Razorpay order:', err);
-        setBookingNotice('Online payment session could not be created. Please select Cash on Service.');
+        setBookingBusy(false);
+        savedBooking = savedBooking || err.booking;
+        setBookingNotice(`${err.message}${savedBooking ? ` Booking ${savedBooking.id} is saved with payment Pending.` : ''}`);
       }
       return;
     }
 
-    // Cash on Service flow
-    const created = await createBooking({
-      ...bookingPayload,
-      payment: 'Cash on Service',
-      paymentStatus: 'Pending',
-    });
-    if (!created) return;
-
-    setBookingNotice(`Booking request ${created.id} submit ho gayi! Work step notification bhej diya gaya hai.`);
-    setActive('bookings');
-  };
-
-  const handleRazorpaySuccess = async (paymentResponse) => {
-    setRazorpayModalOpen(false);
-    if (!pendingBookingPayload) return;
-
-    // Verify signature with Django backend
     try {
-      await api.verifyRazorpayPayment({
-        razorpay_order_id: paymentResponse.razorpay_order_id,
-        razorpay_payment_id: paymentResponse.razorpay_payment_id,
-        razorpay_signature: paymentResponse.razorpay_signature,
-        booking_id: pendingBookingPayload.phone,
-      });
-    } catch (err) {
-      console.warn('Backend payment verification fallback:', err);
+      const created = await createBooking({ ...bookingPayload, payment: 'Cash on Service' });
+      if (!created) return;
+      setBookingNotice(`Booking request ${created.id} submit ho gayi!`);
+      setActive('bookings');
+    } finally {
+      setBookingBusy(false);
     }
-
-    const created = await createBooking({
-      ...pendingBookingPayload,
-      payment: 'Online / Razorpay UPI',
-      paymentStatus: 'Paid',
-      razorpayOrderId: paymentResponse.razorpay_order_id,
-      razorpayPaymentId: paymentResponse.razorpay_payment_id,
-      razorpaySignature: paymentResponse.razorpay_signature,
-    });
-    if (!created) return;
-
-    setPendingBookingPayload(null);
-    setBookingNotice(`Payment Verified! 💳 Booking ${created.id} confirmed via Razorpay (${paymentResponse.razorpay_payment_id}).`);
-    setActive('bookings');
-  };
-
-  const handleRazorpayFailure = (err) => {
-    setBookingNotice(`Payment Incomplete: ${err?.error?.description || 'Transaction cancelled'}. Booking not placed.`);
   };
 
   // Real-time SMS OTP Auth Success Handler
@@ -836,7 +785,7 @@ export default function CustomerPanel() {
                 {authError && <div className="warning-notice">{authError}</div>}
                 <div className="auth-tab-switch">
                   <button type="button" className="tab-switch-btn active" onClick={() => { setAuthTab('login'); setAuthError(''); setAuthModalOpen(true); }}>
-                    Login with Website OTP
+                    Login with SMS OTP
                   </button>
                   <button type="button" className="tab-switch-btn" onClick={() => { setAuthTab('signup'); setAuthError(''); setAuthModalOpen(true); }}>
                     New Customer Signup
@@ -1502,17 +1451,6 @@ export default function CustomerPanel() {
         <InvoiceModal
           booking={invoiceBooking}
           onClose={() => setInvoiceBooking(null)}
-        />
-      )}
-
-      {/* Razorpay Sandbox Checkout Modal */}
-      {razorpayModalOpen && (
-        <RazorpaySandboxModal
-          isOpen={razorpayModalOpen}
-          onClose={() => setRazorpayModalOpen(false)}
-          orderData={razorpayOrderData}
-          onSuccess={handleRazorpaySuccess}
-          onFailure={handleRazorpayFailure}
         />
       )}
 

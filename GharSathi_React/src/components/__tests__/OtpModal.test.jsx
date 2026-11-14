@@ -19,9 +19,9 @@ describe('OtpModal Component', () => {
       />
     );
 
-    expect(screen.getByText(/CUSTOMER AUTHENTICATION · WEBSITE OTP/i)).toBeInTheDocument();
+    expect(screen.getByText(/CUSTOMER AUTHENTICATION · SMS OTP/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/9876543210/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Website par OTP dikhayein/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Send OTP by SMS/i })).toBeInTheDocument();
   });
 
   it('switches between Login and Registration tabs', () => {

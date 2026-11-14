@@ -109,7 +109,7 @@ export default function Signup() {
       return;
     }
     if (role === 'technician') {
-      if (formData.password.length < 4 || !formData.email.includes('@') || formData.aadhaar.replace(/\D/g, '').length !== 12) {
+      if (formData.password.length < 12 || !formData.email.includes('@') || formData.aadhaar.replace(/\D/g, '').length !== 12) {
         setErrorMsg('Technician registration ke liye password, valid email aur 12-digit Aadhaar zaroori hai.');
         return;
       }
@@ -130,7 +130,7 @@ export default function Signup() {
       }
       addToast({
         title: 'Verification OTP Ready! 🔔',
-        message: otp ? `Website OTP: ${otp}` : 'OTP website popup mein dikhaya gaya hai.',
+        message: otp ? `Development OTP: ${otp}` : 'OTP aapke mobile par SMS se bheja gaya hai.',
         type: 'success',
       });
     } catch (err) {
@@ -350,7 +350,7 @@ export default function Signup() {
                     />
                   </div>
                   <small className="field-hint" style={{ marginTop: '6px', display: 'block', color: '#166534', fontWeight: 600 }}>
-                    ⚡ Verification OTP website popup mein dikhaya jayega.
+                    ⚡ Verification OTP SMS se bheja jayega.
                   </small>
                 </div>
 
@@ -505,7 +505,7 @@ export default function Signup() {
                     }}
                   >
                     <div style={{ fontSize: '11px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-                      ⚡ Your On-Screen Registration OTP:
+                      ⚡ Development registration code:
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '6px' }}>
                       <span style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '6px', color: '#0b3d2e', fontFamily: 'monospace' }}>
@@ -532,7 +532,7 @@ export default function Signup() {
                         ⚡ Auto-Fill
                       </button>
                     </div>
-                    <small style={{ fontSize: '11px', color: '#78350f' }}>Direct on-screen access — no SMS wait required.</small>
+                    <small style={{ fontSize: '11px', color: '#78350f' }}>Development mode only.</small>
                   </div>
                 )}
 

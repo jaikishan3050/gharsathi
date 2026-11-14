@@ -7,6 +7,17 @@ logger = logging.getLogger(__name__)
 FAST2SMS_URL = 'https://www.fast2sms.com/dev/bulkV2'
 
 
+def deliver_otp(phone_number, otp_code):
+    """Expose codes only in an explicitly enabled local development session."""
+    if settings.DEBUG and getattr(settings, 'OTP_EXPOSE_DEBUG_CODE', False):
+        return {'success': True, 'provider': 'development',
+                'message': 'Development verification code generated.', 'debug_otp': otp_code}
+    result = send_sms_otp(phone_number, otp_code)
+    if not result.get('success'):
+        return {'success': False, 'error': 'SMS delivery is unavailable. Please retry later.'}
+    return {'success': True, 'provider': result['provider'], 'message': 'Verification code sent by SMS.'}
+
+
 def _failure(provider, message, status_code=None):
     result = {'success': False, 'provider': provider, 'error': message}
     if status_code is not None:
@@ -76,7 +87,7 @@ def send_sms_otp(phone_number, otp_code, app_name='Ghar Sathi'):
                 response = quick_response
 
             error = data.get('message') or 'Fast2SMS did not accept the SMS request.'
-            logger.warning('Fast2SMS rejected OTP request (HTTP %s, code %s): %s', response.status_code, data.get('status_code'), error)
+            logger.warning('Fast2SMS rejected OTP request (HTTP %s, code %s).', response.status_code, data.get('status_code'))
             return _failure('fast2sms', error, data.get('status_code') or response.status_code)
         except requests.RequestException as exc:
             logger.warning('Fast2SMS request failed: %s', exc.__class__.__name__)
@@ -104,9 +115,5 @@ def send_sms_otp(phone_number, otp_code, app_name='Ghar Sathi'):
         except requests.RequestException as exc:
             logger.warning('Twilio request failed: %s', exc.__class__.__name__)
             return _failure('twilio', 'Could not connect to Twilio. Please try again.')
-
-    if getattr(settings, 'DEBUG', False):
-        logger.info('Development OTP for +91%s: %s', clean_phone, otp_code)
-        return {'success': True, 'provider': 'development', 'message': 'Development OTP generated.'}
 
     return _failure(provider or 'unconfigured', 'No working SMS provider is configured.')

@@ -206,11 +206,11 @@ export default function TechnicianPanel() {
         setPopupTarget('forgot');
         setPopupOpen(true);
       }
-      const successMsg = res?.message || 'Password reset OTP website popup mein dikhaya gaya hai.';
+      const successMsg = res?.message || 'Password reset OTP aapke mobile par SMS se bheja gaya hai.';
       setNotice(successMsg);
       addToast({
         title: 'Reset OTP Ready! 🔔',
-        message: otp ? `Website OTP: ${otp}` : 'OTP website popup mein dikhaya gaya hai.',
+        message: otp ? `Development OTP: ${otp}` : 'OTP aapke mobile par SMS se bheja gaya hai.',
         type: 'success',
       });
     } catch (err) {
@@ -226,14 +226,14 @@ export default function TechnicianPanel() {
     e.preventDefault();
     const cleanPhone = normalizePhoneNumber(forgotPhone);
     const cleanOtp = forgotOtp.replace(/\D/g, '').trim();
-    if (!cleanOtp || cleanOtp.length < 4) {
+    if (!cleanOtp || cleanOtp.length !== 6) {
       const errMsg = 'Kripya 6-digit OTP code enter karein.';
       setAuthError(errMsg);
       addToast({ title: 'Invalid OTP', message: errMsg, type: 'error' });
       return;
     }
-    if (!newPassword || newPassword.length < 4) {
-      const errMsg = 'Naya password kam se kam 4 characters ka hona chahiye.';
+    if (!newPassword || newPassword.length < 12) {
+      const errMsg = 'Naya password kam se kam 12 characters ka hona chahiye.';
       setAuthError(errMsg);
       addToast({ title: 'Weak Password', message: errMsg, type: 'error' });
       return;
@@ -271,8 +271,8 @@ export default function TechnicianPanel() {
       setAuthError('Apna poora naam likhein.');
       return;
     }
-    if (!regForm.password || regForm.password.length < 4) {
-      setAuthError('Kam se kam 4 character ka password banayein.');
+    if (!regForm.password || regForm.password.length < 12) {
+      setAuthError('Kam se kam 12 character ka password banayein.');
       return;
     }
     if (!regForm.email.includes('@')) {
@@ -305,7 +305,7 @@ export default function TechnicianPanel() {
       }
       addToast({
         title: 'Verification OTP Ready! 🔔',
-        message: otp ? `Website OTP: ${otp}` : 'OTP website popup mein dikhaya gaya hai.',
+        message: otp ? `Development OTP: ${otp}` : 'OTP aapke mobile par SMS se bheja gaya hai.',
         type: 'success',
       });
       if (isResend) {
@@ -619,7 +619,7 @@ export default function TechnicianPanel() {
             <div className="technician-auth-form">
               <div style={{ marginBottom: '14px', textAlign: 'center' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: '#1b4332' }}>
-                  Reset Password via Website OTP
+                  Reset Password via SMS OTP
                 </h3>
                 <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
                   Apne registered mobile number par OTP prapt karein aur naya password banayein.
@@ -646,7 +646,7 @@ export default function TechnicianPanel() {
                     style={{ marginTop: '16px' }}
                     disabled={forgotLoading || forgotPhone.replace(/\D/g, '').length < 10}
                   >
-                    {forgotLoading ? 'OTP bana rahe hain…' : 'Website par Reset OTP dikhayein'}
+                    {forgotLoading ? 'OTP bana rahe hain…' : 'Send Reset OTP by SMS'}
                   </button>
 
                   <div style={{ textAlign: 'center', marginTop: '16px' }}>
@@ -690,7 +690,7 @@ export default function TechnicianPanel() {
                     }}
                   >
                     <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#854d0e', fontWeight: 800 }}>
-                      ⚡ Website verification code:
+                      ⚡ Development verification code:
                     </div>
                     <div
                       style={{
@@ -735,7 +735,7 @@ export default function TechnicianPanel() {
                     />
                   </Field>
 
-                  <Field label="Create New Password *" hint="Min 4 characters">
+                  <Field label="Create New Password *" hint="Min 12 characters">
                     <input
                       required
                       type="password"
@@ -750,7 +750,7 @@ export default function TechnicianPanel() {
                     type="submit"
                     className="button button-gold button-wide"
                     style={{ marginTop: '16px' }}
-                    disabled={forgotLoading || forgotOtp.length < 4 || newPassword.length < 4}
+                    disabled={forgotLoading || forgotOtp.length !== 6 || newPassword.length < 12}
                   >
                     {forgotLoading ? 'Updating Password…' : 'Reset Password & Save 🔑'}
                   </button>
@@ -816,7 +816,7 @@ export default function TechnicianPanel() {
                       />
                     </Field>
 
-                    <Field label="Create Password *" hint="Min 4 characters for login">
+                    <Field label="Create Password *" hint="Min 12 characters for login">
                       <input
                         required
                         type="password"
@@ -953,7 +953,7 @@ export default function TechnicianPanel() {
                   <div className="otp-verification-banner">
                     <span className="otp-shield-icon">🛡️</span>
                     <div className="otp-header-info">
-                      <strong>Website OTP +91 {regForm.phone.slice(0, 2)}******{regForm.phone.slice(-2)} ke liye taiyar hai</strong>
+                      <strong>SMS OTP +91 {regForm.phone.slice(0, 2)}******{regForm.phone.slice(-2)} ke liye taiyar hai</strong>
                       <p>Popup mein dikhaya gaya 6-digit verification code enter karein.</p>
                     </div>
                   </div>
@@ -970,7 +970,7 @@ export default function TechnicianPanel() {
                     }}
                   >
                     <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#854d0e', fontWeight: 800 }}>
-                      ⚡ Website verification code:
+                      ⚡ Development verification code:
                     </div>
                     <div
                       style={{

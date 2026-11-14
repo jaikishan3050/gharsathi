@@ -701,46 +701,6 @@ export function AppDataProvider({ children }) {
   }, [addToast]);
 
   // Technician Authentication & Registration
-  const registerTechnician = useCallback((form) => {
-    const cleanPhone = form.phone.replace(/\D/g, '').slice(-10);
-    const technician = {
-      id: `TECH-${Date.now().toString().slice(-6)}`,
-      name: form.name.trim(),
-      phone: cleanPhone,
-      password: form.password || 'password123',
-      email: (form.email || '').trim().toLowerCase(),
-      aadhaar: form.aadhaar.trim(),
-      area: form.area || 'Maner',
-      address: form.address.trim(),
-      skills: Array.isArray(form.skills) ? form.skills.join(', ') : form.skills.trim(),
-      liveLocation: form.liveLocation || null,
-      liveImage: form.liveImage || '',
-      status: 'Pending Verification',
-      wallet: 0,
-      walletBalance: 0,
-      walletTransactions: [],
-      completedJobs: 0,
-      rating: 5.0,
-      ratingCount: 0,
-      isOnline: true,
-      registeredAt: new Date().toISOString(),
-    };
-
-    setData((current) => ({
-      ...current,
-      technicians: [technician, ...current.technicians],
-      activity: [addActivity(`Technician ${technician.name} registered (pending verification)`), ...current.activity].slice(0, 50),
-    }));
-
-    setCurrentTechnician(technician);
-    addToast({
-      title: 'Technician Profile Created! 🧰',
-      message: 'Pending admin verification before accepting live bookings.',
-      type: 'success',
-    });
-    return technician;
-  }, [addActivity, addToast]);
-
   const loginTechnician = useCallback(async (phone, password) => {
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
 
@@ -2054,7 +2014,6 @@ export function AppDataProvider({ children }) {
       isAdminLoggedIn,
       signupCustomer,
       logoutCustomer,
-      registerTechnician,
       loginTechnician,
       logoutTechnician,
       loginAdmin,
@@ -2101,7 +2060,6 @@ export function AppDataProvider({ children }) {
       isAdminLoggedIn,
       signupCustomer,
       logoutCustomer,
-      registerTechnician,
       loginTechnician,
       logoutTechnician,
       loginAdmin,

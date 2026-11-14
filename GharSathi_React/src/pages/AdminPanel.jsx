@@ -104,7 +104,7 @@ export default function AdminPanel() {
   const [techForm, setTechForm] = useState({
     name: '',
     phone: '',
-    password: 'password123',
+    password: '',
     email: '',
     aadhaar: '',
     area: areas[0],
@@ -262,7 +262,7 @@ export default function AdminPanel() {
     setTechForm({
       name: '',
       phone: '',
-      password: 'password123',
+      password: '',
       email: '',
       aadhaar: '',
       area: areas[0],

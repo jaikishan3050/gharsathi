@@ -89,7 +89,7 @@ export default function Login() {
       }
       addToast({
         title: 'Verification OTP Ready! 🔔',
-        message: otp ? `Website OTP: ${otp}` : 'OTP website popup mein dikhaya gaya hai.',
+        message: otp ? `Development OTP: ${otp}` : 'OTP aapke mobile par SMS se bheja gaya hai.',
         type: 'success',
       });
     } catch (err) {
@@ -293,7 +293,7 @@ export default function Login() {
                     </div>
                     {role === 'customer' && (
                       <small className="field-hint" style={{ marginTop: '6px', display: 'block', color: '#166534', fontWeight: 600 }}>
-                        OTP website par popup mein dikhaya jayega.
+                        OTP aapke mobile par SMS se bheja jayega.
                       </small>
                     )}
                   </div>
@@ -333,7 +333,7 @@ export default function Login() {
               <div className="auth-step-otp">
                 <div className="otp-sent-banner">
                   <span>
-                    📲 Website popup mein dikhaya OTP enter karein.
+                    📲 SMS mein mila OTP enter karein.
                   </span>
                   <button
                     type="button"
@@ -363,7 +363,7 @@ export default function Login() {
                     }}
                   >
                     <div style={{ fontSize: '11px', color: '#854d0e', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-                      ⚡ Your On-Screen Verification OTP:
+                      ⚡ Development verification code:
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '6px' }}>
                       <span style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '6px', color: '#0b3d2e', fontFamily: 'monospace' }}>
@@ -390,7 +390,7 @@ export default function Login() {
                         ⚡ Auto-Fill
                       </button>
                     </div>
-                    <small style={{ fontSize: '11px', color: '#78350f' }}>Direct on-screen access — no SMS wait required.</small>
+                    <small style={{ fontSize: '11px', color: '#78350f' }}>Development mode only.</small>
                   </div>
                 )}
 

@@ -1,4 +1,6 @@
 import jwt
+import hashlib
+import hmac
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework.authentication import BaseAuthentication
@@ -6,6 +8,10 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import BasePermission
 
 from .models import CustomerProfile, TechnicianProfile
+
+
+def credential_version(profile):
+    return hmac.new(settings.SECRET_KEY.encode(), profile.password.encode(), hashlib.sha256).hexdigest()
 
 
 class AuthenticatedPrincipal:
@@ -56,11 +62,13 @@ class GharSathiJWTAuthentication(BaseAuthentication):
             if not profile and payload.get('phone'):
                 phone = ''.join(filter(str.isdigit, str(payload['phone'])))[-10:]
                 profile = TechnicianProfile.objects.filter(phone__endswith=phone).first()
+            if profile and not hmac.compare_digest(str(payload.get('credential_version', '')), credential_version(profile)):
+                raise AuthenticationFailed('Password changed. Please log in again.')
         elif role == 'customer':
-            profile = CustomerProfile.objects.filter(pk=payload.get('id')).first() if payload.get('id') else None
+            profile = CustomerProfile.objects.filter(pk=payload.get('id'), status='Active').first() if payload.get('id') else None
             if not profile and payload.get('phone'):
                 phone = ''.join(filter(str.isdigit, str(payload['phone'])))[-10:]
-                profile = CustomerProfile.objects.filter(phone__endswith=phone).first()
+                profile = CustomerProfile.objects.filter(phone__endswith=phone, status='Active').first()
 
         if not profile:
             raise AuthenticationFailed('Account for this session was not found or is inactive.')
