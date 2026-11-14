@@ -1345,11 +1345,16 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
         if getattr(self.request.user, 'role', None) == 'admin':
             previous = serializer.instance
             new_email = serializer.validated_data.get('email', previous.email)
-            if new_email.strip().lower() != (previous.email or '').strip().lower():
+            new_phone = serializer.validated_data.get('phone', previous.phone)
+            email_changed = (new_email or '').strip().lower() != (previous.email or '').strip().lower()
+            phone_changed = ''.join(filter(str.isdigit, str(new_phone)))[-10:] != ''.join(
+                filter(str.isdigit, str(previous.phone)))[-10:]
+            if email_changed or phone_changed:
+                old_phone = previous.phone
                 serializer.save(email_verified=False)
-                # Any pending verification for the old identity is no longer valid.
+                # Challenges issued to the old identity must not survive an admin edit.
                 OTPVerification.objects.filter(
-                    phone=previous.phone, role='customer', is_verified=False,
+                    phone=old_phone, role='customer', is_verified=False,
                 ).update(is_verified=True)
                 return
         serializer.save()
