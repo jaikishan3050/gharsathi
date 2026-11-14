@@ -421,3 +421,8 @@ EMAIL_OTP_EXPIRATION_MINUTES = int(os.environ.get('EMAIL_OTP_EXPIRATION_MINUTES'
 
 # Google OAuth Settings
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+
+# Brevo transactional email (set credentials in Render; never commit secrets)
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
+BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL', '').strip()
+CUSTOMER_OTP_CHANNEL = os.environ.get('CUSTOMER_OTP_CHANNEL', 'sms').lower()
